@@ -1202,6 +1202,9 @@ static void BuildClipBrushes( builder_t *b, int root ) {
 			shader = b->shaderSolid;
 		} else if ( ld->flags & ( DOOM_ML_BLOCKING | DOOM_ML_BLOCKMONSTERS ) ) {
 			shader = ( ld->flags & DOOM_ML_BLOCKING ) ? b->shaderPlayerClip : b->shaderMonsterClip;
+			if ( doom_linedef_is_jumpable_window( map, ld ) ) {
+				shader = b->shaderMonsterClip;		// players can jump through, monsters can't
+			}
 		} else {
 			continue;
 		}

@@ -234,6 +234,11 @@ int					doom_wad_list_maps( const doom_wad_t *wad, char names[][DOOM_LUMP_NAME_L
 // Sector containing a point, or -1 for the void outside the map.
 int					doom_map_sector_at( const doom_map_t *map, double x, double y );
 
+#define DOOM_MAX_STEP		24		// highest step a Doom player walks up
+
+// An impassable-flagged window players may jump through (see map.c).
+int					doom_linedef_is_jumpable_window( const doom_map_t *map, const doom_linedef_t *ld );
+
 /*
 =====================================================================
 

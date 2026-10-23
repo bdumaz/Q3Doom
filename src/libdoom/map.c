@@ -194,6 +194,64 @@ void doom_map_free( doom_map_t *map ) {
 	memset( map, 0, sizeof( *map ) );
 }
 
+/*
+=================
+SectorIsEnclosed
+
+True if every two-sided line of the sector is flagged impassable: a Doom
+player can never stand in it (a window sill between two rooms).
+=================
+*/
+static int SectorIsEnclosed( const doom_map_t *map, int sector ) {
+	int		i;
+
+	for ( i = 0 ; i < map->num_linedefs ; i++ ) {
+		const doom_linedef_t *ld = &map->linedefs[i];
+
+		if ( ld->side[1] == DOOM_NO_SIDE ) {
+			continue;
+		}
+		if ( map->sidedefs[ld->side[0]].sector != sector && map->sidedefs[ld->side[1]].sector != sector ) {
+			continue;
+		}
+		if ( !( ld->flags & DOOM_ML_BLOCKING ) ) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+/*
+=================
+doom_linedef_is_jumpable_window
+
+Doom mappers often flag window openings impassable even though Doom's 24
+unit step already made them uncrossable; with Quake 3 jumping that flag
+only adds an invisible wall. A flagged two-sided line is a window players
+may jump through when no masked middle texture (bars, grates) fills the
+opening and either its floors differ by more than a Doom step, or one side
+is a sill sector no Doom player could enter (enclosed by impassable lines).
+Flagged lines between walkable sectors are deliberate barriers. Whether the
+opening is high or large enough is left to the collision.
+=================
+*/
+int doom_linedef_is_jumpable_window( const doom_map_t *map, const doom_linedef_t *ld ) {
+	const doom_sidedef_t	*s0, *s1;
+	int						f0, f1;
+
+	if ( !( ld->flags & DOOM_ML_BLOCKING ) || ld->side[0] == DOOM_NO_SIDE || ld->side[1] == DOOM_NO_SIDE ) {
+		return 0;
+	}
+	s0 = &map->sidedefs[ld->side[0]];
+	s1 = &map->sidedefs[ld->side[1]];
+	if ( strcmp( s0->mid, "-" ) || strcmp( s1->mid, "-" ) ) {
+		return 0;
+	}
+	f0 = map->sectors[s0->sector].floor_height;
+	f1 = map->sectors[s1->sector].floor_height;
+	return abs( f0 - f1 ) > DOOM_MAX_STEP;
+}
+
 int doom_map_validate( const doom_map_t *map, char *err, size_t errlen ) {
 	int		i, s;
 

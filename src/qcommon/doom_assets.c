@@ -420,6 +420,52 @@ static void Doom_CheckWorld_f( void ) {
 		}
 	}
 	Com_Printf( "doom_checkworld %s: %d sides tested, %d failed, %d skipped\n", map->name, tested, failed, skipped );
+
+	// impassable two-sided lines: jumpable windows let players through, the
+	// others block; traced across the middle of the line just above the
+	// higher floor, where a jumping player passes. The trace only spans
+	// the 1 unit clip slab on each side, so walls behind ledges don't count.
+	{
+		int		windows = 0, barriers = 0, wrong = 0;
+
+		for ( i = 0 ; i < map->num_linedefs ; i++ ) {
+			const doom_linedef_t	*ld = &map->linedefs[i];
+			const doom_vertex_t		*a = &map->vertexes[ld->v1], *c = &map->vertexes[ld->v2];
+			const doom_sector_t		*s0, *s1;
+			double					dx = c->x - a->x, dy = c->y - a->y, len = sqrt( dx * dx + dy * dy );
+			int						jumpable, lo, hi;
+			vec3_t					start;
+
+			if ( !( ld->flags & DOOM_ML_BLOCKING ) || ld->side[1] == DOOM_NO_SIDE || len < 8 ) {
+				continue;
+			}
+			s0 = &map->sectors[map->sidedefs[ld->side[0]].sector];
+			s1 = &map->sectors[map->sidedefs[ld->side[1]].sector];
+			lo = s0->floor_height > s1->floor_height ? s0->floor_height : s1->floor_height;
+			hi = s0->ceiling_height < s1->ceiling_height ? s0->ceiling_height : s1->ceiling_height;
+			if ( hi - lo < 8 ) {
+				continue;		// closed: nothing to go through
+			}
+			jumpable = doom_linedef_is_jumpable_window( map, ld );
+			jumpable ? windows++ : barriers++;
+
+			start[0] = ( a->x + c->x ) * 0.5 + dy / len * 2;
+			start[1] = ( a->y + c->y ) * 0.5 - dx / len * 2;
+			start[2] = lo + 4;
+			end[0] = start[0] - dy / len * 4;
+			end[1] = start[1] + dx / len * 4;
+			end[2] = start[2];
+			CM_BoxTrace( &tr, start, end, vec3_origin, vec3_origin, 0, MASK_PLAYERSOLID, qfalse );
+			if ( jumpable != ( tr.fraction == 1 ) ) {
+				if ( wrong < 10 ) {
+					Com_Printf( "  linedef %d: %s but %s\n", i, jumpable ? "jumpable window" : "barrier",
+						tr.fraction == 1 ? "open" : "blocked" );
+				}
+				wrong++;
+			}
+		}
+		Com_Printf( "doom_checkworld %s: %d jumpable windows, %d barriers, %d wrong\n", map->name, windows, barriers, wrong );
+	}
 }
 
 /*

@@ -508,6 +508,69 @@ static int CmdBuild( const doom_wad_t *wad, const char *name, const char *outdir
 	return failed ? 1 : 0;
 }
 
+static void PrintSide( const doom_map_t *map, int side ) {
+	const doom_sidedef_t	*sd = &map->sidedefs[side];
+	const doom_sector_t		*sec = &map->sectors[sd->sector];
+
+	printf( "    side %d: sector %d floor %d ceiling %d light %d | top %s mid %s bottom %s | offset %d %d\n",
+		side, sd->sector, sec->floor_height, sec->ceiling_height, sec->light, sd->top, sd->mid, sd->bottom,
+		sd->x_offset, sd->y_offset );
+}
+
+/*
+=================
+CmdLine
+
+Prints a linedef, its sides and sectors, and every other line within
+'radius' units of its midpoint (debugging collision and windows).
+=================
+*/
+static int CmdLine( const doom_wad_t *wad, const char *name, int index ) {
+	doom_map_t	map;
+	char		err[256];
+	int			i;
+	double		mx, my;
+
+	if ( doom_map_load( wad, name, &map, err, sizeof( err ) ) || index < 0 || index >= map.num_linedefs ) {
+		fprintf( stderr, "%s\n", index < 0 ? "bad linedef" : err );
+		return 1;
+	}
+	{
+		const doom_linedef_t *ld = &map.linedefs[index];
+		const doom_vertex_t *a = &map.vertexes[ld->v1], *c = &map.vertexes[ld->v2];
+
+		printf( "linedef %d: (%d %d) -> (%d %d) flags 0x%x special %d tag %d jumpable window %d\n", index,
+			a->x, a->y, c->x, c->y, ld->flags, ld->special, ld->tag, doom_linedef_is_jumpable_window( &map, ld ) );
+		PrintSide( &map, ld->side[0] );
+		if ( ld->side[1] != DOOM_NO_SIDE ) {
+			PrintSide( &map, ld->side[1] );
+		}
+		mx = ( a->x + c->x ) * 0.5;
+		my = ( a->y + c->y ) * 0.5;
+	}
+	printf( "  lines within 32 units of the midpoint:\n" );
+	for ( i = 0 ; i < map.num_linedefs ; i++ ) {
+		const doom_linedef_t	*ld = &map.linedefs[i];
+		const doom_vertex_t		*a = &map.vertexes[ld->v1], *c = &map.vertexes[ld->v2];
+		double					dx = c->x - a->x, dy = c->y - a->y, t, px, py, d;
+
+		if ( i == index ) {
+			continue;
+		}
+		t = ( dx || dy ) ? ( ( mx - a->x ) * dx + ( my - a->y ) * dy ) / ( dx * dx + dy * dy ) : 0;
+		t = t < 0 ? 0 : t > 1 ? 1 : t;
+		px = a->x + t * dx - mx;
+		py = a->y + t * dy - my;
+		d = sqrt( px * px + py * py );
+		if ( d <= 32 ) {
+			printf( "    linedef %d at %.1f: (%d %d) -> (%d %d) flags 0x%x %s jumpable %d\n", i, d, a->x, a->y, c->x, c->y,
+				ld->flags, ld->side[1] == DOOM_NO_SIDE ? "one-sided" : "two-sided", doom_linedef_is_jumpable_window( &map, ld ) );
+		}
+	}
+	doom_map_free( &map );
+	return 0;
+}
+
 static doom_wad_t *LoadWad( const char *path ) {
 	FILE		*f = fopen( path, "rb" );
 	void		*data;
@@ -548,7 +611,8 @@ int main( int argc, char **argv ) {
 			"       doomtool <wad> lumps\n"
 			"       doomtool <wad> export <dir>\n"
 			"       doomtool <wad> map <name> <out.svg>\n"
-			"       doomtool <wad> build <name|all> [outdir]\n" );
+			"       doomtool <wad> build <name|all> [outdir]\n"
+			"       doomtool <wad> line <map> <linedef>\n" );
 		return 1;
 	}
 
@@ -566,6 +630,8 @@ int main( int argc, char **argv ) {
 		ret = CmdExport( wad, argv[3] );
 	} else if ( !strcmp( argv[2], "map" ) && argc >= 5 ) {
 		ret = CmdMap( wad, argv[3], argv[4] );
+	} else if ( !strcmp( argv[2], "line" ) && argc >= 5 ) {
+		ret = CmdLine( wad, argv[3], atoi( argv[4] ) );
 	} else if ( !strcmp( argv[2], "build" ) && argc >= 4 ) {
 		ret = CmdBuild( wad, argv[3], argc >= 5 ? argv[4] : NULL );
 	} else {
