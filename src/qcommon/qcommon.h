@@ -669,6 +669,9 @@ void		Doom_Shutdown( void );
 const struct doom_wad_s *Doom_GetWad( void );		// NULL if no IWAD
 byte		*Doom_LoadImage( const char *path, int *width, int *height );	// Z_Malloc'ed RGBA
 qboolean	Doom_LoadSound( const char *path, const byte **samples, int *numSamples, int *rate );
+// "maps/<NAME>.bsp" for a map in the IWAD: the runtime-built Quake 3 BSP (cached), else NULL
+const byte	*Doom_GetMapBSP( const char *qpath, int *size );
+const struct doom_map_s *Doom_GetMap( const char *name );		// map model, NULL if not in the IWAD
 
 // vsnprintf is ISO/IEC 9899:1999. MSVC's _vsnprintf does not terminate the
 // string on overflow; its vsnprintf is conforming since VS 2015.

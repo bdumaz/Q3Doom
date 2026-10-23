@@ -354,10 +354,11 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 	//
 	// texturemode stuff
 	//
-	if ( r_textureMode->modified ) {
+	if ( r_textureMode->modified || r_doomTextureFilter->modified ) {
 		R_SyncRenderThread();
 		GL_TextureMode( r_textureMode->string );
 		r_textureMode->modified = qfalse;
+		r_doomTextureFilter->modified = qfalse;
 	}
 
 	//

@@ -229,6 +229,41 @@ Both client and server can use this, and it will
 do the apropriate things.
 =============
 */
+static int	com_pendingErrorCode;
+
+/*
+=============
+Com_ErrorCleanup
+
+Shuts down what a recoverable Com_Error requires, once the longjmp has
+landed back in Com_Frame and no game module frames are on the stack.
+=============
+*/
+static void Com_ErrorCleanup( void ) {
+	int		code = com_pendingErrorCode;
+
+	com_pendingErrorCode = 0;
+	if ( code == ERR_SERVERDISCONNECT ) {
+		CL_Disconnect( qtrue );
+		CL_FlushMemory( );
+	} else if ( code == ERR_DROP || code == ERR_DISCONNECT ) {
+		SV_Shutdown (va("Server crashed: %s\n",  com_errorMessage));
+		CL_Disconnect( qtrue );
+		CL_FlushMemory( );
+	} else if ( code == ERR_NEED_CD ) {
+		SV_Shutdown( "Server didn't have CD\n" );
+		if ( com_cl_running && com_cl_running->integer ) {
+			CL_Disconnect( qtrue );
+			CL_FlushMemory( );
+			com_errorEntered = qfalse;
+			CL_CDDialog();
+		} else {
+			Com_Printf("Server didn't have CD\n" );
+		}
+	}
+	com_errorEntered = qfalse;
+}
+
 void QDECL Com_Error( int code, const char *fmt, ... ) {
 	va_list		argptr;
 	static int	lastErrorTime;
@@ -238,9 +273,7 @@ void QDECL Com_Error( int code, const char *fmt, ... ) {
 #if defined(_WIN32) && defined(_DEBUG)
 	if ( code != ERR_DISCONNECT && code != ERR_NEED_CD ) {
 		if (!com_noErrorInterrupt->integer) {
-			__asm {
-				int 0x03
-			}
+			__debugbreak();
 		}
 	}
 #endif
@@ -278,28 +311,14 @@ void QDECL Com_Error( int code, const char *fmt, ... ) {
 		Cvar_Set("com_errorMessage", com_errorMessage);
 	}
 
-	if ( code == ERR_SERVERDISCONNECT ) {
-		CL_Disconnect( qtrue );
-		CL_FlushMemory( );
-		com_errorEntered = qfalse;
-		longjmp (abortframe, -1);
-	} else if ( code == ERR_DROP || code == ERR_DISCONNECT ) {
-		Com_Printf ("********************\nERROR: %s\n********************\n", com_errorMessage);
-		SV_Shutdown (va("Server crashed: %s\n",  com_errorMessage));
-		CL_Disconnect( qtrue );
-		CL_FlushMemory( );
-		com_errorEntered = qfalse;
-		longjmp (abortframe, -1);
-	} else if ( code == ERR_NEED_CD ) {
-		SV_Shutdown( "Server didn't have CD\n" );
-		if ( com_cl_running && com_cl_running->integer ) {
-			CL_Disconnect( qtrue );
-			CL_FlushMemory( );
-			com_errorEntered = qfalse;
-			CL_CDDialog();
-		} else {
-			Com_Printf("Server didn't have CD\n" );
+	// Q3Doom: the shutdown work for recoverable errors runs after the longjmp
+	// (Com_ErrorCleanup), not here. It unloads the game DLLs, whose frames may
+	// still be on the stack, and the x64 longjmp must unwind through them.
+	if ( code == ERR_SERVERDISCONNECT || code == ERR_DROP || code == ERR_DISCONNECT || code == ERR_NEED_CD ) {
+		if ( code == ERR_DROP || code == ERR_DISCONNECT ) {
+			Com_Printf ("********************\nERROR: %s\n********************\n", com_errorMessage);
 		}
+		com_pendingErrorCode = code;
 		longjmp (abortframe, -1);
 	} else {
 		CL_Shutdown ();
@@ -2653,6 +2672,7 @@ void Com_Frame( void ) {
 
 
 	if ( setjmp (abortframe) ) {
+		Com_ErrorCleanup();
 		return;			// an ERR_DROP was thrown
 	}
 

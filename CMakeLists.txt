@@ -42,7 +42,7 @@ function(q3_deploy target subdir)
 endfunction()
 
 # --- libdoom: WAD, Doom asset decoding, map model (no engine dependencies) ---
-q3_sources(LIBDOOM_SRC libdoom wad.c graphics.c sound.c map.c)
+q3_sources(LIBDOOM_SRC libdoom wad.c graphics.c sound.c map.c builder.c)
 add_library(libdoom STATIC ${LIBDOOM_SRC})
 target_include_directories(libdoom PUBLIC ${SRC}/libdoom)
 set_target_properties(libdoom PROPERTIES OUTPUT_NAME doom)

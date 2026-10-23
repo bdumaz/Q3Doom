@@ -1000,6 +1000,7 @@ typedef struct {
 	// parsed from serverinfo
 	gametype_t		gametype;
 	int				dmflags;
+	float			stepHeight;		// Q3Doom: g_stepHeight from the serverinfo
 	int				teamflags;
 	int				fraglimit;
 	int				capturelimit;

@@ -208,7 +208,7 @@ typedef struct {
 	int32_t		flags;
 } doom_thing_t;
 
-typedef struct {
+typedef struct doom_map_s {
 	char			name[DOOM_LUMP_NAME_LEN + 1];
 
 	int				num_vertexes;
@@ -230,6 +230,39 @@ void				doom_map_free( doom_map_t *map );
 int					doom_map_validate( const doom_map_t *map, char *err, size_t errlen );
 // Map marker lumps present in the WAD, in WAD order. Returns the count.
 int					doom_wad_list_maps( const doom_wad_t *wad, char names[][DOOM_LUMP_NAME_LEN + 1], int max_names );
+
+// Sector containing a point, or -1 for the void outside the map.
+int					doom_map_sector_at( const doom_map_t *map, double x, double y );
+
+/*
+=====================================================================
+
+WORLD BUILDER
+
+Builds a Quake 3 BSP (IBSP version 46) from a map model: collision brushes,
+BSP tree, vertex-lit render surfaces, light grid and entities. Shaders are
+named doom/wall/<TEX>, doom/flat/<FLAT> and doom/sky/SKY<n>.
+Deterministic: the same input always gives the same bytes.
+
+=====================================================================
+*/
+
+typedef struct {
+	int			nodes;
+	int			sector_leafs;
+	int			void_leafs;
+	int			degenerate_leafs;	// numerical slivers, no brushes
+	int			brushes;
+	int			surfaces;
+	int			planes;
+	int			verts;
+	double		covered_area;		// sum of leaf areas, should equal bounds_area
+	double		bounds_area;
+} doom_build_stats_t;
+
+// Returns 0 on success; *data is malloc'ed (free it). 'stats' may be NULL.
+int					doom_build_bsp( const doom_wad_t *wad, const doom_map_t *map, uint8_t **data, size_t *size,
+						doom_build_stats_t *stats, char *err, size_t errlen );
 
 #ifdef __cplusplus
 }

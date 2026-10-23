@@ -2501,6 +2501,9 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 		stages[0].active = qtrue;
 		stages[0].rgbGen = CGEN_LIGHTING_DIFFUSE;
 		stages[0].stateBits = GLS_DEFAULT;
+		if ( image->doomImage ) {
+			stages[0].stateBits |= GLS_ATEST_GE_80;
+		}
 	} else if ( shader.lightmapIndex == LIGHTMAP_BY_VERTEX ) {
 		// explicit colors at vertexes
 		stages[0].bundle[0].image[0] = image;
@@ -2508,6 +2511,10 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 		stages[0].rgbGen = CGEN_EXACT_VERTEX;
 		stages[0].alphaGen = AGEN_SKIP;
 		stages[0].stateBits = GLS_DEFAULT;
+		// Q3Doom: holes in Doom textures (masked middle textures, sprites)
+		if ( image->doomImage ) {
+			stages[0].stateBits |= GLS_ATEST_GE_80;
+		}
 	} else if ( shader.lightmapIndex == LIGHTMAP_2D ) {
 		// GUI elements
 		stages[0].bundle[0].image[0] = image;
@@ -2599,6 +2606,9 @@ qhandle_t RE_RegisterShaderFromImage(const char *name, int lightmapIndex, image_
 		stages[0].active = qtrue;
 		stages[0].rgbGen = CGEN_LIGHTING_DIFFUSE;
 		stages[0].stateBits = GLS_DEFAULT;
+		if ( image->doomImage ) {
+			stages[0].stateBits |= GLS_ATEST_GE_80;
+		}
 	} else if ( shader.lightmapIndex == LIGHTMAP_BY_VERTEX ) {
 		// explicit colors at vertexes
 		stages[0].bundle[0].image[0] = image;
@@ -2606,6 +2616,10 @@ qhandle_t RE_RegisterShaderFromImage(const char *name, int lightmapIndex, image_
 		stages[0].rgbGen = CGEN_EXACT_VERTEX;
 		stages[0].alphaGen = AGEN_SKIP;
 		stages[0].stateBits = GLS_DEFAULT;
+		// Q3Doom: holes in Doom textures (masked middle textures, sprites)
+		if ( image->doomImage ) {
+			stages[0].stateBits |= GLS_ATEST_GE_80;
+		}
 	} else if ( shader.lightmapIndex == LIGHTMAP_2D ) {
 		// GUI elements
 		stages[0].bundle[0].image[0] = image;
@@ -2842,6 +2856,24 @@ a single large text block that can be scanned for shader names
 =====================
 */
 #define	MAX_SHADER_FILES	4096
+/*
+====================
+Q3Doom built-in shaders
+
+Appended to the shader text after the scripts from the pk3 files. Doom
+skies are skyboxes generated from the sky textures (see doom_assets.c).
+====================
+*/
+#define DOOM_SKY_SHADER( n ) \
+	"doom/sky/SKY" #n "\n{\n\tsurfaceparm sky\n\tsurfaceparm noimpact\n\tsurfaceparm nomarks\n" \
+	"\tsurfaceparm nolightmap\n\tskyparms doom/skybox/SKY" #n " - -\n}\n"
+
+static const char doomShaderText[] =
+	DOOM_SKY_SHADER( 1 )
+	DOOM_SKY_SHADER( 2 )
+	DOOM_SKY_SHADER( 3 )
+	DOOM_SKY_SHADER( 4 );
+
 static void ScanAndLoadShaderFiles( void )
 {
 	char **shaderFiles;
@@ -2862,8 +2894,8 @@ static void ScanAndLoadShaderFiles( void )
 		return;
 	}
 
-	if ( numShaders > MAX_SHADER_FILES ) {
-		numShaders = MAX_SHADER_FILES;
+	if ( numShaders > MAX_SHADER_FILES - 1 ) {
+		numShaders = MAX_SHADER_FILES - 1;	// keep a slot for the built-in text
 	}
 
 	// load and parse shader files
@@ -2880,7 +2912,7 @@ static void ScanAndLoadShaderFiles( void )
 	}
 
 	// build single large buffer
-	s_shaderText = ri.Hunk_Alloc( sum + numShaders*2, h_low );
+	s_shaderText = ri.Hunk_Alloc( sum + numShaders*2 + sizeof( doomShaderText ) + 2, h_low );
 
 	// free in reverse order, so the temp files are all dumped
 	for ( i = numShaders - 1; i >= 0 ; i-- ) {
@@ -2891,6 +2923,13 @@ static void ScanAndLoadShaderFiles( void )
 		buffers[i] = p;
 		COM_Compress(p);
 	}
+
+	// Q3Doom built-in shaders, parsed and hashed like one more file
+	strcat( s_shaderText, "\n" );
+	p = &s_shaderText[strlen(s_shaderText)];
+	strcat( s_shaderText, doomShaderText );
+	buffers[numShaders++] = p;
+	COM_Compress(p);
 
 	// free up memory
 	ri.FS_FreeFileList( shaderFiles );

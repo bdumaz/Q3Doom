@@ -97,6 +97,30 @@ static long generateHashValue( const char *fname ) {
 
 /*
 ===============
+R_SetTextureFilter
+
+Sets the filter of the bound texture. Doom images use nearest filtering
+(crisp pixels) unless r_doomTextureFilter is set.
+===============
+*/
+static void R_SetTextureFilter( qboolean mipmap, qboolean doomImage ) {
+	int		minFilter, magFilter;
+
+	if ( doomImage && !r_doomTextureFilter->integer ) {
+		minFilter = mipmap ? GL_NEAREST_MIPMAP_LINEAR : GL_NEAREST;
+		magFilter = GL_NEAREST;
+	} else if ( mipmap ) {
+		minFilter = gl_filter_min;
+		magFilter = gl_filter_max;
+	} else {
+		minFilter = magFilter = GL_LINEAR;
+	}
+	qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter );
+	qglTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter );
+}
+
+/*
+===============
 GL_TextureMode
 ===============
 */
@@ -126,13 +150,13 @@ void GL_TextureMode( const char *string ) {
 	gl_filter_min = modes[i].minimize;
 	gl_filter_max = modes[i].maximize;
 
-	// change all the existing mipmap texture objects
+	// change all the existing mipmap texture objects (and Doom 2D pictures,
+	// whose filter follows r_doomTextureFilter)
 	for ( i = 0 ; i < tr.numImages ; i++ ) {
 		glt = tr.images[ i ];
-		if ( glt->mipmap ) {
+		if ( glt->mipmap || glt->doomImage ) {
 			GL_Bind (glt);
-			qglTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, gl_filter_min);
-			qglTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, gl_filter_max);
+			R_SetTextureFilter( glt->mipmap, glt->doomImage );
 		}
 	}
 }
@@ -449,6 +473,38 @@ static void R_MipMap (byte *in, int width, int height) {
 
 
 /*
+================
+R_MipMapNPOT
+
+Box-filtered mip level for any size (the functions above assume powers of
+two). Output is max(1, w/2) x max(1, h/2), as OpenGL expects.
+================
+*/
+static void R_MipMapNPOT( byte *in, int width, int height ) {
+	int		outWidth = width > 1 ? width >> 1 : 1;
+	int		outHeight = height > 1 ? height >> 1 : 1;
+	int		x, y, k, x0, x1, y0, y1;
+	byte	*temp, *out;
+
+	temp = ri.Hunk_AllocateTempMemory( outWidth * outHeight * 4 );
+	out = temp;
+	for ( y = 0 ; y < outHeight ; y++ ) {
+		y0 = y * 2 < height ? y * 2 : height - 1;
+		y1 = y * 2 + 1 < height ? y * 2 + 1 : y0;
+		for ( x = 0 ; x < outWidth ; x++, out += 4 ) {
+			x0 = x * 2 < width ? x * 2 : width - 1;
+			x1 = x * 2 + 1 < width ? x * 2 + 1 : x0;
+			for ( k = 0 ; k < 4 ; k++ ) {
+				out[k] = ( in[( y0 * width + x0 ) * 4 + k] + in[( y0 * width + x1 ) * 4 + k]
+					+ in[( y1 * width + x0 ) * 4 + k] + in[( y1 * width + x1 ) * 4 + k] + 2 ) >> 2;
+			}
+		}
+	}
+	Com_Memcpy( in, temp, outWidth * outHeight * 4 );
+	ri.Hunk_FreeTempMemory( temp );
+}
+
+/*
 ==================
 R_BlendOverTexture
 
@@ -499,12 +555,13 @@ Upload32
 ===============
 */
 extern qboolean charSet;
-static void Upload32( unsigned *data, 
-						  int width, int height, 
-						  qboolean mipmap, 
-						  qboolean picmip, 
+static void Upload32( unsigned *data,
+						  int width, int height,
+						  qboolean mipmap,
+						  qboolean picmip,
 							qboolean lightMap,
-						  int *format, 
+						  qboolean doomImage,
+						  int *format,
 						  int *pUploadWidth, int *pUploadHeight )
 {
 	int			samples;
@@ -515,18 +572,27 @@ static void Upload32( unsigned *data,
 	byte		*scan;
 	GLenum		internalFormat = GL_RGB;
 	float		rMax = 0, gMax = 0, bMax = 0;
+	// Q3Doom: Doom textures keep their exact size (72 tall doors...) when the
+	// hardware supports it, instead of being resampled to a power of two
+	qboolean	exactSize = doomImage && glNPOTSupported;
 
 	//
 	// convert to exact power of 2 sizes
 	//
-	for (scaled_width = 1 ; scaled_width < width ; scaled_width<<=1)
-		;
-	for (scaled_height = 1 ; scaled_height < height ; scaled_height<<=1)
-		;
-	if ( r_roundImagesDown->integer && scaled_width > width )
-		scaled_width >>= 1;
-	if ( r_roundImagesDown->integer && scaled_height > height )
-		scaled_height >>= 1;
+	if ( exactSize ) {
+		scaled_width = width;
+		scaled_height = height;
+		picmip = qfalse;
+	} else {
+		for (scaled_width = 1 ; scaled_width < width ; scaled_width<<=1)
+			;
+		for (scaled_height = 1 ; scaled_height < height ; scaled_height<<=1)
+			;
+		if ( r_roundImagesDown->integer && scaled_width > width )
+			scaled_width >>= 1;
+		if ( r_roundImagesDown->integer && scaled_height > height )
+			scaled_height >>= 1;
+	}
 
 	if ( scaled_width != width || scaled_height != height ) {
 		resampledBuffer = ri.Hunk_AllocateTempMemory( scaled_width * scaled_height * 4 );
@@ -679,7 +745,11 @@ static void Upload32( unsigned *data,
 		miplevel = 0;
 		while (scaled_width > 1 || scaled_height > 1)
 		{
-			R_MipMap( (byte *)scaledBuffer, scaled_width, scaled_height );
+			if ( exactSize ) {
+				R_MipMapNPOT( (byte *)scaledBuffer, scaled_width, scaled_height );
+			} else {
+				R_MipMap( (byte *)scaledBuffer, scaled_width, scaled_height );
+			}
 			scaled_width >>= 1;
 			scaled_height >>= 1;
 			if (scaled_width < 1)
@@ -697,16 +767,7 @@ static void Upload32( unsigned *data,
 	}
 done:
 
-	if (mipmap)
-	{
-		qglTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, gl_filter_min);
-		qglTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, gl_filter_max);
-	}
-	else
-	{
-		qglTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-		qglTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-	}
+	R_SetTextureFilter( mipmap, doomImage );
 
 	GL_CheckErrors();
 
@@ -753,6 +814,7 @@ image_t *R_CreateImage( const char *name, const byte *pic, int width, int height
 	image->width = width;
 	image->height = height;
 	image->wrapClampMode = glWrapClampMode;
+	image->doomImage = !Q_stricmpn( name, "doom/", 5 );
 
 	// lightmaps are always allocated on TMU 1
 	if ( qglActiveTextureARB && isLightmap ) {
@@ -767,10 +829,11 @@ image_t *R_CreateImage( const char *name, const byte *pic, int width, int height
 
 	GL_Bind(image);
 
-	Upload32( (unsigned *)pic, image->width, image->height, 
+	Upload32( (unsigned *)pic, image->width, image->height,
 								image->mipmap,
 								allowPicmip,
 								isLightmap,
+								image->doomImage,
 								&image->internalFormat,
 								&image->uploadWidth,
 								&image->uploadHeight );

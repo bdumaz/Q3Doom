@@ -72,6 +72,10 @@ static void GLimp_InitExtensions( void )
 	// swap control is always available through SDL
 	r_swapInterval->modified = qtrue;	// force a set next frame
 
+	// non power of two textures: core since OpenGL 2.0
+	glNPOTSupported = atoi( glConfig.version_string ) >= 2 || SDL_GL_ExtensionSupported( "GL_ARB_texture_non_power_of_two" );
+	ri.Printf( PRINT_ALL, "...non power of two textures: %s\n", glNPOTSupported ? "yes" : "no" );
+
 	// GL_ARB_multitexture
 	qglMultiTexCoord2fARB = NULL;
 	qglActiveTextureARB = NULL;

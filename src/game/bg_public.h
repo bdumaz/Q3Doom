@@ -185,6 +185,9 @@ typedef struct {
 	int			pmove_fixed;
 	int			pmove_msec;
 
+	// Q3Doom: g_stepHeight (published in the serverinfo so prediction matches), 0 = STEPSIZE
+	float		stepHeight;
+
 	// callbacks to test the world
 	// these will be different functions during game and cgame
 	void		(*trace)( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentMask );

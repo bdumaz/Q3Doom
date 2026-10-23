@@ -104,6 +104,7 @@ typedef struct image_s {
 	qboolean	mipmap;
 	qboolean	allowPicmip;
 	int			wrapClampMode;		// GL_CLAMP or GL_REPEAT
+	qboolean	doomImage;			// Q3Doom: "doom/..." image, exact size + r_doomTextureFilter
 
 	struct image_s*	next;
 } image_t;
@@ -1017,6 +1018,9 @@ extern	cvar_t	*r_nocull;
 extern	cvar_t	*r_facePlaneCull;		// enables culling of planar surfaces with back side test
 extern	cvar_t	*r_nocurves;
 extern	cvar_t	*r_showcluster;
+
+extern cvar_t	*r_doomTextureFilter;	// Q3Doom: 0 = nearest (crisp Doom pixels), 1 = r_textureMode
+extern qboolean	glNPOTSupported;		// non power of two textures (OpenGL 2.0+)
 
 extern cvar_t	*r_mode;				// video mode
 extern cvar_t	*r_fullscreen;

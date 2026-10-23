@@ -7,6 +7,7 @@ doomtool - inspect and export Doom WAD contents with libdoom
   doomtool <wad> export <dir>         textures, flats, sprites, graphics as
                                       PNG, sounds as WAV, maps as SVG
   doomtool <wad> map <name> <out.svg> draw one map
+  doomtool <wad> build <name|all> [dir] build Quake 3 BSPs, print stats
 
 Part of Q3Doom. Licensed under the GNU General Public License version 2 or later.
 ===========================================================================
@@ -452,6 +453,61 @@ static int CmdMap( const doom_wad_t *wad, const char *name, const char *out ) {
 	return 0;
 }
 
+/*
+=================
+CmdBuild
+
+Builds Quake 3 BSPs ("all" for every map), prints statistics and
+optionally writes the .bsp files into a directory.
+=================
+*/
+static int CmdBuild( const doom_wad_t *wad, const char *name, const char *outdir ) {
+	char	maps[MAX_MAPS][DOOM_LUMP_NAME_LEN + 1];
+	int		i, n, failed = 0;
+
+	if ( !strcmp( name, "all" ) ) {
+		n = doom_wad_list_maps( wad, maps, MAX_MAPS );
+	} else {
+		snprintf( maps[0], sizeof( maps[0] ), "%s", name );
+		n = 1;
+	}
+	if ( outdir ) {
+		MakeDir( outdir );
+	}
+
+	for ( i = 0 ; i < n && i < MAX_MAPS ; i++ ) {
+		doom_map_t			map;
+		doom_build_stats_t	st;
+		uint8_t				*data;
+		size_t				size;
+		char				err[256];
+
+		if ( doom_map_load( wad, maps[i], &map, err, sizeof( err ) )
+			|| doom_build_bsp( wad, &map, &data, &size, &st, err, sizeof( err ) ) ) {
+			printf( "%-6s ERROR: %s\n", maps[i], err );
+			failed++;
+			continue;
+		}
+		printf( "%-6s %7zu bytes  %5d nodes  %4d sector + %4d void + %3d sliver leafs  %5d brushes  %4d surfaces  coverage %.4f\n",
+			map.name, size, st.nodes, st.sector_leafs, st.void_leafs, st.degenerate_leafs, st.brushes,
+			st.surfaces, st.covered_area / st.bounds_area );
+		if ( outdir ) {
+			char	path[1024];
+			FILE	*f;
+
+			FileName( path, sizeof( path ), outdir, map.name, "bsp" );
+			f = fopen( path, "wb" );
+			if ( f ) {
+				fwrite( data, 1, size, f );
+				fclose( f );
+			}
+		}
+		free( data );
+		doom_map_free( &map );
+	}
+	return failed ? 1 : 0;
+}
+
 static doom_wad_t *LoadWad( const char *path ) {
 	FILE		*f = fopen( path, "rb" );
 	void		*data;
@@ -491,7 +547,8 @@ int main( int argc, char **argv ) {
 			"usage: doomtool <wad> info\n"
 			"       doomtool <wad> lumps\n"
 			"       doomtool <wad> export <dir>\n"
-			"       doomtool <wad> map <name> <out.svg>\n" );
+			"       doomtool <wad> map <name> <out.svg>\n"
+			"       doomtool <wad> build <name|all> [outdir]\n" );
 		return 1;
 	}
 
@@ -509,6 +566,8 @@ int main( int argc, char **argv ) {
 		ret = CmdExport( wad, argv[3] );
 	} else if ( !strcmp( argv[2], "map" ) && argc >= 5 ) {
 		ret = CmdMap( wad, argv[3], argv[4] );
+	} else if ( !strcmp( argv[2], "build" ) && argc >= 4 ) {
+		ret = CmdBuild( wad, argv[3], argc >= 5 ? argv[4] : NULL );
 	} else {
 		fprintf( stderr, "unknown command\n" );
 	}

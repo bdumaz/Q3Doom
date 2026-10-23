@@ -144,6 +144,42 @@ static void TestMaps( const doom_wad_t *wad ) {
 	}
 }
 
+/*
+=================
+TestBuilder
+
+Every map builds, its BSP cells tile the bounds exactly (nothing is left
+unclassified), and building twice gives the same bytes.
+=================
+*/
+static void TestBuilder( const doom_wad_t *wad ) {
+	char	names[64][DOOM_LUMP_NAME_LEN + 1];
+	int		i, n;
+
+	n = doom_wad_list_maps( wad, names, 64 );
+	for ( i = 0 ; i < n && i < 64 ; i++ ) {
+		doom_map_t			map;
+		doom_build_stats_t	st;
+		uint8_t				*a = NULL, *b = NULL;
+		size_t				asize = 0, bsize = 0;
+		char				err[256];
+
+		if ( doom_map_load( wad, names[i], &map, err, sizeof( err ) ) ) {
+			continue;	// reported by TestMaps
+		}
+		CHECK( !doom_build_bsp( wad, &map, &a, &asize, &st, err, sizeof( err ) ), "build %s: %s", names[i], err );
+		CHECK( !doom_build_bsp( wad, &map, &b, &bsize, NULL, err, sizeof( err ) ), "rebuild %s: %s", names[i], err );
+		CHECK( a && b && asize == bsize && !memcmp( a, b, asize ), "%s: build is not deterministic", names[i] );
+		CHECK( asize > 8 && !memcmp( a, "IBSP", 4 ) && a[4] == 46, "%s: not an IBSP v46", names[i] );
+		CHECK( st.covered_area > st.bounds_area * 0.99999 && st.covered_area < st.bounds_area * 1.00001,
+			"%s: leafs cover %.6f of the bounds", names[i], st.covered_area / st.bounds_area );
+		CHECK( st.sector_leafs > 0 && st.void_leafs > 0 && st.brushes > 0, "%s: empty build", names[i] );
+		free( a );
+		free( b );
+		doom_map_free( &map );
+	}
+}
+
 static void TestRobustness( const doom_wad_t *wad ) {
 	doom_image_t	img;
 	doom_map_t		map;
@@ -213,6 +249,7 @@ int main( int argc, char **argv ) {
 	TestNamespace( wad, DOOM_NS_SPRITES, "sprite", doom_load_sprite );
 	TestSounds( wad );
 	TestMaps( wad );
+	TestBuilder( wad );
 	TestRobustness( wad );
 
 	doom_wad_close( wad );

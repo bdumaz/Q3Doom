@@ -1510,6 +1510,24 @@ int FS_ReadFile( const char *qpath, void **buffer ) {
 		Com_Error( ERR_FATAL, "FS_ReadFile with empty name\n" );
 	}
 
+	// Q3Doom: maps/<DOOM MAP>.bsp is built from the IWAD at runtime
+	{
+		const byte	*doomBsp = Doom_GetMapBSP( qpath, &len );
+
+		if ( doomBsp ) {
+			if ( !buffer ) {
+				return len;
+			}
+			buf = Hunk_AllocateTempMemory( len + 1 );
+			Com_Memcpy( buf, doomBsp, len );
+			buf[len] = 0;
+			*buffer = buf;
+			fs_loadCount++;
+			fs_loadStack++;
+			return len;
+		}
+	}
+
 	buf = NULL;	// quiet compiler warning
 
 	// if this is a .cfg file and we are playing back a journal, read
