@@ -451,6 +451,10 @@ void Con_Close( void );
 
 
 //
+// cl_doom.c
+void	CL_InitDoomCommands( void );
+void	CL_DoomDrawOverlay( void );
+
 // cl_scrn.c
 //
 void	SCR_Init (void);

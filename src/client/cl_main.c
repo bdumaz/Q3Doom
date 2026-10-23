@@ -2212,6 +2212,7 @@ void CL_InitRef( void ) {
 	ri.FS_ListFiles = FS_ListFiles;
 	ri.FS_FileIsInPAK = FS_FileIsInPAK;
 	ri.FS_FileExists = FS_FileExists;
+	ri.Doom_LoadImage = Doom_LoadImage;
 	ri.Cvar_Get = Cvar_Get;
 	ri.Cvar_Set = Cvar_Set;
 
@@ -2379,6 +2380,7 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("record", CL_Record_f);
 	Cmd_AddCommand ("demo", CL_PlayDemo_f);
 	Cmd_AddCommand ("cinematic", CL_PlayCinematic_f);
+	CL_InitDoomCommands();
 	Cmd_AddCommand ("stoprecord", CL_StopRecord_f);
 	Cmd_AddCommand ("connect", CL_Connect_f);
 	Cmd_AddCommand ("reconnect", CL_Reconnect_f);

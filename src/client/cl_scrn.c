@@ -499,6 +499,9 @@ void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 		VM_Call( uivm, UI_REFRESH, cls.realtime );
 	}
 
+	// Q3Doom asset viewer (doom_showimage)
+	CL_DoomDrawOverlay();
+
 	// console draws next
 	Con_DrawConsole ();
 

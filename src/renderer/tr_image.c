@@ -1819,6 +1819,12 @@ void R_LoadImage( const char *name, byte **pic, int *width, int *height ) {
 	*width = 0;
 	*height = 0;
 
+	// Q3Doom: virtual paths into the Doom IWAD
+	if ( !Q_stricmpn( name, "doom/", 5 ) ) {
+		*pic = ri.Doom_LoadImage( name, width, height );
+		return;
+	}
+
 	len = strlen(name);
 	if (len<5) {
 		return;

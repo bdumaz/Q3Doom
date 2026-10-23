@@ -332,30 +332,49 @@ qboolean S_LoadSound( sfx_t *sfx )
 	short	*samples;
 	wavinfo_t	info;
 	int		size;
+	qboolean	doomSound;
 
 	// player specific sounds are never directly loaded
 	if ( sfx->soundName[0] == '*') {
 		return qfalse;
 	}
 
-	// load it in
-	size = FS_ReadFile( sfx->soundName, (void **)&data );
-	if ( !data ) {
-		return qfalse;
-	}
+	// Q3Doom: DMX sounds from the IWAD are unsigned 8-bit mono, which the
+	// resampler handles like an 8-bit wav
+	doomSound = !Q_stricmpn( sfx->soundName, DOOM_PATH_PREFIX, strlen( DOOM_PATH_PREFIX ) );
+	if ( doomSound ) {
+		const byte	*doomSamples;
 
-	info = GetWavinfo( sfx->soundName, data, size );
+		Com_Memset( &info, 0, sizeof( info ) );
+		if ( !Doom_LoadSound( sfx->soundName, &doomSamples, &info.samples, &info.rate ) ) {
+			return qfalse;
+		}
+		info.width = 1;
+		info.channels = 1;
+		info.dataofs = 0;
+		data = (byte *)doomSamples;
+	} else {
+		// load it in
+		size = FS_ReadFile( sfx->soundName, (void **)&data );
+		if ( !data ) {
+			return qfalse;
+		}
+
+		info = GetWavinfo( sfx->soundName, data, size );
+	}
 	if ( info.channels != 1 ) {
 		Com_Printf ("%s is a stereo wav file\n", sfx->soundName);
-		FS_FreeFile (data);
+		if ( !doomSound ) {
+			FS_FreeFile (data);
+		}
 		return qfalse;
 	}
 
-	if ( info.width == 1 ) {
+	if ( info.width == 1 && !doomSound ) {
 		Com_DPrintf(S_COLOR_YELLOW "WARNING: %s is a 8 bit wav file\n", sfx->soundName);
 	}
 
-	if ( info.rate != 22050 ) {
+	if ( info.rate != 22050 && !doomSound ) {
 		Com_DPrintf(S_COLOR_YELLOW "WARNING: %s is not a 22kHz wav file\n", sfx->soundName);
 	}
 
@@ -394,7 +413,9 @@ qboolean S_LoadSound( sfx_t *sfx )
 	}
 	
 	Hunk_FreeTempMemory(samples);
-	FS_FreeFile( data );
+	if ( !doomSound ) {
+		FS_FreeFile( data );
+	}
 
 	return qtrue;
 }

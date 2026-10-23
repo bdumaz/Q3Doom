@@ -654,6 +654,22 @@ MISC
 ==============================================================
 */
 
+/*
+==============================================================
+
+DOOM ASSETS (doom_assets.c)
+
+==============================================================
+*/
+
+#define DOOM_PATH_PREFIX	"doom/"
+
+void		Doom_Init( void );
+void		Doom_Shutdown( void );
+const struct doom_wad_s *Doom_GetWad( void );		// NULL if no IWAD
+byte		*Doom_LoadImage( const char *path, int *width, int *height );	// Z_Malloc'ed RGBA
+qboolean	Doom_LoadSound( const char *path, const byte **samples, int *numSamples, int *rate );
+
 // vsnprintf is ISO/IEC 9899:1999. MSVC's _vsnprintf does not terminate the
 // string on overflow; its vsnprintf is conforming since VS 2015.
 #define Q_vsnprintf vsnprintf

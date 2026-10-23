@@ -945,7 +945,7 @@ This routine would be a bit simpler with a goto but i abstained
 =================
 */
 static void SV_VerifyPaks_f( client_t *cl ) {
-	int nChkSum1, nChkSum2, nClientPaks, nServerPaks, i, j, nCurArg;
+	int nChkSum1, nClientPaks, nServerPaks, i, j, nCurArg;
 	int nClientChkSum[1024];
 	int nServerChkSum[1024];
 	const char *pPaks, *pArg;

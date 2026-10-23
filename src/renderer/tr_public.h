@@ -151,6 +151,9 @@ typedef struct {
 	void	(*FS_WriteFile)( const char *qpath, const void *buffer, int size );
 	qboolean (*FS_FileExists)( const char *file );
 
+	// Q3Doom: "doom/..." image paths, decoded from the IWAD (see doom_assets.c)
+	byte	*(*Doom_LoadImage)( const char *path, int *width, int *height );
+
 	// cinematic stuff
 	void	(*CIN_UploadCinematic)(int handle);
 	int		(*CIN_PlayCinematic)( const char *arg0, int xpos, int ypos, int width, int height, int bits);

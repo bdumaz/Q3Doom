@@ -326,6 +326,7 @@ void Com_Quit_f( void ) {
 		SV_Shutdown ("Server quit\n");
 		CL_Shutdown ();
 		Com_Shutdown ();
+		Doom_Shutdown ();
 		FS_Shutdown(qtrue);
 	}
 	Sys_Quit ();
@@ -2383,6 +2384,9 @@ void Com_Init( char *commandLine ) {
 	CL_InitKeyCommands();
 
 	FS_InitFilesystem ();
+
+	Com_StartupVariable( "doom_iwad" );
+	Doom_Init();
 
 	Com_InitJournaling();
 
