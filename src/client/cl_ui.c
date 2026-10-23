@@ -757,9 +757,9 @@ static int FloatAsInt( float f ) {
 	return temp;
 }
 
-void *VM_ArgPtr( int intValue );
+// see SV_GameSystemCalls for the intptr_t argument conventions
 #define	VMA(x) VM_ArgPtr(args[x])
-#define	VMF(x)	((float *)args)[x]
+#define	VMF(x)	(*(float *)&args[x])
 
 /*
 ====================
@@ -768,7 +768,7 @@ CL_UISystemCalls
 The ui module is making a system call
 ====================
 */
-int CL_UISystemCalls( int *args ) {
+intptr_t CL_UISystemCalls( intptr_t *args ) {
 	switch( args[0] ) {
 	case UI_ERROR:
 		Com_Error( ERR_DROP, "%s", VMA(1) );
@@ -1035,15 +1035,15 @@ int CL_UISystemCalls( int *args ) {
 		return 0;
 
 	case UI_MEMSET:
-		Com_Memset( VMA(1), args[2], args[3] );
+		Com_Memset( VMA(1), (int)args[2], (int)args[3] );
 		return 0;
 
 	case UI_MEMCPY:
-		Com_Memcpy( VMA(1), VMA(2), args[3] );
+		Com_Memcpy( VMA(1), VMA(2), (int)args[3] );
 		return 0;
 
 	case UI_STRNCPY:
-		return (int)strncpy( VMA(1), VMA(2), args[3] );
+		return (intptr_t)strncpy( VMA(1), VMA(2), (int)args[3] );
 
 	case UI_SIN:
 		return FloatAsInt( sin( VMF(1) ) );
@@ -1112,7 +1112,7 @@ int CL_UISystemCalls( int *args ) {
 
 		
 	default:
-		Com_Error( ERR_DROP, "Bad UI system trap: %i", args[0] );
+		Com_Error( ERR_DROP, "Bad UI system trap: %i", (int)args[0] );
 
 	}
 
@@ -1144,17 +1144,7 @@ CL_InitUI
 
 void CL_InitUI( void ) {
 	int		v;
-	vmInterpret_t		interpret;
-
-	// load the dll or bytecode
-	if ( cl_connectedToPureServer != 0 ) {
-		// if sv_pure is set we only allow qvms to be loaded
-		interpret = VMI_COMPILED;
-	}
-	else {
-		interpret = Cvar_VariableValue( "vm_ui" );
-	}
-	uivm = VM_Create( "ui", CL_UISystemCalls, interpret );
+	uivm = VM_Create( "ui", CL_UISystemCalls );
 	if ( !uivm ) {
 		Com_Error( ERR_FATAL, "VM_Create on UI failed" );
 	}

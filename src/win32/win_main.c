@@ -41,6 +41,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 static char		sys_cmdline[MAX_STRING_CHARS];
 
+WinVars_t	g_wv;
+
+// ask hybrid-graphics laptops (NVIDIA Optimus, AMD PowerXpress) for the discrete GPU
+__declspec(dllexport) DWORD NvOptimusEnablement = 1;
+__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+
 // define this to use alternate spanking method
 // I found out that the regular way doesn't work on my box for some reason
 // see the associated spank.sh script
@@ -203,7 +209,7 @@ Sys_DefaultBasePath
 ==============
 */
 char *Sys_DefaultBasePath( void ) {
-	return Sys_Cwd();
+	return Sys_DefaultInstallPath();
 }
 
 /*
@@ -219,7 +225,7 @@ DIRECTORY SCANNING
 void Sys_ListFilteredFiles( const char *basedir, char *subdirs, char *filter, char **list, int *numfiles ) {
 	char		search[MAX_OSPATH], newsubdirs[MAX_OSPATH];
 	char		filename[MAX_OSPATH];
-	int			findhandle;
+	intptr_t			findhandle;
 	struct _finddata_t findinfo;
 
 	if ( *numfiles >= MAX_FOUND_FILES - 1 ) {
@@ -290,7 +296,7 @@ char **Sys_ListFiles( const char *directory, const char *extension, char *filter
 	char		**listCopy;
 	char		*list[MAX_FOUND_FILES];
 	struct _finddata_t findinfo;
-	int			findhandle;
+	intptr_t			findhandle;
 	int			flag;
 	int			i;
 
@@ -516,105 +522,56 @@ void Sys_UnloadDll( void *dllHandle ) {
 =================
 Sys_LoadDll
 
-Used to load a development dll instead of a virtual machine
-
-TTimo: added some verbosity in debug
+Loads <name><ARCH_STRING>.dll from the active game directory (fs_game,
+or baseq3 when none is set), trying fs_homepath then fs_basepath.
+fqpath (at least MAX_QPATH+1 bytes) receives the dll file name.
 =================
 */
 extern char		*FS_BuildOSPath( const char *base, const char *game, const char *qpath );
 
-// fqpath param added 7/20/02 by T.Ray - Sys_LoadDll is only called in vm.c at this time
-// fqpath will be empty if dll not loaded, otherwise will hold fully qualified path of dll module loaded
-// fqpath buffersize must be at least MAX_QPATH+1 bytes long
-void * QDECL Sys_LoadDll( const char *name, char *fqpath , int (QDECL **entryPoint)(int, ...),
-				  int (QDECL *systemcalls)(int, ...) ) {
-	static int	lastWarning = 0;
+void * QDECL Sys_LoadDll( const char *name, char *fqpath , intptr_t (QDECL **entryPoint)(int, ...),
+				  intptr_t (QDECL *systemcalls)(intptr_t, ...) ) {
 	HINSTANCE	libHandle;
-	void	(QDECL *dllEntry)( int (QDECL *syscallptr)(int, ...) );
-	char	*basepath;
-	char	*cdpath;
+	void	(QDECL *dllEntry)( intptr_t (QDECL *syscallptr)(intptr_t, ...) );
+	const char	*searchPaths[2];
 	char	*gamedir;
 	char	*fn;
-#ifdef NDEBUG
-	int		timestamp;
-  int   ret;
-#endif
 	char	filename[MAX_QPATH];
+	int		i;
 
-	*fqpath = 0 ;		// added 7/20/02 by T.Ray
+	*fqpath = 0;
+	libHandle = NULL;
 
-	Com_sprintf( filename, sizeof( filename ), "%sx86.dll", name );
+	Com_sprintf( filename, sizeof( filename ), "%s" ARCH_STRING ".dll", name );
 
-#ifdef NDEBUG
-	timestamp = Sys_Milliseconds();
-	if( ((timestamp - lastWarning) > (5 * 60000)) && !Cvar_VariableIntegerValue( "dedicated" )
-		&& !Cvar_VariableIntegerValue( "com_blindlyLoadDLLs" ) ) {
-		if (FS_FileExists(filename)) {
-			lastWarning = timestamp;
-			ret = MessageBoxEx( NULL, "You are about to load a .DLL executable that\n"
-				  "has not been verified for use with Quake III Arena.\n"
-				  "This type of file can compromise the security of\n"
-				  "your computer.\n\n"
-				  "Select 'OK' if you choose to load it anyway.",
-				  "Security Warning", MB_OKCANCEL | MB_ICONEXCLAMATION | MB_DEFBUTTON2 | MB_TOPMOST | MB_SETFOREGROUND,
-				  MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ) );
-			if( ret != IDOK ) {
-				return NULL;
-			}
-		}
-	}
-#endif
-
-#ifndef NDEBUG
-	libHandle = LoadLibrary( filename );
-  if (libHandle)
-    Com_Printf("LoadLibrary '%s' ok\n", filename);
-  else
-    Com_Printf("LoadLibrary '%s' failed\n", filename);
-	if ( !libHandle ) {
-#endif
-	basepath = Cvar_VariableString( "fs_basepath" );
-	cdpath = Cvar_VariableString( "fs_cdpath" );
 	gamedir = Cvar_VariableString( "fs_game" );
+	if ( !gamedir[0] ) {
+		gamedir = BASEGAME;
+	}
+	searchPaths[0] = Cvar_VariableString( "fs_homepath" );
+	searchPaths[1] = Cvar_VariableString( "fs_basepath" );
 
-	fn = FS_BuildOSPath( basepath, gamedir, filename );
-	libHandle = LoadLibrary( fn );
-#ifndef NDEBUG
-  if (libHandle)
-    Com_Printf("LoadLibrary '%s' ok\n", fn);
-  else
-    Com_Printf("LoadLibrary '%s' failed\n", fn);
-#endif
-
+	for ( i = 0 ; i < 2 && !libHandle ; i++ ) {
+		if ( !searchPaths[i][0] ) {
+			continue;
+		}
+		fn = FS_BuildOSPath( searchPaths[i], gamedir, filename );
+		libHandle = LoadLibrary( fn );
+		Com_DPrintf( "LoadLibrary '%s' %s\n", fn, libHandle ? "ok" : "failed" );
+	}
 	if ( !libHandle ) {
-		if( cdpath[0] ) {
-			fn = FS_BuildOSPath( cdpath, gamedir, filename );
-			libHandle = LoadLibrary( fn );
-#ifndef NDEBUG
-      if (libHandle)
-        Com_Printf("LoadLibrary '%s' ok\n", fn);
-      else
-        Com_Printf("LoadLibrary '%s' failed\n", fn);
-#endif
-		}
-
-		if ( !libHandle ) {
-			return NULL;
-		}
+		return NULL;
 	}
-#ifndef NDEBUG
-	}
-#endif
 
-	dllEntry = ( void (QDECL *)( int (QDECL *)( int, ... ) ) )GetProcAddress( libHandle, "dllEntry" ); 
-	*entryPoint = (int (QDECL *)(int,...))GetProcAddress( libHandle, "vmMain" );
+	dllEntry = ( void (QDECL *)( intptr_t (QDECL *)( intptr_t, ... ) ) )GetProcAddress( libHandle, "dllEntry" );
+	*entryPoint = (intptr_t (QDECL *)(int,...))GetProcAddress( libHandle, "vmMain" );
 	if ( !*entryPoint || !dllEntry ) {
 		FreeLibrary( libHandle );
 		return NULL;
 	}
 	dllEntry( systemcalls );
 
-	if ( libHandle ) Q_strncpyz ( fqpath , filename , MAX_QPATH ) ;		// added 7/20/02 by T.Ray
+	Q_strncpyz( fqpath, filename, MAX_QPATH );
 	return libHandle;
 }
 
@@ -958,9 +915,6 @@ sysEvent_t Sys_GetEvent( void ) {
 			Com_Quit_f();
 		}
 
-		// save the msg time, because wndprocs don't have access to the timestamp
-		g_wv.sysMsgTime = msg.time;
-
 		TranslateMessage (&msg);
       	DispatchMessage (&msg);
 	}
@@ -1041,9 +995,6 @@ Called after the common systems (cvars, files, etc)
 are initialized
 ================
 */
-#define OSR2_BUILD_NUMBER 1111
-#define WIN98_BUILD_NUMBER 1998
-
 void Sys_Init( void ) {
 	int cpuid;
 
@@ -1054,43 +1005,7 @@ void Sys_Init( void ) {
 	Cmd_AddCommand ("in_restart", Sys_In_Restart_f);
 	Cmd_AddCommand ("net_restart", Sys_Net_Restart_f);
 
-	g_wv.osversion.dwOSVersionInfoSize = sizeof( g_wv.osversion );
-
-	if (!GetVersionEx (&g_wv.osversion))
-		Sys_Error ("Couldn't get OS info");
-
-	if (g_wv.osversion.dwMajorVersion < 4)
-		Sys_Error ("Quake3 requires Windows version 4 or greater");
-	if (g_wv.osversion.dwPlatformId == VER_PLATFORM_WIN32s)
-		Sys_Error ("Quake3 doesn't run on Win32s");
-
-	if ( g_wv.osversion.dwPlatformId == VER_PLATFORM_WIN32_NT )
-	{
-		Cvar_Set( "arch", "winnt" );
-	}
-	else if ( g_wv.osversion.dwPlatformId == VER_PLATFORM_WIN32_WINDOWS )
-	{
-		if ( LOWORD( g_wv.osversion.dwBuildNumber ) >= WIN98_BUILD_NUMBER )
-		{
-			Cvar_Set( "arch", "win98" );
-		}
-		else if ( LOWORD( g_wv.osversion.dwBuildNumber ) >= OSR2_BUILD_NUMBER )
-		{
-			Cvar_Set( "arch", "win95 osr2.x" );
-		}
-		else
-		{
-			Cvar_Set( "arch", "win95" );
-		}
-	}
-	else
-	{
-		Cvar_Set( "arch", "unknown Windows variant" );
-	}
-
-	// save out a couple things in rom cvars for the renderer to access
-	Cvar_Get( "win_hinstance", va("%i", (int)g_wv.hInstance), CVAR_ROM );
-	Cvar_Get( "win_wndproc", va("%i", (int)MainWndProc), CVAR_ROM );
+	Cvar_Set( "arch", "winnt" );
 
 	//
 	// figure out our CPU
@@ -1194,6 +1109,11 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 	g_wv.hInstance = hInstance;
 	Q_strncpyz( sys_cmdline, lpCmdLine, sizeof( sys_cmdline ) );
 
+	// we provide WinMain ourselves instead of linking SDL2main
+	SDL_SetMainReady();
+	// render at the real panel resolution instead of being upscaled by display scaling
+	SDL_SetHint( SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2" );
+
 	// done before Com/Sys_Init since we need this for error output
 	Sys_CreateConsole();
 
@@ -1224,7 +1144,8 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
     // main game loop
 	while( 1 ) {
 		// if not running as a game client, sleep a bit
-		if ( g_wv.isMinimized || ( com_dedicated && com_dedicated->integer ) ) {
+		if ( ( SDL_window && ( SDL_GetWindowFlags( SDL_window ) & SDL_WINDOW_MINIMIZED ) )
+			|| ( com_dedicated && com_dedicated->integer ) ) {
 			Sleep( 5 );
 		}
 

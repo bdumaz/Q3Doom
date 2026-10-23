@@ -305,16 +305,12 @@ SV_GameSystemCalls
 The module is making a system call
 ====================
 */
-//rcg010207 - see my comments in VM_DllSyscall(), in qcommon/vm.c ...
-#if ((defined __linux__) && (defined __powerpc__))
-#define VMA(x) ((void *) args[x])
-#else
+// args[] slots are intptr_t: pointers are full width, int arguments are only
+// valid in the low 32 bits (use them as int), floats are the low 32 bits.
 #define	VMA(x) VM_ArgPtr(args[x])
-#endif
+#define	VMF(x)	(*(float *)&args[x])
 
-#define	VMF(x)	((float *)args)[x]
-
-int SV_GameSystemCalls( int *args ) {
+intptr_t SV_GameSystemCalls( intptr_t *args ) {
 	switch( args[0] ) {
 	case G_PRINT:
 		Com_Printf( "%s", VMA(1) );
@@ -820,15 +816,15 @@ int SV_GameSystemCalls( int *args ) {
 		return botlib_export->ai.GeneticParentsAndChildSelection(args[1], VMA(2), VMA(3), VMA(4), VMA(5));
 
 	case TRAP_MEMSET:
-		Com_Memset( VMA(1), args[2], args[3] );
+		Com_Memset( VMA(1), (int)args[2], (int)args[3] );
 		return 0;
 
 	case TRAP_MEMCPY:
-		Com_Memcpy( VMA(1), VMA(2), args[3] );
+		Com_Memcpy( VMA(1), VMA(2), (int)args[3] );
 		return 0;
 
 	case TRAP_STRNCPY:
-		return (int)strncpy( VMA(1), VMA(2), args[3] );
+		return (intptr_t)strncpy( VMA(1), VMA(2), (int)args[3] );
 
 	case TRAP_SIN:
 		return FloatAsInt( sin( VMF(1) ) );
@@ -862,7 +858,7 @@ int SV_GameSystemCalls( int *args ) {
 
 
 	default:
-		Com_Error( ERR_DROP, "Bad game system trap: %i", args[0] );
+		Com_Error( ERR_DROP, "Bad game system trap: %i", (int)args[0] );
 	}
 	return -1;
 }
@@ -954,8 +950,7 @@ void SV_InitGameProgs( void ) {
 		bot_enable = 0;
 	}
 
-	// load the dll or bytecode
-	gvm = VM_Create( "qagame", SV_GameSystemCalls, Cvar_VariableValue( "vm_game" ) );
+	gvm = VM_Create( "qagame", SV_GameSystemCalls );
 	if ( !gvm ) {
 		Com_Error( ERR_FATAL, "VM_Create on game failed" );
 	}

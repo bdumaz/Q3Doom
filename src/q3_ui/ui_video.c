@@ -33,6 +33,9 @@ DRIVER INFORMATION MENU
 */
 
 
+// index of the "Desktop" entry in the resolution list (r_mode -2)
+#define UI_DESKTOP_MODE		12
+
 #define DRIVERINFO_FRAMEL	"menu/art/frame2_l"
 #define DRIVERINFO_FRAMER	"menu/art/frame1_r"
 #define DRIVERINFO_BACK0	"menu/art/back_0"
@@ -482,7 +485,11 @@ static void GraphicsOptions_ApplyChanges( void *unused, int notification )
 	}
 	trap_Cvar_SetValue( "r_picmip", 3 - s_graphicsoptions.tq.curvalue );
 	trap_Cvar_SetValue( "r_allowExtensions", s_graphicsoptions.allow_extensions.curvalue );
-	trap_Cvar_SetValue( "r_mode", s_graphicsoptions.mode.curvalue );
+	if ( s_graphicsoptions.mode.curvalue == UI_DESKTOP_MODE ) {
+		trap_Cvar_SetValue( "r_mode", -2 );
+	} else {
+		trap_Cvar_SetValue( "r_mode", s_graphicsoptions.mode.curvalue );
+	}
 	trap_Cvar_SetValue( "r_fullscreen", s_graphicsoptions.fs.curvalue );
 	trap_Cvar_Set( "r_glDriver", ( char * ) s_drivers[s_graphicsoptions.driver.curvalue] );
 	switch ( s_graphicsoptions.colordepth.curvalue )
@@ -632,7 +639,11 @@ GraphicsOptions_SetMenuItems
 static void GraphicsOptions_SetMenuItems( void )
 {
 	s_graphicsoptions.mode.curvalue = trap_Cvar_VariableValue( "r_mode" );
-	if ( s_graphicsoptions.mode.curvalue < 0 )
+	if ( s_graphicsoptions.mode.curvalue == -2 )
+	{
+		s_graphicsoptions.mode.curvalue = UI_DESKTOP_MODE;
+	}
+	else if ( s_graphicsoptions.mode.curvalue < 0 )
 	{
 		s_graphicsoptions.mode.curvalue = 3;
 	}
@@ -773,6 +784,7 @@ void GraphicsOptions_MenuInit( void )
 		"1600x1200",
 		"2048x1536",
 		"856x480 wide screen",
+		"Desktop",			// Q3Doom: r_mode -2, see UI_DESKTOP_MODE
 		0
 	};
 	static const char *filter_names[] =

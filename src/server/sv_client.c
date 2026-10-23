@@ -423,7 +423,7 @@ gotnewcl:
 	denied = (char *)VM_Call( gvm, GAME_CLIENT_CONNECT, clientNum, qtrue, qfalse ); // firstTime = qtrue
 	if ( denied ) {
 		// we can't just use VM_ArgPtr, because that is only valid inside a VM_Call
-		denied = VM_ExplicitArgPtr( gvm, (int)denied );
+		denied = VM_ExplicitArgPtr( gvm, (intptr_t)denied );
 
 		NET_OutOfBandPrint( NS_SERVER, from, "print\n%s\n", denied );
 		Com_DPrintf ("Game rejected a connection: %s.\n", denied);
@@ -958,11 +958,6 @@ static void SV_VerifyPaks_f( client_t *cl ) {
 	if ( sv_pure->integer != 0 ) {
 
 		bGood = qtrue;
-		nChkSum1 = nChkSum2 = 0;
-		// we run the game, so determine which cgame and ui the client "should" be running
-		bGood = (FS_FileIsInPAK("vm/cgame.qvm", &nChkSum1) == 1);
-		if (bGood)
-			bGood = (FS_FileIsInPAK("vm/ui.qvm", &nChkSum2) == 1);
 
 		nClientPaks = Cmd_Argc();
 
@@ -988,30 +983,18 @@ static void SV_VerifyPaks_f( client_t *cl ) {
 		// we basically use this while loop to avoid using 'goto' :)
 		while (bGood) {
 
-			// must be at least 6: "cl_paks cgame ui @ firstref ... numChecksums"
-			// numChecksums is encoded
-			if (nClientPaks < 6) {
+			// "cl_paks [cgame] [ui] @ firstref ... numChecksums"
+			// Q3Doom: cgame and ui are native DLLs, so the paks holding the
+			// stock QVMs are never referenced; skip anything before '@' and
+			// verify the data paks only.
+			while ( nCurArg < nClientPaks && *Cmd_Argv(nCurArg) != '@' ) {
+				nCurArg++;
+			}
+			if ( nCurArg >= nClientPaks ) {
 				bGood = qfalse;
 				break;
 			}
-			// verify first to be the cgame checksum
-			pArg = Cmd_Argv(nCurArg++);
-			if (!pArg || *pArg == '@' || atoi(pArg) != nChkSum1 ) {
-				bGood = qfalse;
-				break;
-			}
-			// verify the second to be the ui checksum
-			pArg = Cmd_Argv(nCurArg++);
-			if (!pArg || *pArg == '@' || atoi(pArg) != nChkSum2 ) {
-				bGood = qfalse;
-				break;
-			}
-			// should be sitting at the delimeter now
-			pArg = Cmd_Argv(nCurArg++);
-			if (*pArg != '@') {
-				bGood = qfalse;
-				break;
-			}
+			nCurArg++;	// skip the delimiter
 			// store checksums since tokenization is not re-entrant
 			for (i = 0; nCurArg < nClientPaks; i++) {
 				nClientChkSum[i] = atoi(Cmd_Argv(nCurArg++));

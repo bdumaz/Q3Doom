@@ -1022,7 +1022,6 @@ qboolean UI_ConsoleCommand( int realTime ) {
 		UI_Cache_f();
 		return qtrue;
 	}
-
 	if ( Q_stricmp (cmd, "ui_cinematics") == 0 ) {
 		UI_CinematicsMenu_f();
 		return qtrue;
