@@ -1,0 +1,17 @@
+# Commercial game data: never commit
+GameData/
+*.wad
+*.WAD
+*.pk3
+
+# Upstream source snapshots (cloned separately, see PLAN.md M0)
+external/
+
+# Build outputs and runtime folder
+build/
+out/
+run/
+
+# IDE
+.vs/
+.vscode/
