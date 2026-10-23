@@ -218,20 +218,41 @@ static qboolean GLimp_SetMode( void )
 	return qtrue;
 }
 
+// the desktop gamma ramp before we changed it, restored even after a crash
+static Uint16	originalGamma[3][256];
+static qboolean	originalGammaSaved;
+
 /*
 ** GLimp_CheckHardwareGamma
 */
 static void GLimp_CheckHardwareGamma( void )
 {
-	Uint16	ramp[3][256];
-
 	glConfig.deviceSupportsGamma = qfalse;
 	if ( r_ignorehwgamma->integer ) {
 		return;
 	}
-	if ( SDL_GetWindowGammaRamp( SDL_window, ramp[0], ramp[1], ramp[2] ) == 0 ) {
+	if ( SDL_GetWindowGammaRamp( SDL_window, originalGamma[0], originalGamma[1], originalGamma[2] ) == 0 ) {
 		glConfig.deviceSupportsGamma = qtrue;
+		originalGammaSaved = qtrue;
 	}
+}
+
+/*
+** GLimp_RestoreGamma
+**
+** Called by the crash handler: SDL restores the ramp when the window is
+** destroyed, which never happens if the process dies. The window is also
+** minimized so the crash message is not hidden behind a fullscreen window.
+*/
+void GLimp_RestoreGamma( void )
+{
+	if ( !SDL_window ) {
+		return;
+	}
+	if ( originalGammaSaved ) {
+		SDL_SetWindowGammaRamp( SDL_window, originalGamma[0], originalGamma[1], originalGamma[2] );
+	}
+	SDL_MinimizeWindow( SDL_window );
 }
 
 /*
@@ -293,6 +314,7 @@ void GLimp_Shutdown( void )
 		SDL_DestroyWindow( SDL_window );	// also restores the gamma ramp
 		SDL_window = NULL;
 	}
+	originalGammaSaved = qfalse;
 	SDL_QuitSubSystem( SDL_INIT_VIDEO );
 
 	QGL_Shutdown();

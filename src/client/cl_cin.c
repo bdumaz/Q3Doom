@@ -83,7 +83,7 @@ typedef struct {
 	byte				file[65536];
 	short				sqrTable[256];
 
-	unsigned int		mcomp[256];
+	int					mcomp[256];		// signed: motion offsets point backwards too (64-bit)
 	byte				*qStatus[2][32768];
 
 	long				oldXOff, oldYOff, oldysize, oldxsize;
