@@ -95,6 +95,9 @@ typedef struct {
 #endif
 	void	(*RegisterFont)(const char *fontName, int pointSize, fontInfo_t *font);
 	void	(*RemapShader)(const char *oldShader, const char *newShader, const char *offsetTime);
+
+	// Q3Doom: current light level (0-255) of every sector of the Doom map
+	void	(*DoomSectorLights)( const byte *levels, int count );
 	qboolean (*GetEntityToken)( char *buffer, int size );
 	qboolean (*inPVS)( const vec3_t p1, const vec3_t p2 );
 } refexport_t;
@@ -153,6 +156,9 @@ typedef struct {
 
 	// Q3Doom: "doom/..." image paths, decoded from the IWAD (see doom_assets.c)
 	byte	*(*Doom_LoadImage)( const char *path, int *width, int *height );
+	// animation cycle of a doom/ texture or flat path: lump names of frameSize
+	// bytes each in 'frames' (starting with the path's own); 0 if not animated
+	int		(*Doom_AnimFrames)( const char *path, char *frames, int frameSize, int maxFrames );
 
 	// cinematic stuff
 	void	(*CIN_UploadCinematic)(int handle);

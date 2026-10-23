@@ -181,6 +181,8 @@ void Bullet_Fire (gentity_t *ent, float spread, int damage ) {
 	for (i = 0; i < 10; i++) {
 
 		trap_Trace (&tr, muzzle, NULL, NULL, end, passent, MASK_SHOT);
+		// Q3Doom: gun lines the shot crossed
+		Doom_ShotTrace( ent, muzzle, tr.endpos );
 		if ( tr.surfaceFlags & SURF_NOIMPACT ) {
 			return;
 		}
@@ -277,6 +279,8 @@ qboolean ShotgunPellet( vec3_t start, vec3_t end, gentity_t *ent ) {
 	for (i = 0; i < 10; i++) {
 		trap_Trace (&tr, tr_start, NULL, NULL, tr_end, passent, MASK_SHOT);
 		traceEnt = &g_entities[ tr.entityNum ];
+		// Q3Doom: gun lines the pellet crossed
+		Doom_ShotTrace( ent, tr_start, tr.endpos );
 
 		// send bullet impact
 		if (  tr.surfaceFlags & SURF_NOIMPACT ) {

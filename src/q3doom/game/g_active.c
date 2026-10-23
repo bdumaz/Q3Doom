@@ -759,6 +759,7 @@ void ClientThink_real( gentity_t *ent ) {
 	int			oldEventSequence;
 	int			msec;
 	usercmd_t	*ucmd;
+	vec3_t		doomOldOrigin;		// Q3Doom: walk-over lines
 
 	client = ent->client;
 
@@ -923,6 +924,7 @@ void ClientThink_real( gentity_t *ent ) {
 	pm.pmove_msec = pmove_msec.integer;
 
 	VectorCopy( client->ps.origin, client->oldOrigin );
+	VectorCopy( client->ps.origin, doomOldOrigin );
 
 #ifdef MISSIONPACK
 		if (level.intermissionQueued != 0 && g_singlePlayer.integer) {
@@ -985,6 +987,11 @@ void ClientThink_real( gentity_t *ent ) {
 	// touch other objects
 	ClientImpacts( ent, &pm );
 
+	// Q3Doom: walk-over lines
+	if ( !ent->client->noclip ) {
+		Doom_PlayerMoved( ent, doomOldOrigin );
+	}
+
 	// save results of triggers and client events
 	if (ent->client->ps.eventSequence != oldEventSequence) {
 		ent->eventTime = level.time;
@@ -994,6 +1001,11 @@ void ClientThink_real( gentity_t *ent ) {
 	client->oldbuttons = client->buttons;
 	client->buttons = ucmd->buttons;
 	client->latched_buttons |= client->buttons & ~client->oldbuttons;
+
+	// Q3Doom: use doors and switches when +use is pressed
+	if ( ( client->buttons & BUTTON_USE ) && !( client->oldbuttons & BUTTON_USE ) && client->ps.stats[STAT_HEALTH] > 0 ) {
+		Doom_PlayerUse( ent );
+	}
 
 	// check for respawning
 	if ( client->ps.stats[STAT_HEALTH] <= 0 ) {

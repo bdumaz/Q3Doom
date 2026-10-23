@@ -206,6 +206,7 @@ spawn_t	spawns[] = {
 	{"func_plat", SP_func_plat},
 	{"func_button", SP_func_button},
 	{"func_door", SP_func_door},
+	{"func_doom_plane", SP_func_doom_plane},	// Q3Doom: moving floor or ceiling of a Doom sector
 	{"func_static", SP_func_static},
 	{"func_rotating", SP_func_rotating},
 	{"func_bobbing", SP_func_bobbing},

@@ -150,6 +150,8 @@ void	CG_Trace( trace_t *result, const vec3_t start, const vec3_t mins, const vec
 	t.entityNum = t.fraction != 1.0 ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
 	// check all other solid models
 	CG_ClipMoveToEntities (start, mins, maxs, end, skipNumber, mask, &t);
+	// Q3Doom: solid decorations, not sent by the server
+	CG_DoomClipMove( start, mins, maxs, end, mask, &t );
 
 	*result = t;
 }
@@ -189,6 +191,7 @@ int		CG_PointContents( const vec3_t point, int passEntityNum ) {
 		contents |= trap_CM_TransformedPointContents( point, cmodel, ent->origin, ent->angles );
 	}
 
+	contents |= CG_DoomPointContents( point );
 	return contents;
 }
 

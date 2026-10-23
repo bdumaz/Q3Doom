@@ -175,6 +175,13 @@ struct gentity_s {
 	float		random;
 
 	gitem_t		*item;			// for bonus items
+
+	// Q3Doom
+	int			doomSector;		// func_doom_plane: the sector it moves
+	int			doomCeiling;	// func_doom_plane: 1 ceiling, 0 floor
+	struct doomPlane_s	*doomPlane;	// func_doom_plane: Doom thinker state
+	int			doomLine;		// door trigger or shootable door: its manual door line, -1 none
+	int			doomMessageTime;	// door trigger: last "you need a key" message
 };
 
 
@@ -970,3 +977,9 @@ int		trap_GeneticParentsAndChildSelection(int numranks, float *ranks, int *paren
 
 void	trap_SnapVector( float *v );
 
+
+// Q3Doom engine data (native modules only)
+const struct doom_map_s *trap_Doom_GetMap( const char *mapname );
+const struct doom_wad_s *trap_Doom_GetWad( void );
+
+#include "g_doom.h"

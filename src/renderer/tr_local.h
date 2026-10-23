@@ -141,6 +141,8 @@ typedef enum {
 
 #define MAX_SHADER_STAGES 8
 
+#define MAX_DOOM_SECTORS	8192		// Q3Doom: sector lights (CGEN_DOOM_SECTOR)
+
 typedef enum {
 	GF_NONE,
 
@@ -199,7 +201,8 @@ typedef enum {
 	CGEN_WAVEFORM,			// programmatically generated
 	CGEN_LIGHTING_DIFFUSE,
 	CGEN_FOG,				// standard fog
-	CGEN_CONST				// fixed color
+	CGEN_CONST,				// fixed color
+	CGEN_DOOM_SECTOR		// Q3Doom: tr.doomSectorLights[ lightmap s ] + lightmap t (fake contrast)
 } colorGen_t;
 
 typedef enum {
@@ -920,6 +923,11 @@ typedef struct {
 	int						identityLightByte;	// identityLight * 255
 	int						overbrightBits;		// r_overbrightBits->integer, but set to 0 if no hw gamma
 
+	// Q3Doom: current light level of every sector of a Doom map (set by the
+	// cgame each frame); 0 levels means use the vertex colors baked in the map
+	byte					doomSectorLights[MAX_DOOM_SECTORS];
+	int						numDoomSectorLights;
+
 	orientationr_t			or;					// for current entity
 
 	trRefdef_t				refdef;
@@ -1225,6 +1233,7 @@ shader_t *R_FindShaderByName( const char *name );
 void		R_InitShaders( void );
 void		R_ShaderList_f( void );
 void    R_RemapShader(const char *oldShader, const char *newShader, const char *timeOffset);
+void	R_DoomSectorLights( const byte *levels, int count );
 
 /*
 ====================================================================

@@ -650,6 +650,37 @@ static void RB_FogPass( void ) {
 ComputeColors
 ===============
 */
+/*
+===============
+RB_CalcDoomSectorColors
+
+Doom map surfaces carry their sector index and fake contrast offset in the
+lightmap coordinates. The light is shifted down by the overbright bits the
+hardware gamma adds back, like the vertex colors of Quake 3 maps.
+===============
+*/
+static void RB_CalcDoomSectorColors( unsigned char *colors )
+{
+	int		i, sector, level;
+
+	if ( !tr.numDoomSectorLights ) {
+		Com_Memcpy( colors, tess.vertexColors, tess.numVertexes * sizeof( tess.vertexColors[0] ) );
+		return;
+	}
+	for ( i = 0 ; i < tess.numVertexes ; i++, colors += 4 ) {
+		sector = (int)tess.texCoords[i][1][0];
+		level = ( sector >= 0 && sector < tr.numDoomSectorLights ) ? tr.doomSectorLights[sector] : 255;
+		level += (int)tess.texCoords[i][1][1];
+		if ( level < 0 ) {
+			level = 0;
+		} else if ( level > 255 ) {
+			level = 255;
+		}
+		colors[0] = colors[1] = colors[2] = level >> tr.overbrightBits;
+		colors[3] = 255;
+	}
+}
+
 static void ComputeColors( shaderStage_t *pStage )
 {
 	int		i;
@@ -671,6 +702,9 @@ static void ComputeColors( shaderStage_t *pStage )
 			break;
 		case CGEN_EXACT_VERTEX:
 			Com_Memcpy( tess.svars.colors, tess.vertexColors, tess.numVertexes * sizeof( tess.vertexColors[0] ) );
+			break;
+		case CGEN_DOOM_SECTOR:
+			RB_CalcDoomSectorColors( ( unsigned char * ) tess.svars.colors );
 			break;
 		case CGEN_CONST:
 			for ( i = 0; i < tess.numVertexes; i++ ) {

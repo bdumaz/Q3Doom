@@ -1958,6 +1958,9 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	CG_ShaderStateChanged();
 
 	trap_S_ClearLoopingSounds( qtrue );
+
+	// Q3Doom: sector lights and the map's things
+	CG_DoomInit();
 }
 
 /*
@@ -1970,6 +1973,7 @@ Called before every level change or subsystem restart
 void CG_Shutdown( void ) {
 	// some mods may need to do cleanup work here,
 	// like closing files or archiving session data
+	CG_DoomShutdown();
 }
 
 

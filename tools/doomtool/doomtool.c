@@ -488,9 +488,9 @@ static int CmdBuild( const doom_wad_t *wad, const char *name, const char *outdir
 			failed++;
 			continue;
 		}
-		printf( "%-6s %7zu bytes  %5d nodes  %4d sector + %4d void + %3d sliver leafs  %5d brushes  %4d surfaces  coverage %.4f\n",
+		printf( "%-6s %7zu bytes  %5d nodes  %4d sector + %4d void + %3d sliver leafs  %5d brushes  %4d surfaces  %3d movers  coverage %.4f\n",
 			map.name, size, st.nodes, st.sector_leafs, st.void_leafs, st.degenerate_leafs, st.brushes,
-			st.surfaces, st.covered_area / st.bounds_area );
+			st.surfaces, st.movers, st.covered_area / st.bounds_area );
 		if ( outdir ) {
 			char	path[1024];
 			FILE	*f;

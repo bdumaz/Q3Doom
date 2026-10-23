@@ -1668,3 +1668,18 @@ extern qboolean		initparticles;
 int CG_NewParticleArea ( int num );
 
 
+
+//
+// cg_doom.c (Q3Doom)
+//
+void		CG_DoomInit( void );
+void		CG_DoomShutdown( void );
+void		CG_DoomLightsChanged( void );
+void		CG_DoomAddToScene( void );
+void		CG_DoomClipMove( const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int mask, trace_t *tr );
+int			CG_DoomPointContents( const vec3_t point );
+
+// the engine's Doom data, shared read-only with this native module
+const struct doom_map_s *trap_Doom_GetMap( const char *mapname );
+const struct doom_wad_s *trap_Doom_GetWad( void );
+void		trap_R_DoomSectorLights( const byte *levels, int count );

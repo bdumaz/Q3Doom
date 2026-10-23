@@ -788,3 +788,12 @@ int trap_PC_ReadToken( int handle, pc_token_t *pc_token ) {
 int trap_PC_SourceFileAndLine( int handle, char *filename, int *line ) {
 	return syscall( BOTLIB_PC_SOURCE_FILE_AND_LINE, handle, filename, line );
 }
+
+// Q3Doom: the engine's Doom data, shared read-only with this native module
+const struct doom_map_s *trap_Doom_GetMap( const char *mapname ) {
+	return (const struct doom_map_s *)syscall( G_DOOM_GETMAP, mapname );
+}
+
+const struct doom_wad_s *trap_Doom_GetWad( void ) {
+	return (const struct doom_wad_s *)syscall( G_DOOM_GETWAD );
+}

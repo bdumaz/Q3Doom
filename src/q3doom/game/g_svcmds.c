@@ -453,6 +453,11 @@ qboolean	ConsoleCommand( void ) {
 		return qtrue;
 	}
 
+	if ( Q_stricmp (cmd, "doom_status") == 0 ) {
+		Doom_StatusCommand();
+		return qtrue;
+	}
+
 	if ( Q_stricmp (cmd, "forceteam") == 0 ) {
 		Svcmd_ForceTeam_f();
 		return qtrue;

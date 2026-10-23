@@ -698,6 +698,14 @@ intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 	case CG_R_INPVS:
 		return re.inPVS( VMA(1), VMA(2) );
 
+	case CG_DOOM_GETMAP:
+		return (intptr_t)Doom_GetMap( VMA(1) );
+	case CG_DOOM_GETWAD:
+		return (intptr_t)Doom_GetWad();
+	case CG_R_DOOM_SECTORLIGHTS:
+		re.DoomSectorLights( VMA(1), (int)args[2] );
+		return 0;
+
 	default:
 	        assert(0); // bk010102
 		Com_Error( ERR_DROP, "Bad cgame system trap: %i", (int)args[0] );

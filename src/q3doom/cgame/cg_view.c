@@ -817,6 +817,7 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 		CG_AddMarks();
 		CG_AddParticles ();
 		CG_AddLocalEntities();
+		CG_DoomAddToScene();			// Q3Doom: sector lights, things (after calcViewValues: sprites face the view)
 	}
 	CG_AddViewWeapon( &cg.predictedPlayerState );
 

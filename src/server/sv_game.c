@@ -472,6 +472,11 @@ intptr_t SV_GameSystemCalls( intptr_t *args ) {
 	case BOTLIB_PC_SOURCE_FILE_AND_LINE:
 		return botlib_export->PC_SourceFileAndLine( args[1], VMA(2), VMA(3) );
 
+	case G_DOOM_GETMAP:
+		return (intptr_t)Doom_GetMap( VMA(1) );
+	case G_DOOM_GETWAD:
+		return (intptr_t)Doom_GetWad();
+
 	case BOTLIB_START_FRAME:
 		return botlib_export->BotLibStartFrame( VMF(1) );
 	case BOTLIB_LOAD_MAP:

@@ -79,6 +79,8 @@ vmCvar_t	g_filterBan;
 vmCvar_t	g_smoothClients;
 vmCvar_t	pmove_fixed;
 vmCvar_t	g_stepHeight;
+vmCvar_t	g_doomSkill;
+vmCvar_t	g_doomAllKeys;
 vmCvar_t	pmove_msec;
 vmCvar_t	g_rankings;
 vmCvar_t	g_listEntity;
@@ -179,6 +181,10 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &pmove_fixed, "pmove_fixed", "0", CVAR_SYSTEMINFO, 0, qfalse},
 	// Q3Doom: highest step walked up without jumping (Quake 3: 18, Doom: 24)
 	{ &g_stepHeight, "g_stepHeight", "18", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},
+	// Q3Doom: Doom skill 0-4 (things spawned), latched like the gametype; the
+	// cgame reads it from the serverinfo
+	{ &g_doomSkill, "g_doomSkill", DOOM_DEFAULT_SKILL, CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_LATCH, 0, qfalse},
+	{ &g_doomAllKeys, "g_doomAllKeys", "0", CVAR_CHEAT, 0, qfalse},
 	{ &pmove_msec, "pmove_msec", "8", CVAR_SYSTEMINFO, 0, qfalse},
 
 	{ &g_rankings, "g_rankings", "0", 0, 0, qfalse}
@@ -480,11 +486,16 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 
 	ClearRegisteredItems();
 
+	// Q3Doom: sector state first, the Doom movers spawn from the entity string
+	Doom_InitLevel();
+
 	// parse the key/value pairs and spawn gentities
 	G_SpawnEntitiesFromString();
 
 	// general initialization
 	G_FindTeams();
+
+	Doom_StartLevel();
 
 	// make sure we have flags for CTF, etc
 	if( g_gametype.integer >= GT_TEAM ) {
@@ -520,6 +531,8 @@ G_ShutdownGame
 */
 void G_ShutdownGame( int restart ) {
 	G_Printf ("==== ShutdownGame ====\n");
+
+	Doom_ShutdownLevel();
 
 	if ( level.logFile ) {
 		G_LogPrintf("ShutdownGame:\n" );
@@ -1796,6 +1809,9 @@ int start, end;
 		G_RunThink( ent );
 	}
 end = trap_Milliseconds();
+
+	// Q3Doom: damaging floors, secrets, switches, exits
+	Doom_RunFrame();
 
 start = trap_Milliseconds();
 	// perform final fixups on the players

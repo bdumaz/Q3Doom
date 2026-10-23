@@ -443,3 +443,16 @@ qboolean trap_GetEntityToken( char *buffer, int bufferSize ) {
 qboolean trap_R_inPVS( const vec3_t p1, const vec3_t p2 ) {
 	return syscall( CG_R_INPVS, p1, p2 );
 }
+
+// Q3Doom: the engine's Doom data, shared read-only with this native module
+const struct doom_map_s *trap_Doom_GetMap( const char *mapname ) {
+	return (const struct doom_map_s *)syscall( CG_DOOM_GETMAP, mapname );
+}
+
+const struct doom_wad_s *trap_Doom_GetWad( void ) {
+	return (const struct doom_wad_s *)syscall( CG_DOOM_GETWAD );
+}
+
+void trap_R_DoomSectorLights( const byte *levels, int count ) {
+	syscall( CG_R_DOOM_SECTORLIGHTS, levels, count );
+}

@@ -1805,6 +1805,7 @@ void RE_LoadWorldMap( const char *name ) {
 	VectorNormalize( tr.sunDirection );
 
 	tr.worldMapLoaded = qtrue;
+	tr.numDoomSectorLights = 0;		// until the cgame sends the levels of this map
 
 	// load it
     ri.FS_ReadFile( name, (void **)&buffer );

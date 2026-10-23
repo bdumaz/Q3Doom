@@ -94,6 +94,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #error overflow: (CS_MAX) > MAX_CONFIGSTRINGS
 #endif
 
+// Q3Doom: sector light levels changed by line specials, "sector level effect ..."
+// (the engine reads nothing past CS_MAX, so modules may use the rest)
+#define CS_DOOM_LIGHTS			(CS_MAX)
+
+#if (CS_DOOM_LIGHTS) >= MAX_CONFIGSTRINGS
+#error overflow: CS_DOOM_LIGHTS >= MAX_CONFIGSTRINGS
+#endif
+
 typedef enum {
 	GT_FFA,				// free for all
 	GT_TOURNAMENT,		// one on one tournament

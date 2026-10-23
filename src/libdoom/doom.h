@@ -242,6 +242,98 @@ int					doom_linedef_is_jumpable_window( const doom_map_t *map, const doom_lined
 /*
 =====================================================================
 
+LINE SPECIALS AND SECTOR MOVEMENT (specials.c)
+
+=====================================================================
+*/
+
+typedef enum {
+	DOOM_TRIG_NONE,
+	DOOM_TRIG_WALK,			// crossing the line (W1/WR)
+	DOOM_TRIG_SWITCH,		// using the line (S1/SR), acts on tagged sectors
+	DOOM_TRIG_MANUAL,		// using a door line, acts on its back sector (D1/DR)
+	DOOM_TRIG_GUN			// shooting the line (G1/GR)
+} doom_trigger_t;
+
+typedef enum {
+	DOOM_KIND_NONE,
+	DOOM_KIND_DOOR,
+	DOOM_KIND_PLAT,
+	DOOM_KIND_FLOOR,
+	DOOM_KIND_CEILING,
+	DOOM_KIND_STAIRS,
+	DOOM_KIND_LIGHT,
+	DOOM_KIND_EXIT,			// type 1: secret exit
+	DOOM_KIND_TELEPORT,
+	DOOM_KIND_DONUT,
+	DOOM_KIND_STOP,			// type: the kind it stops (perpetual plats, crushers)
+	DOOM_KIND_SCROLL		// texture scrolls left, no trigger
+} doom_kind_t;
+
+// vldoor_e
+enum { DOOM_DOOR_NORMAL, DOOM_DOOR_CLOSE30THENOPEN, DOOM_DOOR_CLOSE, DOOM_DOOR_OPEN, DOOM_DOOR_RAISEIN5MINS,
+	DOOM_DOOR_BLAZERAISE, DOOM_DOOR_BLAZEOPEN, DOOM_DOOR_BLAZECLOSE };
+// plattype_e
+enum { DOOM_PLAT_PERPETUALRAISE, DOOM_PLAT_DOWNWAITUPSTAY, DOOM_PLAT_RAISEANDCHANGE,
+	DOOM_PLAT_RAISETONEARESTANDCHANGE, DOOM_PLAT_BLAZEDWUS };
+// floor_e
+enum { DOOM_FLOOR_LOWER, DOOM_FLOOR_LOWERTOLOWEST, DOOM_FLOOR_TURBOLOWER, DOOM_FLOOR_RAISE, DOOM_FLOOR_RAISETONEAREST,
+	DOOM_FLOOR_RAISETOTEXTURE, DOOM_FLOOR_LOWERANDCHANGE, DOOM_FLOOR_RAISE24, DOOM_FLOOR_RAISE24ANDCHANGE,
+	DOOM_FLOOR_RAISECRUSH, DOOM_FLOOR_RAISETURBO, DOOM_FLOOR_RAISE512 };
+// ceiling_e
+enum { DOOM_CEIL_LOWERTOFLOOR, DOOM_CEIL_RAISETOHIGHEST, DOOM_CEIL_LOWERANDCRUSH, DOOM_CEIL_CRUSHANDRAISE,
+	DOOM_CEIL_FASTCRUSHANDRAISE, DOOM_CEIL_SILENTCRUSHANDRAISE };
+// stair_e
+enum { DOOM_STAIRS_BUILD8, DOOM_STAIRS_TURBO16 };
+// lights
+enum { DOOM_LIGHT_TURNON, DOOM_LIGHT_TURNOFF, DOOM_LIGHT_STROBE };
+// keys
+enum { DOOM_KEY_NONE, DOOM_KEY_BLUE, DOOM_KEY_YELLOW, DOOM_KEY_RED };
+
+typedef struct {
+	int				special;
+	doom_trigger_t	trigger;
+	int				repeatable;
+	int				monsters;	// 1 monsters can trigger it too, 2 monsters only
+	doom_kind_t		kind;
+	int				type;		// DOOM_DOOR_*, DOOM_PLAT_*, ... for the kind
+	int				amount;		// key for doors, raise amount for plats, light level for lights
+} doom_special_t;
+
+// NULL if the special does nothing
+const doom_special_t *doom_line_special( int special );
+
+// Doom's P_Find*Surrounding; height arrays are the current heights of all
+// sectors (NULL: the heights stored in the map)
+int		doom_find_lowest_floor_surrounding( const doom_map_t *map, int sector, const int *floors, const int *ceilings );
+int		doom_find_highest_floor_surrounding( const doom_map_t *map, int sector, const int *floors, const int *ceilings );
+int		doom_find_next_highest_floor( const doom_map_t *map, int sector, int current, const int *floors, const int *ceilings );
+int		doom_find_lowest_ceiling_surrounding( const doom_map_t *map, int sector, const int *floors, const int *ceilings );
+int		doom_find_highest_ceiling_surrounding( const doom_map_t *map, int sector, const int *floors, const int *ceilings );
+int		doom_find_min_surrounding_light( const doom_map_t *map, int sector, int max, const int *lights );
+int		doom_shortest_lower_texture( const doom_wad_t *wad, const doom_map_t *map, int sector );
+// sectors raised by a stair builder starting at 'sector'; 'visited' (one byte per sector) must start cleared
+int		doom_stair_chain( const doom_map_t *map, int sector, int *out, int max, uint8_t *visited );
+
+// The heights each sector's floor and ceiling can reach through the map's
+// specials (Doom's target rules on the initial heights). min == max: static.
+typedef struct {
+	int		floor_min, floor_max;
+	int		ceiling_min, ceiling_max;
+} doom_plane_range_t;
+
+void	doom_sector_ranges( const doom_wad_t *wad, const doom_map_t *map, doom_plane_range_t *ranges );
+
+// Animated textures and flats: the cycle as seen from 'name' (0 if not animated).
+// Doom advances them every 8 tics.
+#define DOOM_ANIM_TICS		8
+int		doom_anim_frames( const doom_wad_t *wad, int is_texture, const char *name, char frames[][DOOM_LUMP_NAME_LEN + 1], int max_frames );
+// SW1xxx <-> SW2xxx; returns 1 and the other texture if 'name' is a switch
+int		doom_switch_texture( const doom_wad_t *wad, const char *name, char out[DOOM_LUMP_NAME_LEN + 1] );
+
+/*
+=====================================================================
+
 WORLD BUILDER
 
 Builds a Quake 3 BSP (IBSP version 46) from a map model: collision brushes,
@@ -261,6 +353,7 @@ typedef struct {
 	int			surfaces;
 	int			planes;
 	int			verts;
+	int			movers;				// moving floors and ceilings (inline models 1..movers)
 	double		covered_area;		// sum of leaf areas, should equal bounds_area
 	double		bounds_area;
 } doom_build_stats_t;

@@ -2213,6 +2213,7 @@ void CL_InitRef( void ) {
 	ri.FS_FileIsInPAK = FS_FileIsInPAK;
 	ri.FS_FileExists = FS_FileExists;
 	ri.Doom_LoadImage = Doom_LoadImage;
+	ri.Doom_AnimFrames = Doom_AnimFrames;
 	ri.Cvar_Get = Cvar_Get;
 	ri.Cvar_Set = Cvar_Set;
 

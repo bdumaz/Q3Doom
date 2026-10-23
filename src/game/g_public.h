@@ -386,7 +386,11 @@ typedef enum {
 	BOTLIB_PC_LOAD_SOURCE,
 	BOTLIB_PC_FREE_SOURCE,
 	BOTLIB_PC_READ_TOKEN,
-	BOTLIB_PC_SOURCE_FILE_AND_LINE
+	BOTLIB_PC_SOURCE_FILE_AND_LINE,
+
+	// Q3Doom: the engine's Doom data, shared read-only with the native module
+	G_DOOM_GETMAP = 900,	// ( const char *mapname ) -> const doom_map_t *, NULL if not a Doom map
+	G_DOOM_GETWAD			// () -> const doom_wad_t *
 
 } gameImport_t;
 

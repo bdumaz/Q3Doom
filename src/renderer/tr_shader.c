@@ -63,6 +63,106 @@ static long generateHashValue( const char *fname, const int size ) {
 	return hash;
 }
 
+static shader_t *FinishShader( void );
+
+/*
+================
+R_DoomShader
+
+Q3Doom: implicit shader for a doom/<kind>/<NAME> surface, filling the
+global 'shader' being built by R_FindShader.
+- thing: sprite billboard drawn by the cgame with vertex colors, both sides
+- wall, sw<line>, scroll, flat: map surfaces lit by their Doom sector;
+  animated textures cycle like Doom (8 tics a frame), scrolling walls move
+  one texel per tic
+Holes in Doom pictures are alpha tested.
+================
+*/
+#define DOOM_TICRATE	35.0f
+
+static shader_t *R_DoomShader( const char *name ) {
+	char		kind[16], fileName[MAX_QPATH], frames[MAX_IMAGE_ANIMATIONS][16];
+	const char	*s = name + 5, *slash = strchr( s, '/' );
+	image_t		*image;
+	int			numFrames, i;
+
+	if ( !slash || slash - s >= sizeof( kind ) ) {
+		shader.defaultShader = qtrue;
+		return FinishShader();
+	}
+	Q_strncpyz( kind, s, slash - s + 1 );
+
+	Q_strncpyz( fileName, name, sizeof( fileName ) );
+	COM_DefaultExtension( fileName, sizeof( fileName ), ".tga" );
+
+	if ( !Q_stricmp( kind, "thing" ) ) {
+		image = R_FindImageFile( fileName, qtrue, qtrue, GL_CLAMP );
+		if ( !image ) {
+			shader.defaultShader = qtrue;
+			return FinishShader();
+		}
+		stages[0].bundle[0].image[0] = image;
+		stages[0].active = qtrue;
+		stages[0].rgbGen = CGEN_VERTEX;
+		stages[0].alphaGen = AGEN_SKIP;
+		stages[0].stateBits = GLS_DEFAULT | GLS_ATEST_GE_80;
+		shader.cullType = CT_TWO_SIDED;		// lightmapIndex stays as requested: it is part of the shader's identity
+		return FinishShader();
+	}
+
+	image = R_FindImageFile( fileName, qtrue, qtrue, GL_REPEAT );
+	if ( !image ) {
+		shader.defaultShader = qtrue;
+		return FinishShader();
+	}
+	stages[0].bundle[0].image[0] = image;
+	stages[0].active = qtrue;
+	stages[0].rgbGen = CGEN_DOOM_SECTOR;
+	stages[0].alphaGen = AGEN_SKIP;
+	stages[0].stateBits = GLS_DEFAULT | GLS_ATEST_GE_80;
+
+	// animated textures and flats
+	numFrames = ri.Doom_AnimFrames( name, frames[0], sizeof( frames[0] ), MAX_IMAGE_ANIMATIONS );
+	if ( numFrames > 1 ) {
+		for ( i = 0 ; i < numFrames ; i++ ) {
+			Com_sprintf( fileName, sizeof( fileName ), "doom/%s/%s.tga", kind, frames[i] );
+			stages[0].bundle[0].image[i] = R_FindImageFile( fileName, qtrue, qtrue, GL_REPEAT );
+			if ( !stages[0].bundle[0].image[i] ) {
+				stages[0].bundle[0].image[i] = image;
+			}
+		}
+		stages[0].bundle[0].numImageAnimations = numFrames;
+		stages[0].bundle[0].imageAnimationSpeed = DOOM_TICRATE / 8;
+	}
+
+	// scrolling walls (line special 48): one texel per tic, to the left
+	if ( !Q_stricmp( kind, "scroll" ) ) {
+		stages[0].bundle[0].texMods[0].type = TMOD_SCROLL;
+		stages[0].bundle[0].texMods[0].scroll[0] = DOOM_TICRATE / image->width;
+		stages[0].bundle[0].texMods[0].scroll[1] = 0;
+		stages[0].bundle[0].numTexMods = 1;
+	}
+	return FinishShader();
+}
+
+/*
+================
+R_DoomSectorLights
+
+Q3Doom: light levels of the Doom map's sectors for CGEN_DOOM_SECTOR
+================
+*/
+void R_DoomSectorLights( const byte *levels, int count ) {
+	if ( count > MAX_DOOM_SECTORS ) {
+		count = MAX_DOOM_SECTORS;
+	}
+	if ( count < 0 ) {
+		count = 0;
+	}
+	Com_Memcpy( tr.doomSectorLights, levels, count );
+	tr.numDoomSectorLights = count;
+}
+
 void R_RemapShader(const char *shaderName, const char *newShaderName, const char *timeOffset) {
 	char		strippedName[MAX_QPATH];
 	int			hash;
@@ -2478,6 +2578,11 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 		return sh;
 	}
 
+
+	// Q3Doom: Doom world surfaces and sprites
+	if ( !Q_stricmpn( name, "doom/thing/", 11 ) || ( !Q_stricmpn( name, "doom/", 5 ) && lightmapIndex != LIGHTMAP_2D ) ) {
+		return R_DoomShader( name );
+	}
 
 	//
 	// if not defined in the in-memory shader descriptions,

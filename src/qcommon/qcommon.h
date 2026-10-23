@@ -671,6 +671,7 @@ void		Doom_Init( void );
 void		Doom_Shutdown( void );
 const struct doom_wad_s *Doom_GetWad( void );		// NULL if no IWAD
 byte		*Doom_LoadImage( const char *path, int *width, int *height );	// Z_Malloc'ed RGBA
+int			Doom_AnimFrames( const char *path, char *frames, int frameSize, int maxFrames );
 qboolean	Doom_LoadSound( const char *path, const byte **samples, int *numSamples, int *rate );
 // "maps/<NAME>.bsp" for a map in the IWAD: the runtime-built Quake 3 BSP (cached), else NULL
 const byte	*Doom_GetMapBSP( const char *qpath, int *size );

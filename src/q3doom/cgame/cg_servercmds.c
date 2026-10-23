@@ -282,6 +282,8 @@ static void CG_ConfigStringModified( void ) {
 	// do something with it if necessary
 	if ( num == CS_MUSIC ) {
 		CG_StartMusic();
+	} else if ( num == CS_DOOM_LIGHTS ) {
+		CG_DoomLightsChanged();
 	} else if ( num == CS_SERVERINFO ) {
 		CG_ParseServerinfo();
 	} else if ( num == CS_WARMUP ) {

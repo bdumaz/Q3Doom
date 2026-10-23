@@ -558,9 +558,20 @@ typedef struct {
 
 typedef struct {
 	int		shader;
-	int		sector;		// sector the surface is seen from (leaf surface lists)
+	int		sector;		// sector the surface is seen from (leaf surface lists), -1 none
+	int		model;		// 0 world, else the mover model being built
 	int		surface;	// current osurface_t, -1 when a new one must be started
 } surfbuilder_t;
+
+// a moving floor or ceiling: one inline model
+typedef struct {
+	int		sector;
+	int		ceiling;		// 0 floor, 1 ceiling
+	int		model;			// inline model number (*model)
+	int		firstSurface, numSurfaces;
+	int		firstBrush, numBrushes;
+	float	mins[3], maxs[3];
+} mover_t;
 
 typedef struct {
 	const doom_map_t	*map;
@@ -590,9 +601,20 @@ typedef struct {
 	dbuf_t				surfIndexes;	// in parallel, vertexes are made contiguous at the end
 	dbuf_t				*sectorSurfaces;	// per sector: int surface indexes
 	dbuf_t				*leafExtraBrushes;	// per 2D leaf: clip brushes
-	dbuf_t				wallBuilders;		// surfbuilder_t, one per (texture, sector)
+	dbuf_t				wallBuilders;		// surfbuilder_t, one per (texture, sector, model)
 	int					shaderSolid, shaderNodraw, shaderPlayerClip, shaderMonsterClip;
+
+	// moving sectors: the world uses each plane's extreme position (floors at
+	// their lowest, ceilings at their highest), movers fill the rest
+	doom_plane_range_t	*ranges;
+	dbuf_t				movers;			// mover_t
+	int					currentModel;	// model the surfaces being built belong to
 } builder_t;
+
+#define FLOOR_MOVES( b, s )		( (b)->ranges[s].floor_min != (b)->ranges[s].floor_max )
+#define CEILING_MOVES( b, s )	( (b)->ranges[s].ceiling_min != (b)->ranges[s].ceiling_max )
+
+#define MOVER_INSET		0.25	// mover faces sit this far inside their sector (no z-fighting with static walls)
 
 /*
 =================
@@ -768,6 +790,7 @@ static uint8_t LightByte( int light ) {
 static void BeginSurface( builder_t *b, surfbuilder_t *sb, int shader, int sector ) {
 	sb->shader = shader;
 	sb->sector = sector;
+	sb->model = b->currentModel;
 	sb->surface = -1;
 }
 
@@ -778,10 +801,15 @@ SurfacePolygon
 Adds a convex polygon (fan triangulated) to the surface being built,
 starting a new osurface_t when the renderer limits would be exceeded.
 Vertices are in the order they should be wound (clockwise from the front).
+
+Lighting: the vertex color is the sector light (renderers without Doom
+lighting), and the unused lightmap coordinates carry the sector index and
+the fake contrast offset so the renderer can light it live.
 =================
 */
 static void SurfacePolygon( builder_t *b, surfbuilder_t *sb, int n, const float (*xyz)[3], const float (*st)[2],
-	const float normal[3], int light ) {
+	const float normal[3], int lightSector, int lightDelta ) {
+	int			light = b->map->sectors[lightSector].light + lightDelta;
 	osurface_t	*surf;
 	dbuf_t		*verts, *indexes;
 	int			i, base;
@@ -804,7 +832,8 @@ static void SurfacePolygon( builder_t *b, surfbuilder_t *sb, int n, const float 
 		sb->surface = b->surfaces.count - 1;
 		BufInit( BufPush( &b->surfVerts ), sizeof( overt_t ) );
 		BufInit( BufPush( &b->surfIndexes ), sizeof( int ) );
-		if ( sb->sector >= 0 ) {
+		// only world surfaces go in leafs; movers are drawn as entities
+		if ( sb->sector >= 0 && sb->model == 0 ) {
 			*(int *)BufPush( &b->sectorSurfaces[sb->sector] ) = sb->surface;
 		}
 	}
@@ -821,6 +850,8 @@ static void SurfacePolygon( builder_t *b, surfbuilder_t *sb, int n, const float 
 		memcpy( v->normal, normal, sizeof( v->normal ) );
 		v->color[0] = v->color[1] = v->color[2] = LightByte( light );
 		v->color[3] = 255;
+		v->lightmap[0] = (float)lightSector;
+		v->lightmap[1] = (float)lightDelta;
 	}
 	for ( i = 1 ; i < n - 1 ; i++ ) {
 		*(int *)BufPush( indexes ) = base;
@@ -878,25 +909,67 @@ static int IsSky( const char *flat ) {
 
 /*
 =================
-WallQuad
+WallShaderName
 
-One wall piece of a sidedef between z0 and z1. 'texTop' is the height at
-which texture row 0 sits before the sidedef y offset (Doom pegging).
+Switch textures get one shader per line, so the game can swap them line by
+line (shader remapping); the front side of a scrolling line scrolls.
 =================
 */
-static void WallQuad( builder_t *b, const char *texture, int sector, pt_t a, pt_t c, double z0, double z1,
-	double texTop, double xoff, double yoff, int light, const float normal[3] ) {
+static void WallShaderName( builder_t *b, int line, int side, const char *texture, char *out, size_t outlen ) {
+	const doom_special_t	*sp = doom_line_special( b->map->linedefs[line].special );
+	char					other[DOOM_LUMP_NAME_LEN + 1];
+
+	if ( sp && ( sp->trigger == DOOM_TRIG_SWITCH || sp->trigger == DOOM_TRIG_GUN ) && doom_switch_texture( b->wad, texture, other ) ) {
+		snprintf( out, outlen, "doom/sw%d/%s", line, texture );
+	} else if ( sp && sp->kind == DOOM_KIND_SCROLL && side == 0 ) {
+		snprintf( out, outlen, "doom/scroll/%s", texture );
+	} else {
+		snprintf( out, outlen, "doom/wall/%s", texture );
+	}
+}
+
+// Doom's "fake contrast": east-west walls darker, north-south walls lighter
+static int FakeContrast( pt_t v1, pt_t v2 ) {
+	if ( v1.y == v2.y ) {
+		return -16;
+	}
+	if ( v1.x == v2.x ) {
+		return 16;
+	}
+	return 0;
+}
+
+/*
+=================
+WallQuad
+
+One wall piece of sidedef 'side' of 'line' between z0 and z1, facing the
+right of a->c. 'texTop' is the height at which texture row 0 sits before
+the sidedef y offset (Doom pegging), in world heights; 'zShift' converts
+the quad's heights to world heights (movers are built at a canonical
+position). 'inset' pulls the quad back against its normal.
+=================
+*/
+static void WallQuad( builder_t *b, int line, int side, const char *texture, int surfSector, int lightSector, int lightDelta,
+	pt_t a, pt_t c, double z0, double z1, double zShift, double texTop, double xoff, double yoff, double inset ) {
 	surfbuilder_t	*sb = NULL;
-	float			xyz[4][3], st[4][2];
+	float			xyz[4][3], st[4][2], normal[3];
 	char			name[64];
 	int				tw, th, shader, i;
 	double			len;
+	line_t			l;
 
 	if ( z1 - z0 < 0.01 || !strcmp( texture, "-" ) ) {
 		return;
 	}
 	TextureSize( b, texture, &tw, &th );
 	len = sqrt( ( c.x - a.x ) * ( c.x - a.x ) + ( c.y - a.y ) * ( c.y - a.y ) );
+	l = LineFromPoints( a, c );
+	normal[0] = (float)l.nx;
+	normal[1] = (float)l.ny;
+	normal[2] = 0;
+	a.x -= l.nx * inset; a.y -= l.ny * inset;
+	c.x -= l.nx * inset; c.y -= l.ny * inset;
 
 	// clockwise seen from the front: start top, then end top, end bottom, start bottom
 	xyz[0][0] = (float)a.x; xyz[0][1] = (float)a.y; xyz[0][2] = (float)z1;
@@ -905,24 +978,24 @@ static void WallQuad( builder_t *b, const char *texture, int sector, pt_t a, pt_
 	xyz[3][0] = (float)a.x; xyz[3][1] = (float)a.y; xyz[3][2] = (float)z0;
 	st[0][0] = st[3][0] = (float)( xoff / tw );
 	st[1][0] = st[2][0] = (float)( ( xoff + len ) / tw );
-	st[0][1] = st[1][1] = (float)( ( texTop - z1 + yoff ) / th );
-	st[2][1] = st[3][1] = (float)( ( texTop - z0 + yoff ) / th );
+	st[0][1] = st[1][1] = (float)( ( texTop - ( z1 + zShift ) + yoff ) / th );
+	st[2][1] = st[3][1] = (float)( ( texTop - ( z0 + zShift ) + yoff ) / th );
 
-	// all walls with the same texture facing the same sector share surfaces
-	snprintf( name, sizeof( name ), "doom/wall/%s", texture );
+	// walls with the same shader facing the same sector in the same model share surfaces
+	WallShaderName( b, line, side, texture, name, sizeof( name ) );
 	shader = FindShader( b, name, 0, 0 );
 	for ( i = 0 ; i < b->wallBuilders.count ; i++ ) {
 		surfbuilder_t *w = BufAt( &b->wallBuilders, surfbuilder_t, i );
-		if ( w->shader == shader && w->sector == sector ) {
+		if ( w->shader == shader && w->sector == surfSector && w->model == b->currentModel ) {
 			sb = w;
 			break;
 		}
 	}
 	if ( !sb ) {
 		sb = BufPush( &b->wallBuilders );
-		BeginSurface( b, sb, shader, sector );
+		BeginSurface( b, sb, shader, surfSector );
 	}
-	SurfacePolygon( b, sb, 4, (const float (*)[3])xyz, (const float (*)[2])st, normal, light );
+	SurfacePolygon( b, sb, 4, (const float (*)[3])xyz, (const float (*)[2])st, normal, lightSector, lightDelta );
 }
 
 /*
@@ -930,8 +1003,11 @@ static void WallQuad( builder_t *b, const char *texture, int sector, pt_t a, pt_
 BuildWalls
 
 Doom's wall rules (r_segs.c): one-sided middle, two-sided upper and lower,
-masked two-sided middle, the sky hack, and the "fake contrast" that
-darkens east-west walls and brightens north-south ones.
+masked two-sided middle, the sky hack, and the fake contrast. Only the
+parts that never move are world walls: heights use each sector's extreme
+plane positions (floors at their lowest, ceilings at their highest); the
+moving parts are faces of the movers. Texture alignment uses the initial
+heights.
 =================
 */
 static void BuildWalls( builder_t *b ) {
@@ -941,18 +1017,20 @@ static void BuildWalls( builder_t *b ) {
 	for ( i = 0 ; i < map->num_linedefs ; i++ ) {
 		const doom_linedef_t	*ld = &map->linedefs[i];
 		pt_t					v1 = Vertex( map, ld->v1 ), v2 = Vertex( map, ld->v2 );
+		int						contrast = FakeContrast( v1, v2 );
 
 		if ( fabs( v1.x - v2.x ) < 0.001 && fabs( v1.y - v2.y ) < 0.001 ) {
 			continue;
 		}
 
 		for ( s = 0 ; s < 2 ; s++ ) {
-			const doom_sidedef_t	*sd, *other;
-			const doom_sector_t		*front, *back;
-			pt_t					a = s ? v2 : v1, c = s ? v1 : v2;
-			line_t					l = LineFromPoints( a, c );
-			float					normal[3];
-			int						light, tw, th, sector;
+			const doom_sidedef_t		*sd, *other;
+			const doom_sector_t			*front, *back;
+			const doom_plane_range_t	*rf, *rb;
+			// a->c runs from the sidedef's own start vertex (v1 for the front,
+			// v2 for the back), so its sector is on the right, where it faces
+			pt_t						a = s ? v2 : v1, c = s ? v1 : v2;
+			int							tw, th, sector;
 
 			if ( ld->side[s] == DOOM_NO_SIDE ) {
 				continue;
@@ -960,46 +1038,32 @@ static void BuildWalls( builder_t *b ) {
 			sd = &map->sidedefs[ld->side[s]];
 			sector = sd->sector;
 			front = &map->sectors[sector];
+			rf = &b->ranges[sector];
 			other = ld->side[s ^ 1] == DOOM_NO_SIDE ? NULL : &map->sidedefs[ld->side[s ^ 1]];
 			back = other ? &map->sectors[other->sector] : NULL;
-
-			// a->c runs from the sidedef's own start vertex (v1 for the front,
-			// v2 for the back), so its sector is on the right, where the line
-			// normal points: the wall faces that way
-			normal[0] = (float)l.nx;
-			normal[1] = (float)l.ny;
-			normal[2] = 0;
-
-			light = front->light;
-			if ( v1.y == v2.y ) {
-				light -= 16;
-			} else if ( v1.x == v2.x ) {
-				light += 16;
-			}
+			rb = other ? &b->ranges[other->sector] : NULL;
 
 			if ( !back ) {
 				// one-sided: middle texture from floor to ceiling
 				TextureSize( b, sd->mid, &tw, &th );
-				WallQuad( b, sd->mid, sector, a, c, front->floor_height, front->ceiling_height,
+				WallQuad( b, i, s, sd->mid, sector, sector, contrast, a, c, rf->floor_min, rf->ceiling_max, 0,
 					( ld->flags & DOOM_ML_DONTPEGBOTTOM ) ? front->floor_height + th : front->ceiling_height,
-					sd->x_offset, sd->y_offset, light, normal );
+					sd->x_offset, sd->y_offset, 0 );
 				continue;
 			}
 
 			// upper: front ceiling above back ceiling, unless both are sky
-			if ( back->ceiling_height < front->ceiling_height && !( IsSky( front->ceiling_flat ) && IsSky( back->ceiling_flat ) ) ) {
+			if ( !( IsSky( front->ceiling_flat ) && IsSky( back->ceiling_flat ) ) ) {
 				TextureSize( b, sd->top, &tw, &th );
-				WallQuad( b, sd->top, sector, a, c, back->ceiling_height, front->ceiling_height,
+				WallQuad( b, i, s, sd->top, sector, sector, contrast, a, c, rb->ceiling_max, rf->ceiling_max, 0,
 					( ld->flags & DOOM_ML_DONTPEGTOP ) ? front->ceiling_height : back->ceiling_height + th,
-					sd->x_offset, sd->y_offset, light, normal );
+					sd->x_offset, sd->y_offset, 0 );
 			}
 
 			// lower: back floor above front floor
-			if ( back->floor_height > front->floor_height ) {
-				WallQuad( b, sd->bottom, sector, a, c, front->floor_height, back->floor_height,
-					( ld->flags & DOOM_ML_DONTPEGBOTTOM ) ? front->ceiling_height : back->floor_height,
-					sd->x_offset, sd->y_offset, light, normal );
-			}
+			WallQuad( b, i, s, sd->bottom, sector, sector, contrast, a, c, rf->floor_min, rb->floor_min, 0,
+				( ld->flags & DOOM_ML_DONTPEGBOTTOM ) ? front->ceiling_height : back->floor_height,
+				sd->x_offset, sd->y_offset, 0 );
 
 			// masked middle texture: one texture height, not tiled vertically
 			if ( strcmp( sd->mid, "-" ) ) {
@@ -1013,7 +1077,7 @@ static void BuildWalls( builder_t *b ) {
 				z0 = z1 - th;
 				if ( z1 > hi ) z1 = hi;
 				if ( z0 < lo ) z0 = lo;
-				WallQuad( b, sd->mid, sector, a, c, z0, z1, top, sd->x_offset, sd->y_offset, light, normal );
+				WallQuad( b, i, s, sd->mid, sector, sector, contrast, a, c, z0, z1, 0, top, sd->x_offset, sd->y_offset, 0 );
 			}
 		}
 	}
@@ -1021,56 +1085,200 @@ static void BuildWalls( builder_t *b ) {
 
 /*
 =================
-BuildFlats
+SectorFlat
 
-Floor and ceiling of every sector leaf, merged per sector and flat.
-Doom draws flats aligned to the world grid with y flipped.
+The floor or ceiling of every leaf of a sector at height z, merged in one
+surface builder. Doom draws flats aligned to the world grid with y flipped.
 =================
 */
-static void BuildFlats( builder_t *b ) {
-	const doom_map_t	*map = b->map;
-	int					sector, i, j, ceiling;
+static void SectorFlat( builder_t *b, int sector, int ceiling, double z ) {
+	const doom_sector_t	*sec = &b->map->sectors[sector];
+	const char			*flat = ceiling ? sec->ceiling_flat : sec->floor_flat;
+	surfbuilder_t		sb;
+	float				normal[3] = { 0, 0, ceiling ? -1.0f : 1.0f };
 	float				(*xyz)[3] = NULL, (*st)[2] = NULL;
-	int					maxPoints = 0;
+	int					i, j, maxPoints = 0, shader;
 
-	for ( sector = 0 ; sector < map->num_sectors ; sector++ ) {
-		const doom_sector_t *sec = &map->sectors[sector];
+	// moving planes can change texture ("...AndChange" specials): one shader
+	// per sector so the game can remap it alone
+	if ( b->currentModel && !IsSky( flat ) ) {
+		char name[64];
 
-		for ( ceiling = 0 ; ceiling < 2 ; ceiling++ ) {
-			surfbuilder_t	sb;
-			float			normal[3] = { 0, 0, ceiling ? -1.0f : 1.0f };
-			double			z = ceiling ? sec->ceiling_height : sec->floor_height;
+		snprintf( name, sizeof( name ), "doom/fl%d/%s", sector, flat );
+		shader = FindShader( b, name, 0, 0 );
+	} else {
+		shader = FlatShader( b, flat, 0 );
+	}
+	BeginSurface( b, &sb, shader, sector );
 
-			BeginSurface( b, &sb, FlatShader( b, ceiling ? sec->ceiling_flat : sec->floor_flat, 0 ), sector );
+	for ( i = 0 ; i < b->bsp.leafs.count ; i++ ) {
+		const bspleaf2_t *leaf = BufAt( &b->bsp.leafs, bspleaf2_t, i );
 
-			for ( i = 0 ; i < b->bsp.leafs.count ; i++ ) {
-				const bspleaf2_t *leaf = BufAt( &b->bsp.leafs, bspleaf2_t, i );
-
-				if ( leaf->sector != sector || leaf->degenerate ) {
-					continue;
-				}
-				if ( leaf->poly.n > maxPoints ) {
-					maxPoints = leaf->poly.n;
-					xyz = realloc( xyz, sizeof( *xyz ) * maxPoints );
-					st = realloc( st, sizeof( *st ) * maxPoints );
-				}
-				for ( j = 0 ; j < leaf->poly.n ; j++ ) {
-					// clockwise from the viewer: reversed (CW) from above for floors,
-					// the CCW polygon order for ceilings seen from below
-					const pt_t *p = &leaf->poly.p[ceiling ? j : leaf->poly.n - 1 - j];
-
-					xyz[j][0] = (float)p->x;
-					xyz[j][1] = (float)p->y;
-					xyz[j][2] = (float)z;
-					st[j][0] = (float)( p->x / 64.0 );
-					st[j][1] = (float)( -p->y / 64.0 );
-				}
-				SurfacePolygon( b, &sb, leaf->poly.n, (const float (*)[3])xyz, (const float (*)[2])st, normal, sec->light );
-			}
+		if ( leaf->sector != sector || leaf->degenerate ) {
+			continue;
 		}
+		if ( leaf->poly.n > maxPoints ) {
+			maxPoints = leaf->poly.n;
+			xyz = realloc( xyz, sizeof( *xyz ) * maxPoints );
+			st = realloc( st, sizeof( *st ) * maxPoints );
+		}
+		for ( j = 0 ; j < leaf->poly.n ; j++ ) {
+			// clockwise from the viewer: reversed (CW) from above for floors,
+			// the CCW polygon order for ceilings seen from below
+			const pt_t *p = &leaf->poly.p[ceiling ? j : leaf->poly.n - 1 - j];
+
+			xyz[j][0] = (float)p->x;
+			xyz[j][1] = (float)p->y;
+			xyz[j][2] = (float)z;
+			st[j][0] = (float)( p->x / 64.0 );
+			st[j][1] = (float)( -p->y / 64.0 );
+		}
+		SurfacePolygon( b, &sb, leaf->poly.n, (const float (*)[3])xyz, (const float (*)[2])st, normal, sector, 0 );
 	}
 	free( xyz );
 	free( st );
+}
+
+// world floors and ceilings: only the planes that never move
+static void BuildFlats( builder_t *b ) {
+	int		sector;
+
+	for ( sector = 0 ; sector < b->map->num_sectors ; sector++ ) {
+		if ( !FLOOR_MOVES( b, sector ) ) {
+			SectorFlat( b, sector, 0, b->map->sectors[sector].floor_height );
+		}
+		if ( !CEILING_MOVES( b, sector ) ) {
+			SectorFlat( b, sector, 1, b->map->sectors[sector].ceiling_height );
+		}
+	}
+}
+
+/*
+=================
+BuildMover
+
+A moving floor or ceiling of a sector, as inline model 'model', built at a
+canonical position the game offsets by entity origin:
+- floor: a block from floor_min to floor_max (the top is the floor), so
+  that wherever the floor is, the space below it down to the world floor
+  (at floor_min) is filled; entity origin z = floor - floor_max
+- ceiling: a block from ceiling_min to ceiling_max (the bottom is the
+  ceiling), the world ceiling being at ceiling_max; origin z = ceiling -
+  ceiling_min
+Its faces on two-sided lines show the neighbor's lower (floor) or upper
+(ceiling) texture, inset into the sector.
+=================
+*/
+static void BuildMover( builder_t *b, int sector, int ceiling, int model ) {
+	const doom_map_t			*map = b->map;
+	const doom_sector_t			*sec = &map->sectors[sector];
+	const doom_plane_range_t	*r = &b->ranges[sector];
+	mover_t						*m;
+	double						z0 = ceiling ? r->ceiling_min : r->floor_min;
+	double						z1 = ceiling ? r->ceiling_max : r->floor_max;
+	double						zShift = ceiling ? sec->ceiling_height - r->ceiling_min : sec->floor_height - r->floor_max;
+	int							i, firstSurface = b->surfaces.count, firstBrush = b->brushes.count;
+	float						mins[3] = { 1e30f, 1e30f, (float)z0 }, maxs[3] = { -1e30f, -1e30f, (float)z1 };
+
+	b->currentModel = model;
+
+	// brushes over every leaf of the sector
+	for ( i = 0 ; i < b->bsp.leafs.count ; i++ ) {
+		const bspleaf2_t	*leaf = BufAt( &b->bsp.leafs, bspleaf2_t, i );
+		int					j;
+
+		if ( leaf->sector != sector || leaf->degenerate ) {
+			continue;
+		}
+		if ( ceiling ) {
+			AddPrismBrush( b, &leaf->poly, z0, z1, b->shaderSolid, FlatShader( b, sec->ceiling_flat, Q3_CONTENTS_SOLID ), b->shaderNodraw );
+		} else {
+			AddPrismBrush( b, &leaf->poly, z0, z1, b->shaderSolid, b->shaderNodraw, FlatShader( b, sec->floor_flat, Q3_CONTENTS_SOLID ) );
+		}
+		for ( j = 0 ; j < leaf->poly.n ; j++ ) {
+			if ( leaf->poly.p[j].x < mins[0] ) mins[0] = (float)leaf->poly.p[j].x;
+			if ( leaf->poly.p[j].y < mins[1] ) mins[1] = (float)leaf->poly.p[j].y;
+			if ( leaf->poly.p[j].x > maxs[0] ) maxs[0] = (float)leaf->poly.p[j].x;
+			if ( leaf->poly.p[j].y > maxs[1] ) maxs[1] = (float)leaf->poly.p[j].y;
+		}
+	}
+
+	// the moving flat
+	SectorFlat( b, sector, ceiling, ceiling ? z0 : z1 );
+
+	// faces towards the neighbors
+	for ( i = 0 ; i < map->num_linedefs ; i++ ) {
+		const doom_linedef_t		*ld = &map->linedefs[i];
+		const doom_sidedef_t		*nsd;
+		const doom_sector_t			*nsec;
+		const doom_plane_range_t	*rn;
+		pt_t						v1 = Vertex( map, ld->v1 ), v2 = Vertex( map, ld->v2 ), a, c;
+		int							nside, neighbor, tw, th;
+
+		if ( ld->side[1] == DOOM_NO_SIDE ) {
+			continue;
+		}
+		if ( map->sidedefs[ld->side[0]].sector == sector ) {
+			nside = 1;
+		} else if ( map->sidedefs[ld->side[1]].sector == sector ) {
+			nside = 0;
+		} else {
+			continue;
+		}
+		nsd = &map->sidedefs[ld->side[nside]];
+		neighbor = nsd->sector;
+		if ( neighbor == sector ) {
+			continue;
+		}
+		nsec = &map->sectors[neighbor];
+		rn = &b->ranges[neighbor];
+		// the neighbor is on the right of a->c
+		a = nside ? v2 : v1;
+		c = nside ? v1 : v2;
+
+		if ( ceiling ) {
+			if ( r->ceiling_min >= rn->ceiling_max || ( IsSky( sec->ceiling_flat ) && IsSky( nsec->ceiling_flat ) ) ) {
+				continue;	// never below the neighbor's ceiling
+			}
+			TextureSize( b, nsd->top, &tw, &th );
+			WallQuad( b, i, nside, nsd->top, neighbor, neighbor, FakeContrast( v1, v2 ), a, c, z0, z1, zShift,
+				( ld->flags & DOOM_ML_DONTPEGTOP ) ? nsec->ceiling_height : sec->ceiling_height + th,
+				nsd->x_offset, nsd->y_offset, MOVER_INSET );
+		} else {
+			if ( r->floor_max <= rn->floor_min ) {
+				continue;	// never above the neighbor's floor
+			}
+			WallQuad( b, i, nside, nsd->bottom, neighbor, neighbor, FakeContrast( v1, v2 ), a, c, z0, z1, zShift,
+				( ld->flags & DOOM_ML_DONTPEGBOTTOM ) ? nsec->ceiling_height : sec->floor_height,
+				nsd->x_offset, nsd->y_offset, MOVER_INSET );
+		}
+	}
+
+	m = BufPush( &b->movers );
+	m->sector = sector;
+	m->ceiling = ceiling;
+	m->model = model;
+	m->firstSurface = firstSurface;
+	m->numSurfaces = b->surfaces.count - firstSurface;
+	m->firstBrush = firstBrush;
+	m->numBrushes = b->brushes.count - firstBrush;
+	memcpy( m->mins, mins, sizeof( mins ) );
+	memcpy( m->maxs, maxs, sizeof( maxs ) );
+	b->currentModel = 0;
+}
+
+// every moving plane, in sector order (floor before ceiling): models 1..n
+static void BuildMovers( builder_t *b ) {
+	int		sector;
+
+	for ( sector = 0 ; sector < b->map->num_sectors ; sector++ ) {
+		if ( FLOOR_MOVES( b, sector ) ) {
+			BuildMover( b, sector, 0, b->movers.count + 1 );
+		}
+		if ( CEILING_MOVES( b, sector ) ) {
+			BuildMover( b, sector, 1, b->movers.count + 1 );
+		}
+	}
 }
 
 /*
@@ -1125,12 +1333,13 @@ static void EmitLeafs( builder_t *b ) {
 
 			out->cluster = 0;
 			out->area = 0;
-			brush = AddPrismBrush( b, &leaf->poly, b->zmin, sec->floor_height, b->shaderSolid,
+			// moving planes: the world stops at their extreme position, movers fill the rest
+			brush = AddPrismBrush( b, &leaf->poly, b->zmin, b->ranges[leaf->sector].floor_min, b->shaderSolid,
 				b->shaderNodraw, FlatShader( b, sec->floor_flat, Q3_CONTENTS_SOLID ) );
 			if ( brush >= 0 ) {
 				*(int *)BufPush( &b->leafBrushes ) = brush;
 			}
-			brush = AddPrismBrush( b, &leaf->poly, sec->ceiling_height, b->zmax, b->shaderSolid,
+			brush = AddPrismBrush( b, &leaf->poly, b->ranges[leaf->sector].ceiling_max, b->zmax, b->shaderSolid,
 				FlatShader( b, sec->ceiling_flat, Q3_CONTENTS_SOLID ), b->shaderNodraw );
 			if ( brush >= 0 ) {
 				*(int *)BufPush( &b->leafBrushes ) = brush;
@@ -1268,6 +1477,14 @@ static void BuildEntities( builder_t *b ) {
 		EntPrintf( b, "{\n\"classname\" \"info_player_deathmatch\"\n\"origin\" \"%d %d %d\"\n\"angle\" \"%d\"\n\"doom_type\" \"%d\"\n}\n",
 			t->x, t->y, (int)z + 25, t->angle, t->type );
 	}
+
+	// moving floors and ceilings; the game positions them from the sector heights
+	for ( i = 0 ; i < b->movers.count ; i++ ) {
+		const mover_t *m = BufAt( &b->movers, mover_t, i );
+
+		EntPrintf( b, "{\n\"classname\" \"func_doom_plane\"\n\"model\" \"*%d\"\n\"doom_sector\" \"%d\"\n\"doom_plane\" \"%s\"\n}\n",
+			m->model, m->sector, m->ceiling ? "ceiling" : "floor" );
+	}
 	*(char *)BufPush( &b->entities ) = 0;
 }
 
@@ -1384,7 +1601,7 @@ int doom_build_bsp( const doom_wad_t *wad, const doom_map_t *map, uint8_t **outD
 	builder_t	b;
 	seg_t		*segs;
 	poly_t		cell;
-	int			i, nsegs = 0, root;
+	int			i, nsegs = 0, root, worldSurfaces, worldBrushes;
 	double		minFloor = 1e30, maxCeiling = -1e30;
 	dbuf_t		vis, empty, grid;
 	const dbuf_t *lumps[NUM_LUMPS];
@@ -1430,6 +1647,11 @@ int doom_build_bsp( const doom_wad_t *wad, const doom_map_t *map, uint8_t **outD
 	}
 	SkyShaderName( map, b.skyShader, sizeof( b.skyShader ) );
 
+	// how far every floor and ceiling can move
+	b.ranges = malloc( sizeof( doom_plane_range_t ) * map->num_sectors );
+	doom_sector_ranges( wad, map, b.ranges );
+	BufInit( &b.movers, sizeof( mover_t ) );
+
 	// world extents
 	b.bmins[0] = b.bmins[1] = 1e30;
 	b.bmaxs[0] = b.bmaxs[1] = -1e30;
@@ -1449,8 +1671,8 @@ int doom_build_bsp( const doom_wad_t *wad, const doom_map_t *map, uint8_t **outD
 	b.bmins[0] -= WORLD_MARGIN; b.bmins[1] -= WORLD_MARGIN;
 	b.bmaxs[0] += WORLD_MARGIN; b.bmaxs[1] += WORLD_MARGIN;
 	for ( i = 0 ; i < map->num_sectors ; i++ ) {
-		if ( map->sectors[i].floor_height < minFloor ) minFloor = map->sectors[i].floor_height;
-		if ( map->sectors[i].ceiling_height > maxCeiling ) maxCeiling = map->sectors[i].ceiling_height;
+		if ( b.ranges[i].floor_min < minFloor ) minFloor = b.ranges[i].floor_min;
+		if ( b.ranges[i].ceiling_max > maxCeiling ) maxCeiling = b.ranges[i].ceiling_max;
 	}
 	b.zmin = minFloor - SLAB_DEPTH;
 	b.zmax = maxCeiling + SLAB_DEPTH;
@@ -1501,13 +1723,17 @@ int doom_build_bsp( const doom_wad_t *wad, const doom_map_t *map, uint8_t **outD
 		BufInit( &b.leafExtraBrushes[i], sizeof( int ) );
 	}
 
-	// render surfaces, then tree and brushes
+	// the world (model 0) first: its surfaces and brushes must be contiguous,
+	// then each mover's
 	BuildFlats( &b );
 	BuildWalls( &b );
-	PackSurfaces( &b );
 	BuildClipBrushes( &b, root );
 	EmitNodes( &b );
 	EmitLeafs( &b );
+	worldSurfaces = b.surfaces.count;
+	worldBrushes = b.brushes.count;
+	BuildMovers( &b );
+	PackSurfaces( &b );
 	BuildEntities( &b );
 
 	{
@@ -1519,11 +1745,23 @@ int doom_build_bsp( const doom_wad_t *wad, const doom_map_t *map, uint8_t **outD
 		m->mins[0] = (float)b.bmins[0]; m->mins[1] = (float)b.bmins[1]; m->mins[2] = (float)b.zmin;
 		m->maxs[0] = (float)b.bmaxs[0]; m->maxs[1] = (float)b.bmaxs[1]; m->maxs[2] = (float)b.zmax;
 		m->firstSurface = 0;
-		m->numSurfaces = b.surfaces.count;
+		m->numSurfaces = worldSurfaces;
 		m->firstBrush = 0;
-		m->numBrushes = b.brushes.count;
+		m->numBrushes = worldBrushes;
 
 		BuildLightGrid( &b, m->mins, m->maxs, &grid );
+
+		for ( i = 0 ; i < b.movers.count ; i++ ) {
+			const mover_t *mv = BufAt( &b.movers, mover_t, i );
+
+			m = BufPush( &models );
+			memcpy( m->mins, mv->mins, sizeof( m->mins ) );
+			memcpy( m->maxs, mv->maxs, sizeof( m->maxs ) );
+			m->firstSurface = mv->firstSurface;
+			m->numSurfaces = mv->numSurfaces;
+			m->firstBrush = mv->firstBrush;
+			m->numBrushes = mv->numBrushes;
+		}
 
 		lumps[0] = &b.entities;
 		lumps[1] = &b.shaders;
@@ -1567,6 +1805,7 @@ int doom_build_bsp( const doom_wad_t *wad, const doom_map_t *map, uint8_t **outD
 		stats->surfaces = b.surfaces.count;
 		stats->planes = b.planes.count;
 		stats->verts = b.verts.count;
+		stats->movers = b.movers.count;
 		stats->covered_area = area;
 		stats->bounds_area = ( b.bmaxs[0] - b.bmins[0] ) * ( b.bmaxs[1] - b.bmins[1] );
 	}
@@ -1609,6 +1848,8 @@ fail:
 	}
 	BufFree( &b.surfVerts );
 	BufFree( &b.surfIndexes );
+	BufFree( &b.movers );
+	free( b.ranges );
 	BufFree( &grid );
 	return *outData ? 0 : -1;
 }

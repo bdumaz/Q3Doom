@@ -1213,6 +1213,7 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 
 	re.RegisterFont = RE_RegisterFont;
 	re.RemapShader = R_RemapShader;
+	re.DoomSectorLights = R_DoomSectorLights;
 	re.GetEntityToken = R_GetEntityToken;
 	re.inPVS = R_inPVS;
 

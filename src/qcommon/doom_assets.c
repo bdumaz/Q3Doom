@@ -226,6 +226,52 @@ static qboolean Doom_ParsePath( const char *path, char *kind, int kindSize, char
 	return i > 0;
 }
 
+// wall textures under their different shader kinds: plain, scrolling, per-line switches
+static qboolean Doom_IsWallKind( const char *kind ) {
+	return !Q_stricmp( kind, "wall" ) || !Q_stricmp( kind, "scroll" )
+		|| ( !Q_stricmpn( kind, "sw", 2 ) && isdigit( (unsigned char)kind[2] ) );
+}
+
+// flats: plain, or the per-sector shader of a moving floor (fl<sector>)
+static qboolean Doom_IsFlatKind( const char *kind ) {
+	return !Q_stricmp( kind, "flat" ) || ( !Q_stricmpn( kind, "fl", 2 ) && isdigit( (unsigned char)kind[2] ) );
+}
+
+// sprites: as pictures (sprite) or as world billboards (thing)
+static qboolean Doom_IsSpriteKind( const char *kind ) {
+	return !Q_stricmp( kind, "sprite" ) || !Q_stricmp( kind, "thing" );
+}
+
+/*
+=================
+Doom_AnimFrames
+
+The animation cycle of a texture or flat path, as lump names of
+'frameSize' bytes; 0 if it is not animated.
+=================
+*/
+int Doom_AnimFrames( const char *path, char *frames, int frameSize, int maxFrames ) {
+	char	kind[16], name[DOOM_LUMP_NAME_LEN + 1];
+	char	cycle[16][DOOM_LUMP_NAME_LEN + 1];
+	int		i, n, isTexture;
+
+	if ( !doom_wad || !Doom_ParsePath( path, kind, sizeof( kind ), name ) ) {
+		return 0;
+	}
+	if ( Doom_IsWallKind( kind ) ) {
+		isTexture = 1;
+	} else if ( Doom_IsFlatKind( kind ) ) {
+		isTexture = 0;
+	} else {
+		return 0;
+	}
+	n = doom_anim_frames( doom_wad, isTexture, name, cycle, maxFrames < 16 ? maxFrames : 16 );
+	for ( i = 0 ; i < n ; i++ ) {
+		Q_strncpyz( frames + i * frameSize, cycle[i], frameSize );
+	}
+	return n;
+}
+
 /*
 =================
 Doom_LoadImage
@@ -244,11 +290,11 @@ byte *Doom_LoadImage( const char *path, int *width, int *height ) {
 		return NULL;
 	}
 
-	if ( !Q_stricmp( kind, "wall" ) ) {
+	if ( Doom_IsWallKind( kind ) ) {
 		result = doom_load_texture( doom_wad, name, &img );
-	} else if ( !Q_stricmp( kind, "flat" ) ) {
+	} else if ( Doom_IsFlatKind( kind ) ) {
 		result = doom_load_flat( doom_wad, name, &img );
-	} else if ( !Q_stricmp( kind, "sprite" ) ) {
+	} else if ( Doom_IsSpriteKind( kind ) ) {
 		result = doom_load_sprite( doom_wad, name, &img );
 	} else if ( !Q_stricmp( kind, "patch" ) ) {
 		result = doom_load_patch( doom_wad, name, &img );
@@ -340,11 +386,16 @@ static void Doom_CheckWorld_f( void ) {
 	int					i, s, tested = 0, failed = 0, skipped = 0;
 	trace_t				tr;
 	vec3_t				p, end;
+	doom_plane_range_t	*ranges;
 
 	if ( !com_sv_running || !com_sv_running->integer || !( map = Doom_GetMap( mapname ) ) ) {
 		Com_Printf( "doom_checkworld: run a Doom map first\n" );
 		return;
 	}
+	// the world stops where moving planes can go furthest (the movers,
+	// separate models, fill the rest)
+	ranges = Z_Malloc( sizeof( doom_plane_range_t ) * map->num_sectors );
+	doom_sector_ranges( doom_wad, map, ranges );
 
 	for ( i = 0 ; i < map->num_linedefs ; i++ ) {
 		const doom_linedef_t *ld = &map->linedefs[i];
@@ -366,7 +417,7 @@ static void Doom_CheckWorld_f( void ) {
 			dx = c->x - a->x;
 			dy = c->y - a->y;
 			len = sqrt( dx * dx + dy * dy );
-			if ( len < 8 || sec->ceiling_height - sec->floor_height < 8 ) {
+			if ( len < 8 || ranges[sector].ceiling_max - ranges[sector].floor_min < 8 ) {
 				skipped++;
 				continue;
 			}
@@ -375,7 +426,7 @@ static void Doom_CheckWorld_f( void ) {
 			ny = -dx / len;
 			p[0] = ( a->x + c->x ) * 0.5 + nx * 4;
 			p[1] = ( a->y + c->y ) * 0.5 + ny * 4;
-			p[2] = ( sec->floor_height + sec->ceiling_height ) * 0.5;
+			p[2] = ( ranges[sector].floor_min + ranges[sector].ceiling_max ) * 0.5;
 			if ( doom_map_sector_at( map, p[0], p[1] ) != sector ) {
 				skipped++;		// thin or overlapping geometry: the point is elsewhere
 				continue;
@@ -389,16 +440,16 @@ static void Doom_CheckWorld_f( void ) {
 				VectorCopy( p, end );
 				end[2] -= 8192;
 				CM_BoxTrace( &tr, p, end, vec3_origin, vec3_origin, 0, MASK_PLAYERSOLID, qfalse );
-				if ( tr.fraction == 1 || fabs( tr.endpos[2] - sec->floor_height ) > 0.5 ) {
-					bad = 1; why = va( "floor at %.1f, expected %d", tr.endpos[2], sec->floor_height );
+				if ( tr.fraction == 1 || fabs( tr.endpos[2] - ranges[sector].floor_min ) > 0.5 ) {
+					bad = 1; why = va( "floor at %.1f, expected %d", tr.endpos[2], ranges[sector].floor_min );
 				}
 			}
 			if ( !bad ) {
 				VectorCopy( p, end );
 				end[2] += 8192;
 				CM_BoxTrace( &tr, p, end, vec3_origin, vec3_origin, 0, MASK_PLAYERSOLID, qfalse );
-				if ( tr.fraction == 1 || fabs( tr.endpos[2] - sec->ceiling_height ) > 0.5 ) {
-					bad = 1; why = va( "ceiling at %.1f, expected %d", tr.endpos[2], sec->ceiling_height );
+				if ( tr.fraction == 1 || fabs( tr.endpos[2] - ranges[sector].ceiling_max ) > 0.5 ) {
+					bad = 1; why = va( "ceiling at %.1f, expected %d", tr.endpos[2], ranges[sector].ceiling_max );
 				}
 			}
 			if ( !bad && ld->side[1] == DOOM_NO_SIDE ) {
@@ -466,6 +517,7 @@ static void Doom_CheckWorld_f( void ) {
 		}
 		Com_Printf( "doom_checkworld %s: %d jumpable windows, %d barriers, %d wrong\n", map->name, windows, barriers, wrong );
 	}
+	Z_Free( ranges );
 }
 
 /*

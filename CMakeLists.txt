@@ -42,7 +42,7 @@ function(q3_deploy target subdir)
 endfunction()
 
 # --- libdoom: WAD, Doom asset decoding, map model (no engine dependencies) ---
-q3_sources(LIBDOOM_SRC libdoom wad.c graphics.c sound.c map.c builder.c doom_info.c)
+q3_sources(LIBDOOM_SRC libdoom wad.c graphics.c sound.c map.c builder.c specials.c doom_info.c)
 add_library(libdoom STATIC ${LIBDOOM_SRC})
 target_include_directories(libdoom PUBLIC ${SRC}/libdoom)
 set_target_properties(libdoom PROPERTIES OUTPUT_NAME doom)
@@ -158,7 +158,8 @@ target_link_libraries(q3doom_qagame PRIVATE libdoom)
 
 file(GLOB QD_CGAME_SRC ${QD}/cgame/*.c)
 q3_module(q3doom_cgame cgame q3doom ${SRC}/cgame/cgame.def ${QD_CGAME_SRC}
-  ${QD}/game/bg_misc.c ${QD}/game/bg_pmove.c ${QD}/game/bg_slidemove.c ${SRC}/game/q_math.c ${SRC}/game/q_shared.c)
+  ${QD}/game/bg_misc.c ${QD}/game/bg_pmove.c ${QD}/game/bg_slidemove.c ${QD}/game/bg_doom.c
+  ${SRC}/game/q_math.c ${SRC}/game/q_shared.c)
 target_link_libraries(q3doom_cgame PRIVATE libdoom)
 
 # data files of the q3doom game directory (configs)
