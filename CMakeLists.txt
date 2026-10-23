@@ -112,7 +112,11 @@ endif()
 # --- game modules (native DLLs) ---------------------------------------------
 function(q3_module target name gamedir deffile)
   add_library(${target} SHARED ${ARGN} ${deffile})
-  set_target_properties(${target} PROPERTIES OUTPUT_NAME ${name}${ARCH_STRING} PREFIX "")
+  # one output folder per game directory: modules share file names
+  set_target_properties(${target} PROPERTIES OUTPUT_NAME ${name}${ARCH_STRING} PREFIX ""
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/modules/${gamedir}
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/modules/${gamedir}
+    ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/modules/${gamedir})
   q3_deploy(${target} ${gamedir})
 endfunction()
 
@@ -143,3 +147,21 @@ q3_sources(UI_SRC q3_ui
   ui_teamorders.c ui_video.c)
 q3_sources(UI_SHARED game bg_misc.c q_math.c q_shared.c)
 q3_module(stock_ui ui baseq3 ${SRC}/q3_ui/ui.def ${UI_SRC} ${UI_SHARED} ${SRC}/ui/ui_syscalls.c)
+
+# --- Q3Doom game modules (run/q3doom, the default fs_game) -------------------
+# Forked from the stock modules; headers shared with the engine are forwarded
+# to src/game, src/cgame and src/ui. The stock ui is used until it is forked.
+set(QD ${SRC}/q3doom)
+file(GLOB QD_GAME_SRC ${QD}/game/*.c)
+q3_module(q3doom_qagame qagame q3doom ${SRC}/game/game.def ${QD_GAME_SRC} ${SRC}/game/q_math.c ${SRC}/game/q_shared.c)
+target_link_libraries(q3doom_qagame PRIVATE libdoom)
+
+file(GLOB QD_CGAME_SRC ${QD}/cgame/*.c)
+q3_module(q3doom_cgame cgame q3doom ${SRC}/cgame/cgame.def ${QD_CGAME_SRC}
+  ${QD}/game/bg_misc.c ${QD}/game/bg_pmove.c ${QD}/game/bg_slidemove.c ${SRC}/game/q_math.c ${SRC}/game/q_shared.c)
+target_link_libraries(q3doom_cgame PRIVATE libdoom)
+
+# data files of the q3doom game directory (configs)
+add_custom_target(q3doom_data ALL
+  COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/data/q3doom ${RUN_DIR}/q3doom
+  VERBATIM)

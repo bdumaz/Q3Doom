@@ -2410,6 +2410,10 @@ void Com_Init( char *commandLine ) {
 	Com_InitJournaling();
 
 	Cbuf_AddText ("exec default.cfg\n");
+	// Q3Doom defaults (binds), before q3config.cfg so the player's choices win
+	if ( FS_ReadFile( "q3doom.cfg", NULL ) > 0 ) {
+		Cbuf_AddText ("exec q3doom.cfg\n");
+	}
 
 	// skip the q3config.cfg if "safe" is on the command line
 	if ( !Com_SafeMode() ) {

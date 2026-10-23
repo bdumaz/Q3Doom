@@ -510,6 +510,9 @@ issues.
 #define	MAX_FILE_HANDLES	64
 
 #define BASEGAME "baseq3"
+// Q3Doom: the game directory loaded on top of baseq3 by default (fs_game);
+// "+set fs_game baseq3" runs stock Quake 3
+#define DEFAULT_GAMEDIR "q3doom"
 
 qboolean FS_Initialized();
 

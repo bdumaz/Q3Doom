@@ -534,30 +534,34 @@ void * QDECL Sys_LoadDll( const char *name, char *fqpath , intptr_t (QDECL **ent
 	HINSTANCE	libHandle;
 	void	(QDECL *dllEntry)( intptr_t (QDECL *syscallptr)(intptr_t, ...) );
 	const char	*searchPaths[2];
-	char	*gamedir;
+	const char	*gamedirs[2];
 	char	*fn;
 	char	filename[MAX_QPATH];
-	int		i;
+	int		i, g;
 
 	*fqpath = 0;
 	libHandle = NULL;
 
 	Com_sprintf( filename, sizeof( filename ), "%s" ARCH_STRING ".dll", name );
 
-	gamedir = Cvar_VariableString( "fs_game" );
-	if ( !gamedir[0] ) {
-		gamedir = BASEGAME;
+	// the active game directory first, then baseq3 for modules a mod does not replace
+	gamedirs[0] = Cvar_VariableString( "fs_game" );
+	if ( !gamedirs[0][0] ) {
+		gamedirs[0] = BASEGAME;
 	}
+	gamedirs[1] = Q_stricmp( gamedirs[0], BASEGAME ) ? BASEGAME : NULL;
 	searchPaths[0] = Cvar_VariableString( "fs_homepath" );
 	searchPaths[1] = Cvar_VariableString( "fs_basepath" );
 
-	for ( i = 0 ; i < 2 && !libHandle ; i++ ) {
-		if ( !searchPaths[i][0] ) {
-			continue;
+	for ( g = 0 ; g < 2 && gamedirs[g] && !libHandle ; g++ ) {
+		for ( i = 0 ; i < 2 && !libHandle ; i++ ) {
+			if ( !searchPaths[i][0] ) {
+				continue;
+			}
+			fn = FS_BuildOSPath( searchPaths[i], gamedirs[g], filename );
+			libHandle = LoadLibrary( fn );
+			Com_DPrintf( "LoadLibrary '%s' %s\n", fn, libHandle ? "ok" : "failed" );
 		}
-		fn = FS_BuildOSPath( searchPaths[i], gamedir, filename );
-		libHandle = LoadLibrary( fn );
-		Com_DPrintf( "LoadLibrary '%s' %s\n", fn, libHandle ? "ok" : "failed" );
 	}
 	if ( !libHandle ) {
 		return NULL;
