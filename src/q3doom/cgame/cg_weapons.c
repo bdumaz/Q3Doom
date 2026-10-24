@@ -1358,7 +1358,7 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 	AnglesToAxis( angles, flash.axis );
 	// Q3Doom: in first person the flash covers a good part of Doom's darker
 	// view (a white flash): half the size there
-	if ( ps && CG_DoomMap() ) {
+	if ( ps && CG_DoomGame() ) {
 		VectorScale( flash.axis[0], 0.5f, flash.axis[0] );
 		VectorScale( flash.axis[1], 0.5f, flash.axis[1] );
 		VectorScale( flash.axis[2], 0.5f, flash.axis[2] );
@@ -1389,9 +1389,9 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 		if ( weapon->flashDlightColor[0] || weapon->flashDlightColor[1] || weapon->flashDlightColor[2] ) {
 			// Q3Doom: Doom's evenly lit surfaces turn Quake 3's flash light into
 			// a white flash over the whole view: a smaller, dimmer light there
-			float scale = CG_DoomMap() ? 0.35f : 1.0f;
+			float scale = CG_DoomGame() ? 0.35f : 1.0f;
 
-			trap_R_AddLightToScene( flash.origin, ( CG_DoomMap() ? 160 : 300 ) + (rand()&31), weapon->flashDlightColor[0] * scale,
+			trap_R_AddLightToScene( flash.origin, ( CG_DoomGame() ? 160 : 300 ) + (rand()&31), weapon->flashDlightColor[0] * scale,
 				weapon->flashDlightColor[1] * scale, weapon->flashDlightColor[2] * scale );
 		}
 	}
@@ -1421,7 +1421,7 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 	}
 
 	// Q3Doom: the Doom weapon is drawn in 2D (CG_DoomDrawWeapon)
-	if ( CG_DoomMap() && cgs.doomWeapons != DOOM_WEAPONS_Q3 ) {
+	if ( CG_DoomGame() && cgs.doomWeapons != DOOM_WEAPONS_Q3 ) {
 		return;
 	}
 

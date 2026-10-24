@@ -97,6 +97,9 @@ int					doom_decode_patch( const uint8_t *data, size_t size, const uint8_t *pale
 // Loaders return 0 on success, -1 if the resource is missing or invalid.
 int					doom_load_patch( const doom_wad_t *wad, const char *name, doom_image_t *out );	// any picture lump
 int					doom_load_sprite( const doom_wad_t *wad, const char *name, doom_image_t *out );	// S_START..S_END
+// a sprite in a marine colour: 0 green (as is), 1 gray, 2 brown, 3 red, 4 blue
+#define DOOM_NUM_TRANSLATIONS	5
+int					doom_load_sprite_translated( const doom_wad_t *wad, const char *name, int translation, doom_image_t *out );
 int					doom_load_flat( const doom_wad_t *wad, const char *name, doom_image_t *out );	// F_START..F_END
 int					doom_load_texture( const doom_wad_t *wad, const char *name, doom_image_t *out );	// TEXTURE1/2
 

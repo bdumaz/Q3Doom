@@ -184,6 +184,30 @@ int doom_load_sprite( const doom_wad_t *wad, const char *name, doom_image_t *out
 }
 
 /*
+=================
+doom_load_sprite_translated
+
+The marine colours (R_InitTranslationTables): the green ramp 0x70-0x7f
+drawn with another 16 colour ramp. Doom's are gray, brown and red; blue
+is added for the teams.
+=================
+*/
+int doom_load_sprite_translated( const doom_wad_t *wad, const char *name, int translation, doom_image_t *out ) {
+	static const int	ramps[DOOM_NUM_TRANSLATIONS] = { 0x70, 0x60, 0x40, 0x20, 0xc0 };
+	const uint8_t		*palette = doom_palette( wad, 0 );
+	uint8_t				translated[PALETTE_SIZE];
+	int					lump = doom_wad_find_ns( wad, DOOM_NS_SPRITES, name );
+
+	memset( out, 0, sizeof( *out ) );
+	if ( lump < 0 || !palette || translation < 0 || translation >= DOOM_NUM_TRANSLATIONS ) {
+		return -1;
+	}
+	memcpy( translated, palette, PALETTE_SIZE );
+	memcpy( translated + 0x70 * 3, palette + ramps[translation] * 3, 16 * 3 );
+	return doom_decode_patch( doom_wad_lump_data( wad, lump ), wad->lumps[lump].size, translated, out );
+}
+
+/*
 =====================================================================
 
 FLATS

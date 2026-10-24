@@ -932,6 +932,10 @@ void CG_NewClientInfo( int clientNum ) {
 	v = Info_ValueForKey( configstring, "tl" );
 	newInfo.teamLeader = atoi(v);
 
+	// Q3Doom: the marine colour
+	v = Info_ValueForKey( configstring, "dc" );
+	newInfo.doomColor = atoi( v );
+
 	v = Info_ValueForKey( configstring, "g_redteam" );
 	Q_strncpyz(newInfo.redTeam, v, MAX_TEAMNAME);
 
@@ -2256,6 +2260,16 @@ void CG_Player( centity_t *cent ) {
 	// it is possible to see corpses from disconnected players that may
 	// not have valid clientinfo
 	if ( !ci->infoValid ) {
+		return;
+	}
+
+	// Q3Doom: Doom's marine sprite, in the player's colour or the team's
+	if ( CG_DoomGame() ) {
+		if ( cent->currentState.number == cg.snap->ps.clientNum && !cg.renderingThirdPerson ) {
+			return;
+		}
+		CG_PlayerSprites( cent );
+		CG_DoomPlayer( cent, ci->team == TEAM_RED ? 3 : ci->team == TEAM_BLUE ? 4 : ci->doomColor );
 		return;
 	}
 

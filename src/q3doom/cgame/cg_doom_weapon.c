@@ -39,7 +39,7 @@ full bright except in dark sectors
 =================
 */
 static float PspriteLight( void ) {
-	int		level = CG_DoomSectorLight( CG_DoomSectorAt( cg.predictedPlayerState.origin ) );
+	int		level = CG_DoomLightAt( cg.predictedPlayerState.origin );
 	int		lightnum = level >> 4, map;
 
 	if ( lightnum > 15 ) {
@@ -100,7 +100,7 @@ void CG_DoomDrawWeapon( void ) {
 	const playerState_t	*ps = &cg.predictedPlayerState;
 	float				sx, sy;
 
-	if ( !CG_DoomMap() || !cg_drawGun.integer || cg.renderingThirdPerson || ps->persistant[PERS_TEAM] == TEAM_SPECTATOR
+	if ( !CG_DoomGame() || !cg_drawGun.integer || cg.renderingThirdPerson || ps->persistant[PERS_TEAM] == TEAM_SPECTATOR
 		|| ps->pm_type == PM_INTERMISSION || ps->doomWeaponState == S_NULL ) {
 		return;
 	}
@@ -281,7 +281,7 @@ qboolean CG_DoomEntityEvent( centity_t *cent, vec3_t position, int event ) {
 	entityState_t	*es = &cent->currentState;
 	qboolean		local = es->number == cg.snap->ps.clientNum;
 
-	if ( !CG_DoomMap() ) {
+	if ( !CG_DoomGame() ) {
 		return qfalse;
 	}
 
@@ -292,6 +292,7 @@ qboolean CG_DoomEntityEvent( centity_t *cent, vec3_t position, int event ) {
 
 	switch ( event ) {
 	case EV_FIRE_WEAPON:
+		cent->muzzleFlashTime = cg.time;	// the marine's attack frames (CG_DoomPlayer)
 		// the sounds of the attacks that always make one (punch and saw
 		// sounds depend on the hit: the game sends them)
 		switch ( es->eventParm & ~DOOM_FIRE_ACCURATE ) {
@@ -398,10 +399,16 @@ qboolean CG_DoomEntityEvent( centity_t *cent, vec3_t position, int event ) {
 	case EV_DEATH2:
 	case EV_DEATH3:
 		StartDoomSound( es->number, CHAN_VOICE, sfx_pldeth );
+		if ( local ) {
+			CG_DoomLocalDeath( qfalse );
+		}
 		return qtrue;
 
 	case EV_GIB_PLAYER:
 		StartDoomSound( es->number, CHAN_BODY, sfx_slop );
+		if ( local ) {
+			CG_DoomLocalDeath( qtrue );
+		}
 		return qtrue;
 
 	case EV_ITEM_RESPAWN:
@@ -421,7 +428,7 @@ Doom's player pain sound, for CG_PainEvent
 =================
 */
 qboolean CG_DoomPainSound( centity_t *cent ) {
-	if ( !CG_DoomMap() ) {
+	if ( !CG_DoomGame() ) {
 		return qfalse;
 	}
 	StartDoomSound( cent->currentState.number, CHAN_VOICE, sfx_plpain );

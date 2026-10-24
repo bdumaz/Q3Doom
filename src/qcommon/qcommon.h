@@ -219,7 +219,10 @@ PROTOCOL
 ==============================================================
 */
 
-#define	PROTOCOL_VERSION	68
+// Q3Doom: its own protocol, since its snapshots carry the Doom player state:
+// Quake 3's servers (68) and Q3Doom's do not see or join each other
+#define	PROTOCOL_VERSION	1068
+// 1.32 - 68
 // 1.31 - 67
 
 // maintain a list of compatible protocols for demo playing

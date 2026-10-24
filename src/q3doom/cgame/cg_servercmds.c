@@ -157,6 +157,8 @@ void CG_ParseServerinfo( void ) {
 	cgs.stepHeight = atof( Info_ValueForKey( info, "g_stepHeight" ) );
 	cgs.playerHeight = atof( Info_ValueForKey( info, "g_playerHeight" ) );
 	cgs.doomFrag = atoi( Info_ValueForKey( info, "g_doomFrag" ) ) != 0;
+	// a deathmatch: not the campaign or a DoomFrag run (the status bar shows the frags)
+	cgs.doomDeathmatch = !cgs.doomFrag && !atoi( Info_ValueForKey( info, "g_doomCampaign" ) );
 	cgs.doomWeapons = Com_Clamp( 0, 2, atoi( Info_ValueForKey( info, "g_doomWeaponSet" ) ) );
 	mapname = Info_ValueForKey( info, "mapname" );
 	Com_sprintf( cgs.mapname, sizeof( cgs.mapname ), "maps/%s.bsp", mapname );

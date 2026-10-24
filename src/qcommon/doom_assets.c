@@ -237,9 +237,29 @@ static qboolean Doom_IsFlatKind( const char *kind ) {
 	return !Q_stricmp( kind, "flat" ) || ( !Q_stricmpn( kind, "fl", 2 ) && isdigit( (unsigned char)kind[2] ) );
 }
 
-// sprites: as pictures (sprite) or as world billboards (thing)
+// sprites: as pictures (sprite) or as world billboards (thing); a digit
+// after the kind is a marine colour (thing3: red)
+static int Doom_SpriteKindTranslation( const char *kind ) {
+	const char *digit;
+
+	if ( !Q_stricmpn( kind, "sprite", 6 ) ) {
+		digit = kind + 6;
+	} else if ( !Q_stricmpn( kind, "thing", 5 ) ) {
+		digit = kind + 5;
+	} else {
+		return -1;
+	}
+	if ( !digit[0] ) {
+		return 0;
+	}
+	if ( digit[0] >= '1' && digit[0] < '0' + DOOM_NUM_TRANSLATIONS && !digit[1] ) {
+		return digit[0] - '0';
+	}
+	return -1;
+}
+
 static qboolean Doom_IsSpriteKind( const char *kind ) {
-	return !Q_stricmp( kind, "sprite" ) || !Q_stricmp( kind, "thing" );
+	return Doom_SpriteKindTranslation( kind ) >= 0;
 }
 
 /*
@@ -368,7 +388,7 @@ byte *Doom_LoadImage( const char *path, int *width, int *height ) {
 	} else if ( Doom_IsFlatKind( kind ) ) {
 		result = doom_load_flat( doom_wad, name, &img );
 	} else if ( Doom_IsSpriteKind( kind ) ) {
-		result = doom_load_sprite( doom_wad, name, &img );
+		result = doom_load_sprite_translated( doom_wad, name, Doom_SpriteKindTranslation( kind ), &img );
 	} else if ( !Q_stricmp( kind, "patch" ) ) {
 		result = doom_load_patch( doom_wad, name, &img );
 	} else if ( !Q_stricmp( kind, "skybox" ) ) {

@@ -317,7 +317,7 @@ void UI_MainMenu( void ) {
 	s_main.singleplayer.color				= color_red;
 	s_main.singleplayer.style				= style;
 
-	// Q3Doom: no MULTIPLAYER entry (single player Doom for now), set up but not added
+	y += MAIN_MENU_VERTICAL_SPACING;
 	s_main.multiplayer.generic.type			= MTYPE_PTEXT;
 	s_main.multiplayer.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
 	s_main.multiplayer.generic.x			= 320;
@@ -398,6 +398,7 @@ void UI_MainMenu( void ) {
 	s_main.exit.style						= style;
 
 	Menu_AddItem( &s_main.menu,	&s_main.singleplayer );
+	Menu_AddItem( &s_main.menu,	&s_main.multiplayer );
 	Menu_AddItem( &s_main.menu,	&s_main.setup );
 	Menu_AddItem( &s_main.menu,	&s_main.demos );
 	if (teamArena) {

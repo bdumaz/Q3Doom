@@ -338,6 +338,7 @@ typedef struct {
 
 	int				teamTask;		// task in teamplay (offence/defence)
 	qboolean		teamLeader;		// true when this is a team leader
+	int				doomColor;		// Q3Doom: marine colour, 0-4 (doom_load_sprite_translated)
 
 	int				powerups;		// so can display quad/flag status
 
@@ -1009,6 +1010,7 @@ typedef struct {
 	float			stepHeight;		// Q3Doom: g_stepHeight from the serverinfo
 	float			playerHeight;	// Q3Doom: g_playerHeight from the serverinfo
 	qboolean		doomFrag;		// Q3Doom: a DoomFrag run (g_doomFrag)
+	qboolean		doomDeathmatch;	// Q3Doom: neither the campaign nor DoomFrag
 	int				doomWeapons;	// Q3Doom: DOOM_WEAPONS_* of the level (g_doomWeaponSet)
 	int				teamflags;
 	int				fraglimit;
@@ -1691,11 +1693,13 @@ void		CG_DoomLightsChanged( void );
 void		CG_DoomAddToScene( void );
 void		CG_DoomClipMove( const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int mask, trace_t *tr );
 int			CG_DoomPointContents( const vec3_t point );
-qboolean	CG_DoomMap( void );
+qboolean	CG_DoomMap( void );		// a Doom level is loaded
+qboolean	CG_DoomGame( void );	// Doom's sprites, sounds and status bar (every map)
 const struct doom_map_s *CG_DoomMapData( void );
 const struct doom_wad_s *CG_DoomWad( void );
 int			CG_DoomSectorAt( const vec3_t point );
 int			CG_DoomSectorLight( int sector );
+int			CG_DoomLightAt( const vec3_t point );
 int			CG_DoomPowerTics( int power );
 qboolean	CG_DoomPowerActive( int power );
 int			CG_DoomSpriteLump( int state, int rotation, qboolean *flip );
@@ -1704,6 +1708,9 @@ void		CG_DoomAddSprite( const vec3_t origin, float angle, int state, int light )
 void		CG_DoomSpawnFx( const vec3_t origin, int state, int flags );
 void		CG_DoomItem( centity_t *cent );
 void		CG_DoomThing( centity_t *cent );
+void		CG_DoomPlayer( centity_t *cent, int translation );
+void		CG_DoomLocalDeath( qboolean gib );
+void		CG_DoomLocalAlive( void );
 void		CG_DoomMissile( centity_t *cent );
 sfxHandle_t	CG_DoomSound( int sfx );
 
@@ -1727,6 +1734,7 @@ void		CG_DoomMessage( const char *text );
 void		CG_DoomBonus( void );
 void		CG_DoomDamage( int damage, int yawByte );
 void		CG_DoomAutomap_f( void );
+void		CG_DoomDrawFaceIcon( float x, float y, float w, float h, int clientNum );
 int			CG_DoomLump( const char *name );
 void		CG_DoomDrawPatch( float x, float y, int lump );
 void		CG_DoomPatchSize( int lump, int *width, int *height, int *left, int *top );

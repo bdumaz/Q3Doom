@@ -24,24 +24,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define ART_FRAMEL			"menu/art/frame2_l"
 #define ART_FRAMER			"menu/art/frame1_r"
-#define ART_MODEL0			"menu/art/model_0"
-#define ART_MODEL1			"menu/art/model_1"
 #define ART_BACK0			"menu/art/back_0"
 #define ART_BACK1			"menu/art/back_1"
-#define ART_FX_BASE			"menu/art/fx_base"
-#define ART_FX_BLUE			"menu/art/fx_blue"
-#define ART_FX_CYAN			"menu/art/fx_cyan"
-#define ART_FX_GREEN		"menu/art/fx_grn"
-#define ART_FX_RED			"menu/art/fx_red"
-#define ART_FX_TEAL			"menu/art/fx_teal"
-#define ART_FX_WHITE		"menu/art/fx_white"
-#define ART_FX_YELLOW		"menu/art/fx_yel"
 
 #define ID_NAME			10
 #define ID_HANDICAP		11
-#define ID_EFFECTS		12
+#define ID_COLOR		12
 #define ID_BACK			13
-#define ID_MODEL		14
 
 #define MAX_NAMELENGTH	20
 
@@ -56,23 +45,23 @@ typedef struct {
 
 	menufield_s			name;
 	menulist_s			handicap;
-	menulist_s			effects;
+	menulist_s			color;
 
 	menubitmap_s		back;
-	menubitmap_s		model;
 	menubitmap_s		item_null;
-
-	qhandle_t			fxBasePic;
-	qhandle_t			fxPic[7];
-	playerInfo_t		playerinfo;
-	int					current_fx;
-	char				playerModel[MAX_QPATH];
 } playersettings_t;
 
 static playersettings_t	s_playersettings;
 
-static int gamecodetoui[] = {4,2,3,0,5,1,6};
-static int uitogamecode[] = {4,6,2,3,1,5,7};
+// Q3Doom: the marine colours (doomcolor, doom_load_sprite_translated)
+static const char *doomColor_items[] = {
+	"Green",
+	"Gray",
+	"Brown",
+	"Red",
+	"Blue",
+	0
+};
 
 static const char *handicap_items[] = {
 	"None",
@@ -199,10 +188,12 @@ static void PlayerSettings_DrawHandicap( void *self ) {
 
 /*
 =================
-PlayerSettings_DrawEffects
+PlayerSettings_DrawColor
+
+Q3Doom: the marine colour (doomcolor)
 =================
 */
-static void PlayerSettings_DrawEffects( void *self ) {
+static void PlayerSettings_DrawColor( void *self ) {
 	menulist_s		*item;
 	qboolean		focus;
 	int				style;
@@ -218,36 +209,31 @@ static void PlayerSettings_DrawEffects( void *self ) {
 		color = text_color_highlight;
 	}
 
-	UI_DrawProportionalString( item->generic.x, item->generic.y, "Effects", style, color );
-
-	UI_DrawHandlePic( item->generic.x + 64, item->generic.y + PROP_HEIGHT + 8, 128, 8, s_playersettings.fxBasePic );
-	UI_DrawHandlePic( item->generic.x + 64 + item->curvalue * 16 + 8, item->generic.y + PROP_HEIGHT + 6, 16, 12, s_playersettings.fxPic[item->curvalue] );
+	UI_DrawProportionalString( item->generic.x, item->generic.y, "Color", style, color );
+	UI_DrawProportionalString( item->generic.x + 64, item->generic.y + PROP_HEIGHT, doomColor_items[item->curvalue], style, color );
 }
 
 
 /*
 =================
 PlayerSettings_DrawPlayer
+
+Q3Doom: Doom's marine in the chosen colour, turning around (the eight
+rotations of PLAYA, the right side mirrored from the left)
 =================
 */
 static void PlayerSettings_DrawPlayer( void *self ) {
-	menubitmap_s	*b;
-	vec3_t			viewangles;
-	char			buf[MAX_QPATH];
+	static const char	*rotations[8] = { "PLAYA1", "PLAYA2A8", "PLAYA3A7", "PLAYA4A6", "PLAYA5", "PLAYA4A6", "PLAYA3A7", "PLAYA2A8" };
+	menubitmap_s		*b = (menubitmap_s *)self;
+	int					r = ( uis.realtime / 400 ) & 7, color = s_playersettings.color.curvalue;
+	qhandle_t			pic;
+	float				w, h;
 
-	trap_Cvar_VariableStringBuffer( "model", buf, sizeof( buf ) );
-	if ( strcmp( buf, s_playersettings.playerModel ) != 0 ) {
-		UI_PlayerInfo_SetModel( &s_playersettings.playerinfo, buf );
-		strcpy( s_playersettings.playerModel, buf );
-
-		viewangles[YAW]   = 180 - 30;
-		viewangles[PITCH] = 0;
-		viewangles[ROLL]  = 0;
-		UI_PlayerInfo_SetInfo( &s_playersettings.playerinfo, LEGS_IDLE, TORSO_STAND, viewangles, vec3_origin, WP_MACHINEGUN, qfalse );
-	}
-
-	b = (menubitmap_s*) self;
-	UI_DrawPlayer( b->generic.x, b->generic.y, b->width, b->height, &s_playersettings.playerinfo, uis.realtime/2 );
+	pic = trap_R_RegisterShaderNoMip( color ? va( "doom/sprite%d/%s", color, rotations[r] ) : va( "doom/sprite/%s", rotations[r] ) );
+	// the marine is about 40 by 56 Doom pixels, which are 1.2 times taller
+	w = 160;
+	h = 56 * 4 * 1.2f;
+	UI_DrawHandlePic( b->generic.x + ( b->width - w ) / 2, b->generic.y + ( b->height - h ) / 2, r > 4 ? -w : w, h, pic );
 }
 
 
@@ -263,8 +249,8 @@ static void PlayerSettings_SaveChanges( void ) {
 	// handicap
 	trap_Cvar_SetValue( "handicap", 100 - s_playersettings.handicap.curvalue * 5 );
 
-	// effects color
-	trap_Cvar_SetValue( "color1", uitogamecode[s_playersettings.effects.curvalue] );
+	// Q3Doom: the marine colour
+	trap_Cvar_SetValue( "doomcolor", s_playersettings.color.curvalue );
 }
 
 
@@ -287,29 +273,13 @@ PlayerSettings_SetMenuItems
 =================
 */
 static void PlayerSettings_SetMenuItems( void ) {
-	vec3_t	viewangles;
-	int		c;
 	int		h;
 
 	// name
 	Q_strncpyz( s_playersettings.name.field.buffer, UI_Cvar_VariableString("name"), sizeof(s_playersettings.name.field.buffer) );
 
-	// effects color
-	c = trap_Cvar_VariableValue( "color1" ) - 1;
-	if( c < 0 || c > 6 ) {
-		c = 6;
-	}
-	s_playersettings.effects.curvalue = gamecodetoui[c];
-
-	// model/skin
-	memset( &s_playersettings.playerinfo, 0, sizeof(playerInfo_t) );
-	
-	viewangles[YAW]   = 180 - 30;
-	viewangles[PITCH] = 0;
-	viewangles[ROLL]  = 0;
-
-	UI_PlayerInfo_SetModel( &s_playersettings.playerinfo, UI_Cvar_VariableString( "model" ) );
-	UI_PlayerInfo_SetInfo( &s_playersettings.playerinfo, LEGS_IDLE, TORSO_STAND, viewangles, vec3_origin, WP_MACHINEGUN, qfalse );
+	// Q3Doom: the marine colour
+	s_playersettings.color.curvalue = (int)Com_Clamp( 0, 4, trap_Cvar_VariableValue( "doomcolor" ) );
 
 	// handicap
 	h = Com_Clamp( 5, 100, trap_Cvar_VariableValue("handicap") );
@@ -330,11 +300,6 @@ static void PlayerSettings_MenuEvent( void* ptr, int event ) {
 	switch( ((menucommon_s*)ptr)->id ) {
 	case ID_HANDICAP:
 		trap_Cvar_Set( "handicap", va( "%i", 100 - 25 * s_playersettings.handicap.curvalue ) );
-		break;
-
-	case ID_MODEL:
-		PlayerSettings_SaveChanges();
-		UI_PlayerModelMenu();
 		break;
 
 	case ID_BACK:
@@ -410,37 +375,28 @@ static void PlayerSettings_MenuInit( void ) {
 	s_playersettings.handicap.generic.bottom	= y + 2 * PROP_HEIGHT;
 	s_playersettings.handicap.numitems			= 20;
 
+	// Q3Doom: the marine colour, in place of Quake 3's rail effects
 	y += 3 * PROP_HEIGHT;
-	s_playersettings.effects.generic.type		= MTYPE_SPINCONTROL;
-	s_playersettings.effects.generic.flags		= QMF_NODEFAULTINIT;
-	s_playersettings.effects.generic.id			= ID_EFFECTS;
-	s_playersettings.effects.generic.ownerdraw	= PlayerSettings_DrawEffects;
-	s_playersettings.effects.generic.x			= 192;
-	s_playersettings.effects.generic.y			= y;
-	s_playersettings.effects.generic.left		= 192 - 8;
-	s_playersettings.effects.generic.top		= y - 8;
-	s_playersettings.effects.generic.right		= 192 + 200;
-	s_playersettings.effects.generic.bottom		= y + 2* PROP_HEIGHT;
-	s_playersettings.effects.numitems			= 7;
+	s_playersettings.color.generic.type			= MTYPE_SPINCONTROL;
+	s_playersettings.color.generic.flags		= QMF_NODEFAULTINIT;
+	s_playersettings.color.generic.id			= ID_COLOR;
+	s_playersettings.color.generic.ownerdraw	= PlayerSettings_DrawColor;
+	s_playersettings.color.generic.x			= 192;
+	s_playersettings.color.generic.y			= y;
+	s_playersettings.color.generic.left			= 192 - 8;
+	s_playersettings.color.generic.top			= y - 8;
+	s_playersettings.color.generic.right		= 192 + 200;
+	s_playersettings.color.generic.bottom		= y + 2* PROP_HEIGHT;
+	s_playersettings.color.numitems				= 5;
 
-	s_playersettings.model.generic.type			= MTYPE_BITMAP;
-	s_playersettings.model.generic.name			= ART_MODEL0;
-	s_playersettings.model.generic.flags		= QMF_RIGHT_JUSTIFY|QMF_PULSEIFFOCUS;
-	s_playersettings.model.generic.id			= ID_MODEL;
-	s_playersettings.model.generic.callback		= PlayerSettings_MenuEvent;
-	s_playersettings.model.generic.x			= 640;
-	s_playersettings.model.generic.y			= 480-64;
-	s_playersettings.model.width				= 128;
-	s_playersettings.model.height				= 64;
-	s_playersettings.model.focuspic				= ART_MODEL1;
-
+	// Q3Doom: the marine (no Quake 3 model to choose)
 	s_playersettings.player.generic.type		= MTYPE_BITMAP;
 	s_playersettings.player.generic.flags		= QMF_INACTIVE;
 	s_playersettings.player.generic.ownerdraw	= PlayerSettings_DrawPlayer;
 	s_playersettings.player.generic.x			= 400;
-	s_playersettings.player.generic.y			= -40;
-	s_playersettings.player.width				= 32*10;
-	s_playersettings.player.height				= 56*10;
+	s_playersettings.player.generic.y			= 100;
+	s_playersettings.player.width				= 220;
+	s_playersettings.player.height				= 300;
 
 	s_playersettings.back.generic.type			= MTYPE_BITMAP;
 	s_playersettings.back.generic.name			= ART_BACK0;
@@ -466,8 +422,7 @@ static void PlayerSettings_MenuInit( void ) {
 
 	Menu_AddItem( &s_playersettings.menu, &s_playersettings.name );
 	Menu_AddItem( &s_playersettings.menu, &s_playersettings.handicap );
-	Menu_AddItem( &s_playersettings.menu, &s_playersettings.effects );
-	Menu_AddItem( &s_playersettings.menu, &s_playersettings.model );
+	Menu_AddItem( &s_playersettings.menu, &s_playersettings.color );
 	Menu_AddItem( &s_playersettings.menu, &s_playersettings.back );
 
 	Menu_AddItem( &s_playersettings.menu, &s_playersettings.player );
@@ -486,19 +441,8 @@ PlayerSettings_Cache
 void PlayerSettings_Cache( void ) {
 	trap_R_RegisterShaderNoMip( ART_FRAMEL );
 	trap_R_RegisterShaderNoMip( ART_FRAMER );
-	trap_R_RegisterShaderNoMip( ART_MODEL0 );
-	trap_R_RegisterShaderNoMip( ART_MODEL1 );
 	trap_R_RegisterShaderNoMip( ART_BACK0 );
 	trap_R_RegisterShaderNoMip( ART_BACK1 );
-
-	s_playersettings.fxBasePic = trap_R_RegisterShaderNoMip( ART_FX_BASE );
-	s_playersettings.fxPic[0] = trap_R_RegisterShaderNoMip( ART_FX_RED );
-	s_playersettings.fxPic[1] = trap_R_RegisterShaderNoMip( ART_FX_YELLOW );
-	s_playersettings.fxPic[2] = trap_R_RegisterShaderNoMip( ART_FX_GREEN );
-	s_playersettings.fxPic[3] = trap_R_RegisterShaderNoMip( ART_FX_TEAL );
-	s_playersettings.fxPic[4] = trap_R_RegisterShaderNoMip( ART_FX_BLUE );
-	s_playersettings.fxPic[5] = trap_R_RegisterShaderNoMip( ART_FX_CYAN );
-	s_playersettings.fxPic[6] = trap_R_RegisterShaderNoMip( ART_FX_WHITE );
 }
 
 

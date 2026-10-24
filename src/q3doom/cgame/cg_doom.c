@@ -66,6 +66,7 @@ static struct {
 	spriteRot_t			(*frames)[MAX_SPRITE_FRAMES][8];
 	qhandle_t			*lumpShader;		// per WAD lump, registered on first use
 	qhandle_t			*fuzzShader;
+	qhandle_t			*colorShader[DOOM_NUM_TRANSLATIONS];	// the marine colours 1-4
 
 	int					numThings;
 	doomThing_t			things[MAX_DOOM_THINGS];
@@ -86,6 +87,8 @@ static struct {
 } cgDoom;
 
 #define DOOM_MAP()	( cgDoom.map != NULL )
+// Doom's sprites, sounds and status bar: on every map, Quake 3's included
+#define DOOM_GAME()	( cgDoom.wad != NULL )
 
 static int	levelShotState;		// the level's menu picture: 0 to check, 1 this frame, 2 done
 
@@ -294,6 +297,10 @@ qboolean CG_DoomMap( void ) {
 	return cgDoom.map != NULL;
 }
 
+qboolean CG_DoomGame( void ) {
+	return cgDoom.wad != NULL;
+}
+
 const doom_map_t *CG_DoomMapData( void ) {
 	return cgDoom.map;
 }
@@ -315,6 +322,30 @@ int CG_DoomSectorLight( int sector ) {
 		return 255;
 	}
 	return cgDoom.levels[sector];
+}
+
+/*
+=================
+CG_DoomLightAt
+
+The light of a sprite at a point: its sector's on a Doom map, the light
+grid's on a Quake 3 map (as bright as Quake 3 lights its models)
+=================
+*/
+int CG_DoomLightAt( const vec3_t point ) {
+	vec3_t	ambient, directed, dir, p;
+	float	light;
+
+	if ( DOOM_MAP() ) {
+		return CG_DoomSectorLight( CG_DoomSectorAt( point ) );
+	}
+	VectorCopy( point, p );
+	p[2] += 24;		// the middle of a standing thing, off the floor
+	if ( !trap_R_LightForPoint( p, ambient, directed, dir ) ) {
+		return 255;
+	}
+	light = ( ambient[0] + ambient[1] + ambient[2] ) / 3 + ( directed[0] + directed[1] + directed[2] ) / 6;
+	return light < 96 ? 96 : light > 255 ? 255 : (int)light;
 }
 
 /*
@@ -406,6 +437,23 @@ static qhandle_t LumpShader( int lump ) {
 	return cgDoom.lumpShader[lump];
 }
 
+// a marine sprite in another colour (1-4: gray, brown, red, blue)
+static qhandle_t TranslatedShader( int lump, int translation ) {
+	qhandle_t	*shaders;
+
+	if ( translation <= 0 || translation >= DOOM_NUM_TRANSLATIONS ) {
+		return LumpShader( lump );
+	}
+	if ( !cgDoom.colorShader[translation] ) {
+		cgDoom.colorShader[translation] = calloc( doom_wad_num_lumps( cgDoom.wad ), sizeof( qhandle_t ) );
+	}
+	shaders = cgDoom.colorShader[translation];
+	if ( !shaders[lump] ) {
+		shaders[lump] = trap_R_RegisterShader( va( "doom/thing%d/%s", translation, doom_wad_lump( cgDoom.wad, lump )->name ) );
+	}
+	return shaders[lump];
+}
+
 /*
 =================
 CG_DoomSpriteLump
@@ -417,7 +465,7 @@ int CG_DoomSpriteLump( int state, int rotation, qboolean *flip ) {
 	const doom_state_t	*st;
 	int					frame;
 
-	if ( !DOOM_MAP() || state <= S_NULL || state >= NUMSTATES ) {
+	if ( !DOOM_GAME() || state <= S_NULL || state >= NUMSTATES ) {
 		return -1;
 	}
 	st = &doom_states[state];
@@ -467,7 +515,7 @@ lifted to stand on it (as modern ports do). Missiles and effects keep
 Doom's offsets.
 =================
 */
-static void AddSprite( const vec3_t origin, float angle, int state, int light, qboolean fuzz, qboolean standing ) {
+static void AddSprite( const vec3_t origin, float angle, int state, int light, qboolean fuzz, qboolean standing, int translation ) {
 	const doom_state_t	*st = &doom_states[state];
 	const spriteRot_t	*rot;
 	const uint8_t		*header;
@@ -479,7 +527,7 @@ static void AddSprite( const vec3_t origin, float angle, int state, int light, q
 		return;
 	}
 	if ( light < 0 ) {
-		light = CG_DoomSectorLight( CG_DoomSectorAt( origin ) );
+		light = CG_DoomLightAt( origin );
 	}
 	viewToThing = RAD2DEG( atan2( origin[1] - cg.refdef.vieworg[1], origin[0] - cg.refdef.vieworg[0] ) );
 	r = (int)floor( AngleNormalize360( viewToThing - angle + 202.5f ) / 45.0f ) & 7;
@@ -533,7 +581,7 @@ static void AddSprite( const vec3_t origin, float angle, int state, int light, q
 		verts[i].modulate[3] = 255;
 	}
 	if ( !fuzz ) {
-		trap_R_AddPolyToScene( LumpShader( rot->lump ), 4, verts );
+		trap_R_AddPolyToScene( translation > 0 ? TranslatedShader( rot->lump, translation ) : LumpShader( rot->lump ), 4, verts );
 		return;
 	}
 
@@ -552,7 +600,7 @@ static void AddSprite( const vec3_t origin, float angle, int state, int light, q
 }
 
 void CG_DoomAddSprite( const vec3_t origin, float angle, int state, int light ) {
-	AddSprite( origin, angle, state, light, qfalse, qfalse );
+	AddSprite( origin, angle, state, light, qfalse, qfalse, 0 );
 }
 
 /*
@@ -577,7 +625,7 @@ void CG_DoomSpawnFx( const vec3_t origin, int state, int flags ) {
 	trace_t		tr;
 	vec3_t		down;
 
-	if ( !DOOM_MAP() || state <= S_NULL || state >= NUMSTATES ) {
+	if ( !DOOM_GAME() || state <= S_NULL || state >= NUMSTATES ) {
 		return;
 	}
 	fx = &cgDoom.fx[next];
@@ -874,7 +922,7 @@ void CG_DoomItem( centity_t *cent ) {
 	const qvItem_t		*q;
 	int					type;
 
-	if ( !DOOM_MAP() || !es->modelindex || es->modelindex >= bg_numItems || ( es->eFlags & EF_NODRAW ) ) {
+	if ( !DOOM_GAME() || !es->modelindex || es->modelindex >= bg_numItems || ( es->eFlags & EF_NODRAW ) ) {
 		return;
 	}
 	if ( r_quakeVisuals.integer && ( q = QV_Item( bg_itemlist[es->modelindex].doomednum ) ) != NULL ) {
@@ -886,7 +934,7 @@ void CG_DoomItem( centity_t *cent ) {
 		return;
 	}
 	AddSprite( cent->lerpOrigin, es->angles[YAW],
-		CG_DoomAnimatedState( doom_mobjinfo[type].spawnstate, cg.time * DOOM_TICRATE / 1000 ), -1, qfalse, qtrue );
+		CG_DoomAnimatedState( doom_mobjinfo[type].spawnstate, cg.time * DOOM_TICRATE / 1000 ), -1, qfalse, qtrue, 0 );
 }
 
 /*
@@ -904,7 +952,7 @@ void CG_DoomThing( centity_t *cent ) {
 	vec3_t				delta, origin;
 	float				len, decay;
 
-	if ( !DOOM_MAP() || type <= 0 || type >= NUMMOBJTYPES || es->frame <= S_NULL || es->frame >= NUMSTATES ) {
+	if ( !DOOM_GAME() || type <= 0 || type >= NUMMOBJTYPES || es->frame <= S_NULL || es->frame >= NUMSTATES ) {
 		return;
 	}
 
@@ -928,7 +976,85 @@ void CG_DoomThing( centity_t *cent ) {
 	VectorCopy( cent->lerpOrigin, cent->doomLastOrigin );
 	cent->doomDrawTime = cg.time;
 	VectorAdd( cent->lerpOrigin, cent->doomStepOffset, origin );
-	AddSprite( origin, es->angles[YAW], es->frame, -1, ( doom_mobjinfo[type].flags & MF_SHADOW ) != 0, qtrue );
+	AddSprite( origin, es->angles[YAW], es->frame, -1, ( doom_mobjinfo[type].flags & MF_SHADOW ) != 0, qtrue, 0 );
+}
+
+/*
+=================
+CG_DoomPlayer
+
+A player or a corpse as Doom's marine (MT_PLAYER's states), in its colour:
+- gibbed (s.time: when): the gibs (S_PLAY_XDIE), down to the pile
+- dead (s.time2: when it died): the death (S_PLAY_DIE), down to the corpse
+- firing: the flash frame, then the attack frame (S_PLAY_ATK2, ATK1)
+- hurt: the pain frame; moving: running (S_PLAY_RUN); else standing
+=================
+*/
+static int	localDeathTime, localGibTime;
+
+// EV_DEATH* and EV_GIB_PLAYER of the local player; cleared when alive
+void CG_DoomLocalDeath( qboolean gib ) {
+	if ( !localDeathTime ) {
+		localDeathTime = cg.time;
+	}
+	if ( gib ) {
+		localGibTime = cg.time;
+	}
+}
+
+void CG_DoomLocalAlive( void ) {
+	localDeathTime = localGibTime = 0;
+}
+
+static int TicsSince( int time ) {
+	int tics = ( cg.time - time ) * DOOM_TICRATE / 1000;
+
+	return tics < 0 ? 0 : tics;
+}
+
+void CG_DoomPlayer( centity_t *cent, int translation ) {
+	const entityState_t	*es = &cent->currentState;
+	int					state, tics, gibTime = es->time, deathTime = es->time2;
+	float				speed;
+	vec3_t				feet;
+
+	if ( !DOOM_GAME() ) {
+		return;
+	}
+	// the server does not send a client its own entity: its times are those
+	// of the death and gib events it got
+	if ( cent == &cg.predictedPlayerEntity ) {
+		gibTime = localGibTime;
+		deathTime = localDeathTime;
+	}
+	if ( gibTime ) {
+		state = CG_DoomAnimatedState( S_PLAY_XDIE1, TicsSince( gibTime ) );
+	} else if ( es->eFlags & EF_DEAD ) {
+		// a corpse first seen without its time of death lies still
+		state = CG_DoomAnimatedState( S_PLAY_DIE1, deathTime ? TicsSince( deathTime ) : 1000 );
+	} else {
+		tics = TicsSince( cent->muzzleFlashTime );
+		speed = sqrt( es->pos.trDelta[0] * es->pos.trDelta[0] + es->pos.trDelta[1] * es->pos.trDelta[1] );
+		if ( cent->muzzleFlashTime && tics < doom_states[S_PLAY_ATK2].tics ) {
+			state = S_PLAY_ATK2;
+		} else if ( cent->muzzleFlashTime && tics < doom_states[S_PLAY_ATK2].tics + doom_states[S_PLAY_ATK1].tics ) {
+			state = S_PLAY_ATK1;
+		} else if ( cent->pe.painTime && TicsSince( cent->pe.painTime ) < 8 ) {
+			state = S_PLAY_PAIN;
+		} else if ( speed > 30 ) {
+			state = S_PLAY_RUN1 + ( cg.time * DOOM_TICRATE / 1000 / 4 ) % 4;
+		} else {
+			state = S_PLAY;
+		}
+	}
+	if ( state == S_NULL ) {
+		return;
+	}
+	// the sprite stands on the feet, MINS_Z below the origin
+	VectorCopy( cent->lerpOrigin, feet );
+	feet[2] += MINS_Z;
+	AddSprite( feet, cent->lerpAngles[YAW], state, -1,
+		( es->powerups & ( 1 << DPW_INVISIBILITY ) ) != 0, qtrue, translation );
 }
 
 /*
@@ -944,7 +1070,7 @@ void CG_DoomMissile( centity_t *cent ) {
 	float				angle;
 	vec3_t				origin;
 
-	if ( !DOOM_MAP() || type <= 0 || type >= NUMMOBJTYPES ) {
+	if ( !DOOM_GAME() || type <= 0 || type >= NUMMOBJTYPES ) {
 		return;
 	}
 	angle = RAD2DEG( atan2( es->pos.trDelta[1], es->pos.trDelta[0] ) );
@@ -962,7 +1088,7 @@ A Doom sound effect (sfx_*), 0 if the WAD does not have it
 =================
 */
 sfxHandle_t CG_DoomSound( int sfx ) {
-	if ( !DOOM_MAP() || sfx <= sfx_None || sfx >= NUMSFX ) {
+	if ( !DOOM_GAME() || sfx <= sfx_None || sfx >= NUMSFX ) {
 		return 0;
 	}
 	return cgDoom.sounds[sfx] > 0 ? cgDoom.sounds[sfx] : 0;
@@ -995,18 +1121,28 @@ void CG_DoomInit( void ) {
 
 	memset( &cgDoom, 0, sizeof( cgDoom ) );
 	levelShotState = 0;
-	COM_StripExtension( COM_SkipPath( cgs.mapname ), mapname );
-	cgDoom.map = trap_Doom_GetMap( mapname );
-	if ( !cgDoom.map ) {
+	CG_DoomLocalAlive();
+
+	// the sprites, sounds and status bar, on every map
+	cgDoom.wad = trap_Doom_GetWad();
+	if ( !cgDoom.wad ) {
 		return;
 	}
-	cgDoom.wad = trap_Doom_GetWad();
 	info = CG_ConfigString( CS_SERVERINFO );
 	cgDoom.skill = atoi( Info_ValueForKey( info, "g_doomSkill" ) );
 	cgDoom.random = 0x1234;
+	BuildSpriteFrames();
+	RegisterSounds();
 	qvNumItems = 0;
 	if ( r_quakeVisuals.integer ) {
 		QV_LoadItems();
+	}
+
+	COM_StripExtension( COM_SkipPath( cgs.mapname ), mapname );
+	cgDoom.map = trap_Doom_GetMap( mapname );
+	if ( !cgDoom.map ) {
+		CG_DoomHudInit();
+		return;
 	}
 
 	// lights
@@ -1017,7 +1153,6 @@ void CG_DoomInit( void ) {
 	CG_DoomLightsChanged();
 
 	// things
-	BuildSpriteFrames();
 	for ( i = 0 ; i < cgDoom.map->num_things && cgDoom.numThings < MAX_DOOM_THINGS ; i++ ) {
 		const doom_thing_t		*t = &cgDoom.map->things[i];
 		int						type = BG_DoomStaticThing( t, cgDoom.skill );
@@ -1047,16 +1182,20 @@ void CG_DoomInit( void ) {
 	}
 	CG_Printf( "Doom map %s: %d things drawn, %d solid\n", cgDoom.map->name, cgDoom.numThings, cgDoom.numBlockers );
 
-	RegisterSounds();
 	CG_DoomHudInit();
 	CG_DoomIntermissionChanged();
 }
 
 void CG_DoomShutdown( void ) {
+	int		i;
+
 	CG_DoomHudShutdown();
 	free( cgDoom.frames );
 	free( cgDoom.lumpShader );
 	free( cgDoom.fuzzShader );
+	for ( i = 0 ; i < DOOM_NUM_TRANSLATIONS ; i++ ) {
+		free( cgDoom.colorShader[i] );
+	}
 	free( cgDoom.baseLight );
 	free( cgDoom.lights );
 	free( cgDoom.levels );
@@ -1115,6 +1254,13 @@ Every frame, before the scene is rendered
 void CG_DoomAddToScene( void ) {
 	int		i, tics;
 
+	if ( !DOOM_GAME() ) {
+		return;
+	}
+	if ( cg.predictedPlayerState.stats[STAT_HEALTH] > 0 ) {
+		CG_DoomLocalAlive();
+	}
+	RunFx();
 	if ( !DOOM_MAP() ) {
 		return;
 	}
@@ -1126,13 +1272,11 @@ void CG_DoomAddToScene( void ) {
 
 		// things hanging from the ceiling keep their offsets
 		AddSprite( th->origin, th->angle, CG_DoomAnimatedState( doom_mobjinfo[th->type].spawnstate, tics ), cgDoom.levels[th->sector],
-			qfalse, !( doom_mobjinfo[th->type].flags & MF_SPAWNCEILING ) );
+			qfalse, !( doom_mobjinfo[th->type].flags & MF_SPAWNCEILING ), 0 );
 		if ( r_quakeVisuals.integer ) {
 			QV_Corona( th );
 		}
 	}
-
-	RunFx();
 }
 
 /*

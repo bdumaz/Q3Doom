@@ -308,6 +308,7 @@ struct gclient_s {
 
 	// timers
 	int			respawnTime;		// can respawn when time > this, force after g_forcerespwan
+	int			spawnProtectedUntil;	// Q3Doom: other players do no damage until then, or a shot
 	int			inactivityTime;		// kick players when time > this
 	qboolean	inactivityWarning;	// qtrue if the five seoond warning has been given
 	int			rewardTime;			// clear the EF_AWARD_IMPRESSIVE, etc when time > this
@@ -770,6 +771,7 @@ extern	vmCvar_t	g_smoothClients;
 extern	vmCvar_t	pmove_fixed;
 extern	vmCvar_t	g_stepHeight;
 extern	vmCvar_t	g_playerHeight;
+extern	vmCvar_t	g_spawnProtection;
 extern	vmCvar_t	g_doomSkill;
 extern	vmCvar_t	g_doomAllKeys;
 extern	vmCvar_t	g_fallDamage;

@@ -41,7 +41,7 @@ void CG_CheckAmmo( void ) {
 	int		weapons;
 
 	// Q3Doom: no low ammo warning in Doom
-	if ( CG_DoomMap() ) {
+	if ( CG_DoomGame() ) {
 		cg.lowAmmoWarning = 0;
 		return;
 	}
@@ -313,7 +313,7 @@ void CG_CheckLocalSounds( playerState_t *ps, playerState_t *ops ) {
 	}
 
 	// hit changes (Q3Doom: Doom has no hit sounds)
-	if ( CG_DoomMap() ) {
+	if ( CG_DoomGame() ) {
 	} else if ( ps->persistant[PERS_HITS] > ops->persistant[PERS_HITS] ) {
 		armor  = ps->persistant[PERS_ATTACKEE_ARMOR] & 0xff;
 		health = ps->persistant[PERS_ATTACKEE_ARMOR] >> 8;

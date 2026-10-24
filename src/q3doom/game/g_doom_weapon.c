@@ -294,14 +294,14 @@ static void Saw( gentity_t *ent, const vec3_t eye ) {
 }
 
 // P_GunShot
-static void GunShot( gentity_t *ent, const vec3_t eye, float pitch, qboolean accurate ) {
+static void GunShot( gentity_t *ent, const vec3_t eye, float pitch, qboolean accurate, int mod ) {
 	int		damage = 5 * ( Doom_Random() % 3 + 1 );
 	float	yaw = ent->client->ps.viewangles[YAW];
 
 	if ( !accurate ) {
 		yaw += Spread();
 	}
-	Doom_LineAttack( ent, eye, yaw, pitch, DOOM_MISSILERANGE, damage, MOD_MACHINEGUN );
+	Doom_LineAttack( ent, eye, yaw, pitch, DOOM_MISSILERANGE, damage, mod );
 }
 
 /*
@@ -503,6 +503,8 @@ void Doom_FireWeapon( gentity_t *ent, int parm ) {
 	if ( !ent->client ) {
 		return;
 	}
+	// firing ends the spawn protection
+	ent->client->spawnProtectedUntil = 0;
 	EyePoint( ent, eye );
 
 	// the shot wakes up the monsters that hear it (P_FireWeapon)
@@ -518,12 +520,12 @@ void Doom_FireWeapon( gentity_t *ent, int parm ) {
 	case ACT_FirePistol:
 	case ACT_FireCGun:
 		pitch = ShotPitch( ent, eye, ent->client->ps.viewangles[YAW], AIMRANGE );
-		GunShot( ent, eye, pitch, ( parm & DOOM_FIRE_ACCURATE ) != 0 );
+		GunShot( ent, eye, pitch, ( parm & DOOM_FIRE_ACCURATE ) != 0, action == ACT_FirePistol ? MOD_PISTOL : MOD_DOOM_CHAINGUN );
 		break;
 	case ACT_FireShotgun:
 		pitch = ShotPitch( ent, eye, ent->client->ps.viewangles[YAW], AIMRANGE );
 		for ( i = 0 ; i < 7 ; i++ ) {
-			GunShot( ent, eye, pitch, qfalse );
+			GunShot( ent, eye, pitch, qfalse, MOD_SHOTGUN );
 		}
 		break;
 	case ACT_FireMissile:

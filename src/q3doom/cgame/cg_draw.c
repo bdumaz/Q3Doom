@@ -322,6 +322,12 @@ void CG_DrawHead( float x, float y, float w, float h, int clientNum, vec3_t head
 	vec3_t			origin;
 	vec3_t			mins, maxs;
 
+	// Q3Doom: the Doom face on the marine's colour
+	if ( CG_DoomGame() ) {
+		CG_DoomDrawFaceIcon( x, y, w, h, clientNum );
+		return;
+	}
+
 	ci = &cgs.clientinfo[ clientNum ];
 
 	if ( cg_draw3dIcons.integer ) {
@@ -719,7 +725,9 @@ static float CG_DrawAttacker( float y ) {
 		return y;
 	}
 
-	if ( !cg.attackerTime ) {
+	// Q3Doom: no Quake 3 head of the attacker (the marines have none); the
+	// Doom face looks toward the damage instead
+	if ( !cg.attackerTime || CG_DoomGame() ) {
 		return y;
 	}
 
@@ -1709,6 +1717,10 @@ static void CG_DrawLagometer( void ) {
 	x = 640 - 48;
 	y = 480 - 48;
 #endif
+	// Q3Doom: above the Doom status bar (32 of Doom's 200 lines)
+	if ( CG_DoomHudActive() ) {
+		y -= 32 * 480 / 200;
+	}
 
 	trap_R_SetColor( NULL );
 	CG_DrawPic( x, y, 48, 48, cgs.media.lagometerShader );
@@ -2553,7 +2565,7 @@ static void CG_Draw2D( void ) {
 			}
 #endif
 
-			if ( !CG_DoomMap() || cgs.doomWeapons == DOOM_WEAPONS_Q3 ) {
+			if ( !CG_DoomGame() || cgs.doomWeapons == DOOM_WEAPONS_Q3 ) {
 				CG_DrawAmmoWarning();
 			}
 
@@ -2562,7 +2574,7 @@ static void CG_Draw2D( void ) {
 #endif
 			CG_DrawCrosshair();
 			CG_DrawCrosshairNames();
-			if ( !CG_DoomMap() || cgs.doomWeapons == DOOM_WEAPONS_Q3 ) {
+			if ( !CG_DoomGame() || cgs.doomWeapons == DOOM_WEAPONS_Q3 ) {
 				CG_DrawWeaponSelect();
 			}
 
@@ -2596,7 +2608,7 @@ static void CG_Draw2D( void ) {
 
 #ifndef MISSIONPACK
 	// Q3Doom: no Quake 3 powerup timers and pickup icons (under the Doom status bar)
-	if ( !CG_DoomMap() ) {
+	if ( !CG_DoomGame() ) {
 		CG_DrawLowerRight();
 		CG_DrawLowerLeft();
 	}

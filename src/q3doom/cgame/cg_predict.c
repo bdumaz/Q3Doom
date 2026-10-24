@@ -313,7 +313,7 @@ static void CG_TouchItem( centity_t *cent ) {
 
 	// if its a weapon, give them some predicted ammo so the autoswitch will work
 	// (Q3Doom: the game switches Doom weapons)
-	if ( item->giType == IT_WEAPON && !CG_DoomMap() ) {
+	if ( item->giType == IT_WEAPON && !CG_DoomGame() ) {
 		cg.predictedPlayerState.stats[ STAT_WEAPONS ] |= 1 << item->giTag;
 		if ( !cg.predictedPlayerState.ammo[ item->giTag ] ) {
 			cg.predictedPlayerState.ammo[ item->giTag ] = 1;

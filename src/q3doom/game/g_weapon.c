@@ -819,6 +819,7 @@ FireWeapon
 ===============
 */
 void FireWeapon( gentity_t *ent ) {
+	ent->client->spawnProtectedUntil = 0;		// Q3Doom: firing ends the spawn protection
 	if (ent->client->ps.powerups[PW_QUAD] ) {
 		s_quadFactor = g_quadfactor.value;
 	} else {

@@ -50,6 +50,7 @@ static struct {
 
 	// pictures
 	int					sbar, starms, tallPercent, tallMinus;
+	int					faceBack[4];		// STFB0-3, behind the face in deathmatch
 	int					tallNum[10], shortNum[10], greyNum[10];
 	int					keys[6];
 	int					faces[ST_NUMFACES];
@@ -312,13 +313,15 @@ void CG_DoomHudInit( void ) {
 
 	memset( &hud, 0, sizeof( hud ) );
 	hud.wad = CG_DoomWad();
-	hud.map = CG_DoomMapData();
-	if ( !hud.wad || !hud.map ) {
+	hud.map = CG_DoomMapData();		// NULL on a Quake 3 map: no automap
+	if ( !hud.wad ) {
 		return;
 	}
 	hud.active = qtrue;
 	hud.lumpShader = calloc( doom_wad_num_lumps( hud.wad ), sizeof( qhandle_t ) );
-	hud.mapped = calloc( hud.map->num_linedefs, 1 );
+	if ( hud.map ) {
+		hud.mapped = calloc( hud.map->num_linedefs, 1 );
+	}
 
 	hud.sbar = Lump( "STBAR" );
 	hud.starms = Lump( "STARMS" );
@@ -331,6 +334,9 @@ void CG_DoomHudInit( void ) {
 	}
 	for ( i = 0 ; i < 6 ; i++ ) {
 		hud.keys[i] = Lump( va( "STKEYS%d", i ) );
+	}
+	for ( i = 0 ; i < 4 ; i++ ) {
+		hud.faceBack[i] = Lump( va( "STFB%d", i ) );
 	}
 	for ( p = 0, i = 0 ; p < ST_NUMPAINFACES ; p++ ) {
 		hud.faces[i++] = Lump( va( "STFST%d0", p ) );
@@ -410,7 +416,7 @@ void CG_DoomDamage( int damage, int yawByte ) {
 }
 
 void CG_DoomAutomap_f( void ) {
-	hud.automap = !hud.automap;
+	hud.automap = !hud.automap && hud.map;
 }
 
 /*
@@ -610,6 +616,35 @@ static void DrawQ3Weapons( const playerState_t *ps ) {
 	}
 }
 
+// the face background (STFB0-3) of a player's colour: blue has none, the
+// gray one is the closest
+static int ClientFaceBack( int clientNum ) {
+	const clientInfo_t	*ci = &cgs.clientinfo[clientNum];
+	int					color = ci->team == TEAM_RED ? 3 : ci->team == TEAM_BLUE ? 4 : ci->doomColor;
+
+	return color >= 1 && color <= 3 ? color : color == 4 ? 1 : 0;
+}
+
+static int FaceBackColor( const playerState_t *ps ) {
+	return ClientFaceBack( ps->clientNum );
+}
+
+/*
+=================
+CG_DoomDrawFaceIcon
+
+A player in the scoreboard: the status bar face, looking ahead, on the
+background of the player's colour (in 640x480 coordinates)
+=================
+*/
+void CG_DoomDrawFaceIcon( float x, float y, float w, float h, int clientNum ) {
+	if ( !hud.active || clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return;
+	}
+	CG_DrawPic( x, y, w, h, CG_DoomPatchShader( hud.faceBack[ClientFaceBack( clientNum )] ) );
+	CG_DrawPic( x, y, w, h, CG_DoomPatchShader( hud.faces[1] ) );
+}
+
 /*
 =================
 DrawStatusBar
@@ -638,13 +673,20 @@ static void DrawStatusBar( const playerState_t *ps ) {
 	DrawNum( 221, 171, ps->stats[STAT_ARMOR], 3, hud.tallNum );
 	DrawPatch( 221, 171, hud.tallPercent );
 
-	// arms: 2-7, yellow when owned
-	DrawPatch( 104, 168, hud.starms );
-	for ( i = 0 ; i < 6 ; i++ ) {
-		qboolean owned = cgs.doomWeapons == DOOM_WEAPONS_Q3 ? ( ps->stats[STAT_WEAPONS] & ( 1 << bg_doomQ3Weapon[DWP_PISTOL + i] ) ) != 0
-			: DOOM_OWNS( ps, DWP_PISTOL + i );
+	if ( cgs.doomDeathmatch ) {
+		// deathmatch: the frags over the bar's FRAG label, and the face on
+		// the player's colour
+		DrawNum( 138, 171, ps->persistant[PERS_SCORE], 2, hud.tallNum );
+		DrawPatch( 143, 168, hud.faceBack[FaceBackColor( ps )] );
+	} else {
+		// arms: 2-7, yellow when owned
+		DrawPatch( 104, 168, hud.starms );
+		for ( i = 0 ; i < 6 ; i++ ) {
+			qboolean owned = cgs.doomWeapons == DOOM_WEAPONS_Q3 ? ( ps->stats[STAT_WEAPONS] & ( 1 << bg_doomQ3Weapon[DWP_PISTOL + i] ) ) != 0
+				: DOOM_OWNS( ps, DWP_PISTOL + i );
 
-		DrawPatch( 111 + ( i % 3 ) * 12, 172 + ( i / 3 ) * 10, owned ? hud.shortNum[i + 2] : hud.greyNum[i + 2] );
+			DrawPatch( 111 + ( i % 3 ) * 12, 172 + ( i / 3 ) * 10, owned ? hud.shortNum[i + 2] : hud.greyNum[i + 2] );
+		}
 	}
 
 	// face
@@ -894,7 +936,9 @@ void CG_DoomDraw2D( void ) {
 	HudTics();
 
 	if ( ps->persistant[PERS_TEAM] != TEAM_SPECTATOR && ps->pm_type != PM_INTERMISSION ) {
-		MarkSeenLines();
+		if ( hud.map ) {
+			MarkSeenLines();
+		}
 		if ( hud.automap ) {
 			DrawAutomap( ps );
 		} else {

@@ -80,6 +80,7 @@ vmCvar_t	g_smoothClients;
 vmCvar_t	pmove_fixed;
 vmCvar_t	g_stepHeight;
 vmCvar_t	g_playerHeight;
+vmCvar_t	g_spawnProtection;
 vmCvar_t	g_doomSkill;
 vmCvar_t	g_doomAllKeys;
 vmCvar_t	g_fallDamage;
@@ -196,6 +197,8 @@ static cvarTable_t		gameCvarTable[] = {
 	// Q3Doom: the standing height of the player box (Quake 3 and Doom: 56;
 	// lower so the player fits the openings Doom's exact-fit rule allows)
 	{ &g_playerHeight, "g_playerHeight", "45", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},
+	// Q3Doom: milliseconds after a respawn when other players do no damage (until you fire)
+	{ &g_spawnProtection, "g_spawnProtection", "1500", CVAR_ARCHIVE, 0, qfalse},
 	// Q3Doom: Doom skill 0-4 (things spawned), latched like the gametype; the
 	// cgame reads it from the serverinfo
 	{ &g_doomSkill, "g_doomSkill", DOOM_DEFAULT_SKILL, CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_LATCH, 0, qfalse},
@@ -207,7 +210,7 @@ static cvarTable_t		gameCvarTable[] = {
 	// Q3Doom: 0 spawns no monsters (Doom's -nomonsters)
 	{ &g_doomMonsters, "g_doomMonsters", "1", CVAR_SERVERINFO | CVAR_LATCH, 0, qfalse},
 	// Q3Doom: playing the campaign (set by doom_campaign): progress is saved
-	{ &g_doomCampaign, "g_doomCampaign", "0", 0, 0, qfalse},
+	{ &g_doomCampaign, "g_doomCampaign", "0", CVAR_SERVERINFO, 0, qfalse},
 	// Q3Doom: DoomFrag (set by the doomfrag command): a time trial with these options
 	{ &g_doomFrag, "g_doomFrag", "0", CVAR_SERVERINFO, 0, qfalse},
 	{ &g_doomPhysics, "g_doomPhysics", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},		// 0 VQ3, 1 CPM

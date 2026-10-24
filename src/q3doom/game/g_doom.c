@@ -866,6 +866,25 @@ static void SpawnThingBlockers( void ) {
 
 /*
 =================
+SetWeaponSet
+
+The weapons of this level: DoomFrag's option, the campaign's option, else
+Doom's; the clients read it from the serverinfo
+=================
+*/
+static void SetWeaponSet( void ) {
+	if ( g_doomFrag.integer ) {
+		doomLevel.weaponSet = (int)Com_Clamp( DOOM_WEAPONS_DOOM, DOOM_WEAPONS_NONE, g_doomWeapons.integer );
+	} else if ( doomLevel.campaign && g_doomCampaignWeapons.integer ) {
+		doomLevel.weaponSet = DOOM_WEAPONS_Q3;
+	} else {
+		doomLevel.weaponSet = DOOM_WEAPONS_DOOM;
+	}
+	trap_Cvar_Set( "g_doomWeaponSet", va( "%d", doomLevel.weaponSet ) );
+}
+
+/*
+=================
 Doom_InitLevel
 
 Before the entities spawn: they need the sector state
@@ -879,6 +898,7 @@ void Doom_InitLevel( void ) {
 	trap_Cvar_VariableStringBuffer( "mapname", mapname, sizeof( mapname ) );
 	doomLevel.map = trap_Doom_GetMap( mapname );
 	if ( !doomLevel.map ) {
+		SetWeaponSet();		// a Quake 3 map: Doom's weapons all the same
 		return;
 	}
 	doomLevel.wad = trap_Doom_GetWad();
@@ -926,17 +946,7 @@ void Doom_InitLevel( void ) {
 	}
 	Doom_InitMobjs();
 	Doom_InitCampaign();
-
-	// the weapons of this level: DoomFrag's option, the campaign's option,
-	// else Doom's; the clients read it from the serverinfo
-	if ( g_doomFrag.integer ) {
-		doomLevel.weaponSet = (int)Com_Clamp( DOOM_WEAPONS_DOOM, DOOM_WEAPONS_NONE, g_doomWeapons.integer );
-	} else if ( doomLevel.campaign && g_doomCampaignWeapons.integer ) {
-		doomLevel.weaponSet = DOOM_WEAPONS_Q3;
-	} else {
-		doomLevel.weaponSet = DOOM_WEAPONS_DOOM;
-	}
-	trap_Cvar_Set( "g_doomWeaponSet", va( "%d", doomLevel.weaponSet ) );
+	SetWeaponSet();
 }
 
 /*

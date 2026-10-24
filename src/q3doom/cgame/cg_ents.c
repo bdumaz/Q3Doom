@@ -238,7 +238,7 @@ static void CG_Item( centity_t *cent ) {
 	}
 
 	// Q3Doom: Doom items are Doom sprites
-	if ( CG_DoomMap() ) {
+	if ( CG_DoomGame() ) {
 		CG_DoomItem( cent );
 		return;
 	}
@@ -417,7 +417,7 @@ static void CG_Missile( centity_t *cent ) {
 	s1 = &cent->currentState;
 
 	// Q3Doom: Doom missiles (s.generic1: mobj type)
-	if ( CG_DoomMap() && s1->generic1 ) {
+	if ( CG_DoomGame() && s1->generic1 ) {
 		CG_DoomMissile( cent );
 		return;
 	}

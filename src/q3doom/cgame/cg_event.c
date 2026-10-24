@@ -245,6 +245,48 @@ static void CG_Obituary( entityState_t *ent ) {
 		}
 	}
 
+	// Q3Doom: Doom's weapons by their names
+	if ( attacker != ENTITYNUM_WORLD && cgs.doomWeapons != DOOM_WEAPONS_Q3 ) {
+		switch ( mod ) {
+		case MOD_GAUNTLET:
+			message = "was punched out by";
+			break;
+		case MOD_CHAINSAW:
+			message = "was sawn in half by";
+			break;
+		case MOD_PISTOL:
+			message = "was popped by";
+			message2 = "'s pistol";
+			break;
+		case MOD_SHOTGUN:
+			message = "chewed on";
+			message2 = "'s boomstick";
+			break;
+		case MOD_DOOM_CHAINGUN:
+			message = "was mowed down by";
+			message2 = "'s chaingun";
+			break;
+		case MOD_ROCKET:
+		case MOD_ROCKET_SPLASH:
+			message = "was splattered by";
+			message2 = "'s rocket";
+			break;
+		case MOD_PLASMA:
+			message = "was melted by";
+			message2 = "'s plasma rifle";
+			break;
+		case MOD_BFG:
+		case MOD_BFG_SPLASH:
+			message = "was splintered by";
+			message2 = "'s BFG9000";
+			break;
+		}
+		if ( message ) {
+			CG_Printf( "%s %s %s%s\n", targetName, message, attackerName, message2 );
+			return;
+		}
+	}
+
 	if ( attacker != ENTITYNUM_WORLD ) {
 		switch (mod) {
 		case MOD_GRAPPLE:

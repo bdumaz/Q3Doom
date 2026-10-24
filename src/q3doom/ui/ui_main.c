@@ -232,6 +232,8 @@ void UI_RegisterCvars( void ) {
 	for ( i = 0, cv = cvarTable ; i < cvarTableSize ; i++, cv++ ) {
 		trap_Cvar_Register( cv->vmCvar, cv->cvarName, cv->defaultString, cv->cvarFlags );
 	}
+	// Q3Doom: the marine colour, sent to the server (Player Settings)
+	trap_Cvar_Register( NULL, "doomcolor", "0", CVAR_USERINFO | CVAR_ARCHIVE );
 }
 
 /*

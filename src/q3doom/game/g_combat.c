@@ -265,8 +265,12 @@ void GibEntity( gentity_t *self, int killer ) {
 	}
 	G_AddEvent( self, EV_GIB_PLAYER, killer );
 	self->takedamage = qfalse;
-	self->s.eType = ET_INVISIBLE;
 	self->r.contents = 0;
+	// Q3Doom: the marine turns into Doom's pile of gibs (S_PLAY_XDIE), from now
+	self->s.time = level.time;
+	if ( !self->s.time2 ) {
+		self->s.time2 = level.time;
+	}
 }
 
 /*
@@ -320,7 +324,9 @@ char	*modNames[] = {
 	"MOD_JUICED",
 #endif
 	"MOD_GRAPPLE",
-	"MOD_CHAINSAW"
+	"MOD_CHAINSAW",
+	"MOD_PISTOL",
+	"MOD_DOOM_CHAINGUN"
 };
 
 #ifdef MISSIONPACK
@@ -474,6 +480,8 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 	}
 #endif
 	self->client->ps.pm_type = PM_DEAD;
+	// Q3Doom: the marine's death animation starts now (S_PLAY_DIE1)
+	self->s.time2 = level.time;
 
 	if ( attacker ) {
 		killer = attacker->s.number;
@@ -900,6 +908,10 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 
 	if ( client ) {
 		if ( client->noclip ) {
+			return;
+		}
+		// Q3Doom: spawn protection, against other players only
+		if ( attacker->client && attacker != targ && level.time < client->spawnProtectedUntil ) {
 			return;
 		}
 	}

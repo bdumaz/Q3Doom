@@ -337,8 +337,8 @@ static void CG_OffsetFirstPersonView( void ) {
 	// if dead, fix the angle and don't add any kick
 	if ( cg.snap->ps.stats[STAT_HEALTH] <= 0 ) {
 		// Q3Doom: Doom's view just drops to the floor, facing the killer
-		angles[ROLL] = CG_DoomMap() ? 0 : 40;
-		angles[PITCH] = CG_DoomMap() ? 0 : -15;
+		angles[ROLL] = CG_DoomGame() ? 0 : 40;
+		angles[PITCH] = CG_DoomGame() ? 0 : -15;
 		angles[YAW] = cg.snap->ps.stats[STAT_DEAD_YAW];
 		origin[2] += cg.predictedPlayerState.viewheight;
 		return;
@@ -544,7 +544,7 @@ static int CG_CalcFov( void ) {
 	}
 	// Q3Doom: cg_doomAspect, Doom's 320x200 shown on a 4:3 screen: pixels
 	// 1.2 times taller, so the same width sees less height
-	if ( cg_doomAspect.integer && CG_DoomMap() ) {
+	if ( cg_doomAspect.integer && CG_DoomGame() ) {
 		x *= 1.2f;
 	}
 	fov_y = atan2( cg.refdef.height, x );
@@ -830,13 +830,13 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	CG_DoomUpdateLevelShot();
 
 	// decide on third person view (Q3Doom: Doom stays in first person when dead)
-	cg.renderingThirdPerson = cg_thirdPerson.integer || ( cg.snap->ps.stats[STAT_HEALTH] <= 0 && !CG_DoomMap() );
+	cg.renderingThirdPerson = cg_thirdPerson.integer || ( cg.snap->ps.stats[STAT_HEALTH] <= 0 && !CG_DoomGame() );
 
 	// build cg.refdef
 	inwater = CG_CalcViewValues();
 
 	// first person blend blobs, done after AnglesToAxis (Q3Doom: Doom flashes the palette)
-	if ( !cg.renderingThirdPerson && !CG_DoomMap() ) {
+	if ( !cg.renderingThirdPerson && !CG_DoomGame() ) {
 		CG_DamageBlendBlob();
 	}
 

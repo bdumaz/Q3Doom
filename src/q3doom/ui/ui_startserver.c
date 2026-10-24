@@ -789,6 +789,10 @@ static void ServerOptions_Start( void ) {
 	
 	trap_Cvar_SetValue( "sv_punkbuster", s_serveroptions.punkbuster.curvalue );
 
+	// Q3Doom: a match, not the campaign or a DoomFrag run
+	trap_Cvar_Set( "g_doomCampaign", "0" );
+	trap_Cvar_Set( "g_doomFrag", "0" );
+
 	// the wait commands will allow the dedicated to take effect
 	trap_Cmd_ExecuteText( EXEC_APPEND, va( "wait ; wait ; map %s\n", s_startserver.maplist[s_startserver.currentmap] ) );
 
