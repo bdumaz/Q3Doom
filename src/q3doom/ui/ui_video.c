@@ -312,6 +312,7 @@ typedef struct {
 	menulist_s  	colordepth;
 	menulist_s  	geometry;
 	menulist_s  	filter;
+	menulist_s  	quakeVisuals;	// Q3Doom: r_quakeVisuals
 	menutext_s		driverinfo;
 
 	menubitmap_s	apply;
@@ -330,6 +331,7 @@ typedef struct
 	int filter;
 	int driver;
 	qboolean extensions;
+	int quakeVisuals;		// Q3Doom
 } InitialVideoOptions_s;
 
 static InitialVideoOptions_s	s_ivo;
@@ -372,6 +374,7 @@ static void GraphicsOptions_GetInitialVideo( void )
 	s_ivo.lighting    = s_graphicsoptions.lighting.curvalue;
 	s_ivo.geometry    = s_graphicsoptions.geometry.curvalue;
 	s_ivo.filter      = s_graphicsoptions.filter.curvalue;
+	s_ivo.quakeVisuals = s_graphicsoptions.quakeVisuals.curvalue;
 	s_ivo.texturebits = s_graphicsoptions.texturebits.curvalue;
 }
 
@@ -496,6 +499,10 @@ static void GraphicsOptions_UpdateMenuItems( void )
 	{
 		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
 	}
+	if ( s_ivo.quakeVisuals != s_graphicsoptions.quakeVisuals.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
 
 	GraphicsOptions_CheckConfig();
 }	
@@ -545,6 +552,7 @@ static void GraphicsOptions_ApplyChanges( void *unused, int notification )
 		break;
 	}
 	trap_Cvar_SetValue( "r_vertexLight", s_graphicsoptions.lighting.curvalue );
+	trap_Cvar_SetValue( "r_quakeVisuals", s_graphicsoptions.quakeVisuals.curvalue );
 
 	if ( s_graphicsoptions.geometry.curvalue == 2 )
 	{
@@ -680,6 +688,7 @@ static void GraphicsOptions_SetMenuItems( void )
 	}
 
 	s_graphicsoptions.lighting.curvalue = trap_Cvar_VariableValue( "r_vertexLight" ) != 0;
+	s_graphicsoptions.quakeVisuals.curvalue = trap_Cvar_VariableValue( "r_quakeVisuals" ) != 0;
 	switch ( ( int ) trap_Cvar_VariableValue( "r_texturebits" ) )
 	{
 	default:
@@ -994,6 +1003,15 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.filter.generic.x	    = 400;
 	s_graphicsoptions.filter.generic.y	    = y;
 	s_graphicsoptions.filter.itemnames      = filter_names;
+	y += BIGCHAR_HEIGHT+2;
+
+	// Q3Doom: references/modifies "r_quakeVisuals": Quake 3 textures, items and lights on Doom maps
+	s_graphicsoptions.quakeVisuals.generic.type		= MTYPE_SPINCONTROL;
+	s_graphicsoptions.quakeVisuals.generic.name		= "Quake Visuals:";
+	s_graphicsoptions.quakeVisuals.generic.flags	= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_graphicsoptions.quakeVisuals.generic.x		= 400;
+	s_graphicsoptions.quakeVisuals.generic.y		= y;
+	s_graphicsoptions.quakeVisuals.itemnames		= enabled_names;
 	y += 2*BIGCHAR_HEIGHT;
 
 	s_graphicsoptions.driverinfo.generic.type     = MTYPE_PTEXT;
@@ -1048,6 +1066,7 @@ void GraphicsOptions_MenuInit( void )
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.tq );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.texturebits );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.filter );
+	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.quakeVisuals );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.driverinfo );
 
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.back );

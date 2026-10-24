@@ -95,6 +95,16 @@ static shader_t *R_DoomShader( const char *name ) {
 		stages[0].stateBits = GLS_SRCBLEND_ONE_MINUS_DST_COLOR | GLS_DSTBLEND_ZERO;
 		return FinishShader();
 	}
+	// Quake Visuals: the glow around a light source (a sprite in the light's color)
+	if ( !Q_stricmp( name, "doom/corona" ) ) {
+		stages[0].bundle[0].image[0] = tr.dlightImage;
+		stages[0].active = qtrue;
+		stages[0].rgbGen = CGEN_ENTITY;
+		stages[0].stateBits = GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE;
+		shader.cullType = CT_TWO_SIDED;
+		shader.sort = SS_BLEND1;
+		return FinishShader();
+	}
 	if ( !Q_stricmp( name, "doom/amline" ) ) {
 		stages[0].bundle[0].image[0] = tr.whiteImage;
 		stages[0].active = qtrue;
@@ -2528,6 +2538,254 @@ most world construction surfaces.
 
 ===============
 */
+/*
+=====================================================================
+
+Q3Doom: QUAKE VISUALS (r_quakeVisuals)
+
+Doom's walls, flats and skies drawn with Quake 3 shaders, as listed in
+quakevisuals.dat. The replacement keeps the Doom name, so the map and its
+collision are untouched: the Quake 3 shader is parsed under the Doom name,
+its lightmap stages give way to Doom's sector lighting on its first stage
+(which becomes opaque: there is nothing under a Doom floor), its glow
+stages stay, and its texture coordinates are scaled from the Doom texture
+to the Quake 3 one (by default 0.5 units a texel, as in Quake 3 maps).
+
+=====================================================================
+*/
+
+#define MAX_QV_ENTRIES	512
+
+typedef struct {
+	char	kind[8];		// wall, flat, sky, keep
+	char	pattern[24];
+	char	shader[MAX_QPATH];
+	float	scale;
+} qvEntry_t;
+
+static qvEntry_t	qvEntries[MAX_QV_ENTRIES];
+static int			qvNumEntries = -1;		// -1: not loaded
+
+// case insensitive, '*' matches any run of characters
+static qboolean QV_Match( const char *pattern, const char *name ) {
+	if ( *pattern == '*' ) {
+		do {
+			if ( QV_Match( pattern + 1, name ) ) {
+				return qtrue;
+			}
+		} while ( *name++ );
+		return qfalse;
+	}
+	if ( !*pattern ) {
+		return !*name;
+	}
+	if ( tolower( *pattern ) != tolower( *name ) ) {
+		return qfalse;
+	}
+	return QV_Match( pattern + 1, name + 1 );
+}
+
+static void QV_Load( void ) {
+	char	*buf, *line, *next, *p, *token, text[256];
+	int		len;
+
+	qvNumEntries = 0;
+	len = ri.FS_ReadFile( "quakevisuals.dat", (void **)&buf );
+	if ( len <= 0 || !buf ) {
+		ri.Printf( PRINT_WARNING, "WARNING: r_quakeVisuals: no quakevisuals.dat\n" );
+		return;
+	}
+	// a line at a time: "<kind> <pattern> [shader] [scale]", # comments
+	for ( line = buf ; line && *line && qvNumEntries < MAX_QV_ENTRIES ; line = next ) {
+		qvEntry_t	*e = &qvEntries[qvNumEntries];
+
+		next = strchr( line, '\n' );
+		len = next ? next - line : strlen( line );
+		if ( next ) {
+			next++;
+		}
+		if ( len >= sizeof( text ) ) {
+			len = sizeof( text ) - 1;
+		}
+		memcpy( text, line, len );
+		text[len] = 0;
+		if ( strchr( text, '#' ) ) {
+			*strchr( text, '#' ) = 0;
+		}
+
+		p = text;
+		token = COM_ParseExt( &p, qfalse );
+		if ( Q_stricmp( token, "wall" ) && Q_stricmp( token, "flat" ) && Q_stricmp( token, "sky" ) && Q_stricmp( token, "keep" ) ) {
+			continue;		// blank, comment, or the cgame's items
+		}
+		Q_strncpyz( e->kind, token, sizeof( e->kind ) );
+		Q_strncpyz( e->pattern, COM_ParseExt( &p, qfalse ), sizeof( e->pattern ) );
+		e->shader[0] = 0;
+		e->scale = 0.5f;
+		if ( Q_stricmp( e->kind, "keep" ) ) {
+			Q_strncpyz( e->shader, COM_ParseExt( &p, qfalse ), sizeof( e->shader ) );
+			token = COM_ParseExt( &p, qfalse );
+			if ( token[0] && atof( token ) > 0 ) {
+				e->scale = atof( token );
+			}
+			if ( !e->shader[0] ) {
+				continue;
+			}
+		}
+		if ( e->pattern[0] ) {
+			qvNumEntries++;
+		}
+	}
+	ri.FS_FreeFile( buf );
+	ri.Printf( PRINT_ALL, "Quake Visuals: %d replacements\n", qvNumEntries );
+}
+
+// the replacement of a Doom texture, flat or sky; NULL to keep the Doom one
+static const qvEntry_t *QV_Lookup( const char *kind, const char *name ) {
+	int		i;
+
+	if ( qvNumEntries < 0 ) {
+		QV_Load();
+	}
+	for ( i = 0 ; i < qvNumEntries ; i++ ) {
+		const qvEntry_t *e = &qvEntries[i];
+
+		if ( Q_stricmp( e->kind, kind ) && Q_stricmp( e->kind, "keep" ) ) {
+			continue;
+		}
+		if ( QV_Match( e->pattern, name ) ) {
+			return Q_stricmp( e->kind, "keep" ) ? e : NULL;
+		}
+	}
+	return NULL;
+}
+
+// adds a texture modification before the stage's own
+static void QV_PrependTexMod( shaderStage_t *stage, const texModInfo_t *mod ) {
+	int		i;
+
+	if ( stage->bundle[0].numTexMods == TR_MAX_TEXMODS ) {
+		stage->bundle[0].numTexMods--;
+	}
+	for ( i = stage->bundle[0].numTexMods ; i > 0 ; i-- ) {
+		stage->bundle[0].texMods[i] = stage->bundle[0].texMods[i - 1];
+	}
+	stage->bundle[0].texMods[0] = *mod;
+	stage->bundle[0].numTexMods++;
+}
+
+static shader_t *R_QuakeVisualsShader( const char *name ) {
+	const char		*kindStart = name + 5, *slash = strchr( kindStart, '/' );
+	char			kind[16], doomFile[MAX_QPATH], *text;
+	const qvEntry_t	*e;
+	image_t			*doomImage, *q3Image = NULL;
+	qboolean		scroll;
+	int				i, n;
+
+	if ( !slash || slash - kindStart >= sizeof( kind ) ) {
+		return NULL;
+	}
+	Q_strncpyz( kind, kindStart, slash - kindStart + 1 );
+	scroll = !Q_stricmp( kind, "scroll" );
+
+	if ( !Q_stricmp( kind, "sky" ) ) {
+		e = QV_Lookup( "sky", slash + 1 );
+	} else if ( !Q_stricmp( kind, "wall" ) || scroll || ( kind[0] == 's' && kind[1] == 'w' ) ) {
+		e = QV_Lookup( "wall", slash + 1 );
+	} else if ( !Q_stricmp( kind, "flat" ) || ( kind[0] == 'f' && kind[1] == 'l' ) ) {
+		e = QV_Lookup( "flat", slash + 1 );
+	} else {
+		return NULL;
+	}
+	if ( !e ) {
+		return NULL;
+	}
+
+	// the Quake 3 shader under the Doom name
+	text = FindShaderInShaderText( e->shader );
+	if ( text ) {
+		if ( !ParseShader( &text ) ) {
+			return NULL;
+		}
+	} else {
+		char fileName[MAX_QPATH];
+
+		Com_sprintf( fileName, sizeof( fileName ), "%s.tga", e->shader );
+		q3Image = R_FindImageFile( fileName, qtrue, qtrue, GL_REPEAT );
+		if ( !q3Image ) {
+			ri.Printf( PRINT_DEVELOPER, "Quake Visuals: no %s for %s\n", e->shader, name );
+			return NULL;
+		}
+		stages[0].bundle[0].image[0] = q3Image;
+		stages[0].active = qtrue;
+		stages[0].stateBits = GLS_DEFAULT;
+	}
+	if ( shader.isSky ) {
+		return FinishShader();
+	}
+
+	// no lightmaps, no vertex deformations (liquids would part from the walls)
+	for ( i = 0, n = 0 ; i < MAX_SHADER_STAGES ; i++ ) {
+		if ( !stages[i].active || stages[i].bundle[0].isLightmap ) {
+			continue;
+		}
+		if ( n != i ) {
+			texModInfo_t *mods = stages[n].bundle[0].texMods;
+
+			memcpy( mods, stages[i].bundle[0].texMods, sizeof( texModInfo_t ) * TR_MAX_TEXMODS );
+			stages[n] = stages[i];
+			stages[n].bundle[0].texMods = mods;
+		}
+		n++;
+	}
+	for ( i = n ; i < MAX_SHADER_STAGES ; i++ ) {
+		texModInfo_t *mods = stages[i].bundle[0].texMods;
+
+		Com_Memset( &stages[i], 0, sizeof( stages[i] ) );
+		stages[i].bundle[0].texMods = mods;
+	}
+	if ( !n ) {
+		return NULL;
+	}
+	shader.numDeforms = 0;
+	shader.sort = 0;
+
+	// the first stage: opaque, lit by the Doom sector and the point lights
+	stages[0].stateBits = ( stages[0].stateBits & GLS_ATEST_BITS ) | GLS_DEPTHMASK_TRUE;
+	stages[0].rgbGen = CGEN_DOOM_QUAKE;
+	q3Image = stages[0].bundle[0].image[0];
+
+	// texture coordinates: from Doom texels to Quake 3 ones
+	Com_sprintf( doomFile, sizeof( doomFile ), "%s.tga", name );
+	doomImage = R_FindImageFile( doomFile, qtrue, qtrue, GL_REPEAT );
+	if ( doomImage && q3Image ) {
+		texModInfo_t	mod;
+
+		for ( i = 0 ; i < n ; i++ ) {
+			if ( stages[i].bundle[0].tcGen == TCGEN_ENVIRONMENT_MAPPED ) {
+				continue;
+			}
+			Com_Memset( &mod, 0, sizeof( mod ) );
+			mod.type = TMOD_SCALE;
+			mod.scale[0] = (float)doomImage->width / ( q3Image->width * e->scale );
+			mod.scale[1] = (float)doomImage->height / ( q3Image->height * e->scale );
+			QV_PrependTexMod( &stages[i], &mod );
+			// scrolling walls (line special 48): a Doom texel per tic, before the scaling
+			if ( scroll ) {
+				Com_Memset( &mod, 0, sizeof( mod ) );
+				mod.type = TMOD_SCROLL;
+				mod.scroll[0] = DOOM_TICRATE / doomImage->width;
+				QV_PrependTexMod( &stages[i], &mod );
+			}
+		}
+	}
+	return FinishShader();
+}
+
+void R_QuakeVisualsReset( void ) {
+	qvNumEntries = -1;
+}
+
 shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImage ) {
 	char		strippedName[MAX_QPATH];
 	char		fileName[MAX_QPATH];
@@ -2586,6 +2844,23 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 	shader.needsST2 = qtrue;
 	shader.needsColor = qtrue;
 
+	// Q3Doom: Quake 3 shaders for Doom's surfaces (Quake Visuals)
+	if ( r_quakeVisuals->integer && !Q_stricmpn( strippedName, "doom/", 5 ) && lightmapIndex != LIGHTMAP_2D ) {
+		sh = R_QuakeVisualsShader( strippedName );
+		if ( sh ) {
+			return sh;
+		}
+		// not replaced: start the Doom shader afresh
+		Com_Memset( &shader, 0, sizeof( shader ) );
+		Com_Memset( &stages, 0, sizeof( stages ) );
+		Q_strncpyz( shader.name, strippedName, sizeof( shader.name ) );
+		shader.lightmapIndex = lightmapIndex;
+		for ( i = 0 ; i < MAX_SHADER_STAGES ; i++ ) {
+			stages[i].bundle[0].texMods = texMods[i];
+		}
+		shader.needsNormal = shader.needsST1 = shader.needsST2 = shader.needsColor = qtrue;
+	}
+
 	//
 	// attempt to define shader from an explicit parameter file
 	//
@@ -2608,6 +2883,7 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 
 	// Q3Doom: Doom world surfaces and sprites
 	if ( !Q_stricmpn( name, "doom/thing/", 11 ) || !Q_stricmpn( name, "doom/fuzz/", 10 ) || !Q_stricmp( name, "doom/invert" ) || !Q_stricmp( name, "doom/amline" )
+		|| !Q_stricmp( name, "doom/corona" )
 		|| ( !Q_stricmpn( name, "doom/", 5 ) && lightmapIndex != LIGHTMAP_2D ) ) {
 		return R_DoomShader( name );
 	}
@@ -3172,6 +3448,8 @@ R_InitShaders
 */
 void R_InitShaders( void ) {
 	ri.Printf( PRINT_ALL, "Initializing Shaders\n" );
+
+	R_QuakeVisualsReset();		// Q3Doom: quakevisuals.dat is read again
 
 	Com_Memset(hashTable, 0, sizeof(hashTable));
 

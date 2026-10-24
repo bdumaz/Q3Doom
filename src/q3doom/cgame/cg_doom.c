@@ -646,11 +646,229 @@ CG_DoomItem
 An item entity: its Doom sprite and animation, standing on the floor
 =================
 */
+/*
+=====================================================================
+
+QUAKE VISUALS: items as Quake 3 models (r_quakeVisuals)
+
+"item <doomednum> <model> [model2|-] [scale]" lines of quakevisuals.dat;
+weapon pickups show the Quake 3 weapon they give with the Quake 3 weapon
+set, or the closest looking one with Doom's.
+
+=====================================================================
+*/
+
+#define MAX_QV_ITEMS	64
+
+typedef struct {
+	int			ednum;
+	qhandle_t	models[2];
+	float		scale;
+	qboolean	weapon;
+	vec3_t		midpoint;		// weapons turn around their middle
+} qvItem_t;
+
+static qvItem_t	qvItems[MAX_QV_ITEMS];
+static int		qvNumItems;
+
+static void QV_AddWeapon( int ednum, int q3Weapon ) {
+	gitem_t		*item = BG_FindItemForWeapon( q3Weapon );
+	qvItem_t	*q;
+	vec3_t		mins, maxs;
+
+	if ( !item || qvNumItems == MAX_QV_ITEMS ) {
+		return;
+	}
+	q = &qvItems[qvNumItems];
+	memset( q, 0, sizeof( *q ) );
+	q->models[0] = trap_R_RegisterModel( item->world_model[0] );
+	if ( !q->models[0] ) {
+		return;
+	}
+	q->ednum = ednum;
+	q->scale = 1.5f;		// as Quake 3 draws weapon pickups
+	q->weapon = qtrue;
+	trap_R_ModelBounds( q->models[0], mins, maxs );
+	VectorAdd( mins, maxs, q->midpoint );
+	VectorScale( q->midpoint, 0.5f, q->midpoint );
+	qvNumItems++;
+}
+
+static void QV_LoadItems( void ) {
+	static const int	doomLook[DWP_NUMWEAPONS] = {
+		WP_GAUNTLET, WP_MACHINEGUN, WP_SHOTGUN, WP_MACHINEGUN, WP_ROCKET_LAUNCHER, WP_PLASMAGUN, WP_BFG, WP_GAUNTLET, WP_SHOTGUN
+	};
+	static const struct { int ednum, weapon; } pickups[] = {
+		{ 2001, DWP_SHOTGUN }, { 2002, DWP_CHAINGUN }, { 2003, DWP_MISSILE }, { 2004, DWP_PLASMA }, { 2005, DWP_CHAINSAW }, { 2006, DWP_BFG }
+	};
+	fileHandle_t	f;
+	int				len, i;
+	char			*buf, *line, *next;
+
+	qvNumItems = 0;
+	for ( i = 0 ; i < (int)( sizeof( pickups ) / sizeof( pickups[0] ) ) ; i++ ) {
+		int w = pickups[i].weapon;
+
+		QV_AddWeapon( pickups[i].ednum, cgs.doomWeapons == DOOM_WEAPONS_Q3 ? bg_doomQ3Weapon[w] : doomLook[w] );
+	}
+
+	len = trap_FS_FOpenFile( "quakevisuals.dat", &f, FS_READ );
+	if ( len <= 0 || !f ) {
+		return;
+	}
+	buf = malloc( len + 1 );
+	trap_FS_Read( buf, len, f );
+	trap_FS_FCloseFile( f );
+	buf[len] = 0;
+
+	for ( line = buf ; line && *line && qvNumItems < MAX_QV_ITEMS ; line = next ) {
+		char		text[256], *p, *token;
+		qvItem_t	*q = &qvItems[qvNumItems];
+		int			n;
+
+		next = strchr( line, '\n' );
+		n = next ? next - line : strlen( line );
+		if ( next ) {
+			next++;
+		}
+		if ( n >= (int)sizeof( text ) ) {
+			n = sizeof( text ) - 1;
+		}
+		memcpy( text, line, n );
+		text[n] = 0;
+		p = text;
+		if ( Q_stricmp( COM_ParseExt( &p, qfalse ), "item" ) ) {
+			continue;
+		}
+		memset( q, 0, sizeof( *q ) );
+		q->ednum = atoi( COM_ParseExt( &p, qfalse ) );
+		q->models[0] = trap_R_RegisterModel( COM_ParseExt( &p, qfalse ) );
+		token = COM_ParseExt( &p, qfalse );
+		if ( token[0] && strcmp( token, "-" ) ) {
+			q->models[1] = trap_R_RegisterModel( token );
+		}
+		token = COM_ParseExt( &p, qfalse );
+		q->scale = token[0] ? atof( token ) : 1.0f;
+		if ( q->ednum && q->models[0] && q->scale > 0 ) {
+			qvNumItems++;
+		}
+	}
+	free( buf );
+}
+
+static const qvItem_t *QV_Item( int ednum ) {
+	int		i;
+
+	for ( i = 0 ; i < qvNumItems ; i++ ) {
+		if ( qvItems[i].ednum == ednum ) {
+			return &qvItems[i];
+		}
+	}
+	return NULL;
+}
+
+// a Quake 3 item: floating, bobbing and turning like Quake 3's (CG_Item)
+static void QV_DrawItem( centity_t *cent, const qvItem_t *q ) {
+	refEntity_t	ent;
+	vec3_t		origin;
+	int			i;
+
+	memset( &ent, 0, sizeof( ent ) );
+	AxisCopy( cg.autoAxis, ent.axis );
+	VectorCopy( cent->lerpOrigin, origin );
+	origin[2] += 16 + 4 + cos( ( cg.time + 1000 ) * ( 0.005 + cent->currentState.number * 0.00001 ) ) * 4;
+	if ( q->weapon ) {
+		for ( i = 0 ; i < 3 ; i++ ) {
+			origin[i] -= q->scale * ( q->midpoint[0] * ent.axis[0][i] + q->midpoint[1] * ent.axis[1][i] + q->midpoint[2] * ent.axis[2][i] );
+		}
+		origin[2] += 8;
+	}
+	if ( q->scale != 1.0f ) {
+		VectorScale( ent.axis[0], q->scale, ent.axis[0] );
+		VectorScale( ent.axis[1], q->scale, ent.axis[1] );
+		VectorScale( ent.axis[2], q->scale, ent.axis[2] );
+		ent.nonNormalizedAxes = qtrue;
+	}
+	VectorCopy( origin, ent.origin );
+	VectorCopy( origin, ent.oldorigin );
+	ent.renderfx = RF_MINLIGHT;
+	for ( i = 0 ; i < 2 ; i++ ) {
+		if ( q->models[i] ) {
+			ent.hModel = q->models[i];
+			trap_R_AddRefEntityToScene( &ent );
+		}
+	}
+}
+
+/*
+=================
+QV_Corona
+
+The glow of a light source (the lamps, candles and torches the builder
+bakes point lights for, libdoom builder.c lightThings), flickering a little
+for flames
+=================
+*/
+static void QV_Corona( const doomThing_t *th ) {
+	static const struct { int ednum; float r, g, b, z, radius; qboolean flame; } coronas[] = {
+		{ 2028,	1.0f, 0.95f, 0.8f,	44, 18, qfalse },
+		{ 85,	0.8f, 0.9f, 1.0f,	68, 18, qfalse },
+		{ 86,	0.8f, 0.9f, 1.0f,	44, 16, qfalse },
+		{ 34,	1.0f, 0.75f, 0.45f,	12, 8, qtrue },
+		{ 35,	1.0f, 0.75f, 0.45f,	48, 14, qtrue },
+		{ 44,	0.35f, 0.45f, 1.0f,	60, 20, qtrue },
+		{ 45,	0.35f, 1.0f, 0.4f,	60, 20, qtrue },
+		{ 46,	1.0f, 0.4f, 0.25f,	60, 20, qtrue },
+		{ 55,	0.35f, 0.45f, 1.0f,	36, 16, qtrue },
+		{ 56,	0.35f, 1.0f, 0.4f,	36, 16, qtrue },
+		{ 57,	1.0f, 0.4f, 0.25f,	36, 16, qtrue },
+		{ 70,	1.0f, 0.6f, 0.3f,	36, 20, qtrue }
+	};
+	static qhandle_t	shader;
+	int					ednum = doom_mobjinfo[th->type].doomednum, i;
+	refEntity_t			ent;
+	vec3_t				toView;
+	float				flicker;
+
+	for ( i = 0 ; i < (int)( sizeof( coronas ) / sizeof( coronas[0] ) ) ; i++ ) {
+		if ( coronas[i].ednum == ednum ) {
+			break;
+		}
+	}
+	if ( i == (int)( sizeof( coronas ) / sizeof( coronas[0] ) ) ) {
+		return;
+	}
+	if ( !shader ) {
+		shader = trap_R_RegisterShader( "doom/corona" );
+	}
+	memset( &ent, 0, sizeof( ent ) );
+	ent.reType = RT_SPRITE;
+	ent.customShader = shader;
+	VectorCopy( th->origin, ent.origin );
+	ent.origin[2] += coronas[i].z;
+	// a little toward the viewer, off the light's own sprite
+	VectorSubtract( cg.refdef.vieworg, ent.origin, toView );
+	VectorNormalize( toView );
+	VectorMA( ent.origin, 8, toView, ent.origin );
+	flicker = coronas[i].flame ? 0.85f + 0.15f * sin( cg.time * 0.013f + th->origin[0] ) * sin( cg.time * 0.029f + th->origin[1] ) : 1.0f;
+	ent.radius = coronas[i].radius * flicker;
+	ent.shaderRGBA[0] = 160 * coronas[i].r * flicker;
+	ent.shaderRGBA[1] = 160 * coronas[i].g * flicker;
+	ent.shaderRGBA[2] = 160 * coronas[i].b * flicker;
+	ent.shaderRGBA[3] = 255;
+	trap_R_AddRefEntityToScene( &ent );
+}
+
 void CG_DoomItem( centity_t *cent ) {
 	const entityState_t	*es = &cent->currentState;
+	const qvItem_t		*q;
 	int					type;
 
 	if ( !DOOM_MAP() || !es->modelindex || es->modelindex >= bg_numItems || ( es->eFlags & EF_NODRAW ) ) {
+		return;
+	}
+	if ( r_quakeVisuals.integer && ( q = QV_Item( bg_itemlist[es->modelindex].doomednum ) ) != NULL ) {
+		QV_DrawItem( cent, q );
 		return;
 	}
 	type = doom_mobjtype_for_ednum( bg_itemlist[es->modelindex].doomednum );
@@ -776,6 +994,10 @@ void CG_DoomInit( void ) {
 	info = CG_ConfigString( CS_SERVERINFO );
 	cgDoom.skill = atoi( Info_ValueForKey( info, "g_doomSkill" ) );
 	cgDoom.random = 0x1234;
+	qvNumItems = 0;
+	if ( r_quakeVisuals.integer ) {
+		QV_LoadItems();
+	}
 
 	// lights
 	cgDoom.numSectors = cgDoom.map->num_sectors;
@@ -893,6 +1115,9 @@ void CG_DoomAddToScene( void ) {
 		const doomThing_t *th = &cgDoom.things[i];
 
 		CG_DoomAddSprite( th->origin, th->angle, CG_DoomAnimatedState( doom_mobjinfo[th->type].spawnstate, tics ), cgDoom.levels[th->sector] );
+		if ( r_quakeVisuals.integer ) {
+			QV_Corona( th );
+		}
 	}
 
 	RunFx();

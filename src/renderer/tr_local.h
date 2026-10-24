@@ -202,7 +202,8 @@ typedef enum {
 	CGEN_LIGHTING_DIFFUSE,
 	CGEN_FOG,				// standard fog
 	CGEN_CONST,				// fixed color
-	CGEN_DOOM_SECTOR		// Q3Doom: tr.doomSectorLights[ lightmap s ] + lightmap t (fake contrast)
+	CGEN_DOOM_SECTOR,		// Q3Doom: tr.doomSectorLights[ lightmap s ] + lightmap t (fake contrast)
+	CGEN_DOOM_QUAKE			// Q3Doom: the same, brightened, plus the baked point lights (vertex colors): Quake Visuals
 } colorGen_t;
 
 typedef enum {
@@ -1029,6 +1030,8 @@ extern	cvar_t	*r_showcluster;
 
 extern cvar_t	*r_doomTextureFilter;	// Q3Doom: 0 = nearest (crisp Doom pixels), 1 = r_textureMode
 extern cvar_t	*r_doomLightFade;		// Q3Doom: 1 = Doom's light fading with distance
+extern cvar_t	*r_quakeVisualsBright;	// Q3Doom: sector light multiplier on Quake Visuals surfaces
+extern cvar_t	*r_quakeVisuals;		// Q3Doom: 1 = Quake 3 textures, models and lights on Doom maps (quakevisuals.dat)
 extern qboolean	glNPOTSupported;		// non power of two textures (OpenGL 2.0+)
 
 extern cvar_t	*r_mode;				// video mode
@@ -1232,6 +1235,7 @@ shader_t	*R_GetShaderByHandle( qhandle_t hShader );
 shader_t	*R_GetShaderByState( int index, long *cycleTime );
 shader_t *R_FindShaderByName( const char *name );
 void		R_InitShaders( void );
+void		R_QuakeVisualsReset( void );
 void		R_ShaderList_f( void );
 void    R_RemapShader(const char *oldShader, const char *newShader, const char *timeOffset);
 void	R_DoomSectorLights( const byte *levels, int count );

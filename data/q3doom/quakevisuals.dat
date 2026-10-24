@@ -1,0 +1,245 @@
+# Q3Doom - Quake Visuals (r_quakeVisuals 1): what Quake 3 asset replaces
+# each Doom asset. Edit freely; vid_restart (or a map change) reloads it.
+#
+#   wall <TEXTURE> <shader> [scale]   a wall texture (TEXTURE1/2)
+#   flat <FLAT> <shader> [scale]      a floor or ceiling flat
+#   sky <SKYn> <shader>               the sky of an episode (SKY1 ... SKY4)
+#   keep <NAME>                       keep the Doom texture or flat
+#   item <doomednum> <model> [model2] [scale]   an item's 3D model
+#
+# Names may end with * (any suffix). The first matching line wins. A shader
+# is a Quake 3 shader or image path; [scale] is world units per texel
+# (default 0.5: a 256 pixel texture covers 128 units, as in Quake 3 maps).
+# Anything not listed keeps its Doom look.
+
+# --- kept Doom: gameplay signs and see-through middle textures --------------
+
+keep SW1*
+keep SW2*
+keep EXIT*
+keep DOORBLU*
+keep DOORRED*
+keep DOORYEL*
+keep MIDGRATE
+keep MIDBRN1
+keep MIDVINE*
+keep BRNSMAL*
+keep BRNBIG*
+keep AASTINKY
+keep *POIS
+keep GRAYDANG
+keep PLANET1
+
+# --- skies --------------------------------------------------------------------
+
+sky SKY1 textures/skies/pjbasesky_arena1_sky
+sky SKY2 textures/skies/killsky
+sky SKY3 textures/skies/hellsky2
+sky SKY4 textures/skies/tim_hell
+
+# --- lights ---------------------------------------------------------------------
+
+wall LITE3 textures/base_light/light5_3000 1
+wall LITE4 textures/base_light/light5_3000 1
+wall LITE5 textures/base_light/light5_3000 1
+wall LITE96 textures/base_light/patch10_pj_lite2 1
+wall LITE2 textures/base_light/patch10_pj_lite 1
+wall LITEMET textures/base_light/patch10_pj_lite 1
+wall LITESTON textures/base_light/patch10_pj_lite 1
+wall LITEBLU* textures/base_light/ceil1_30 1
+wall LITERED textures/base_light/jaildr1_3 1
+wall DOORHI textures/base_light/wsupprt1_12 1
+flat TLITE6_* textures/base_light/ceil1_39 2
+flat CEIL1_2 textures/base_light/ceil1_38 2
+flat CEIL1_3 textures/base_light/ceil1_38 2
+flat CEIL3_4 textures/base_light/ceil1_37 2
+flat CEIL3_6 textures/base_light/xceil1_39 2
+flat FLAT2 textures/base_light/ceil1_37 2
+flat FLAT17 textures/base_light/ceil1_37 2
+flat FLAT22 textures/base_light/ceil1_30 2
+flat FLOOR1_7 textures/base_light/ceil1_22a 2
+flat GATE4 textures/sfx/pentagramfloor
+flat GATE* textures/sfx/pentagramfloor_red
+
+# --- liquids --------------------------------------------------------------------
+
+flat NUKAGE* textures/liquids/slime1
+flat FWATER* textures/liquids/pool2
+flat LAVA* textures/liquids/lavahell
+flat BLOOD* textures/liquids/bloodwater
+wall FIREBLU* textures/liquids/lavahelldark
+wall FIRE* textures/liquids/lavahell
+wall NUKE24 textures/liquids/slime1
+wall NUKEDGE textures/gothic_block/blocks17slime
+wall SLADRIP* textures/gothic_block/blocks17slime
+wall BLODRIP* textures/base_wall/metalblackbloody
+wall BLODGR* textures/gothic_block/blocks17slime
+
+# --- tech base walls ---------------------------------------------------------
+
+wall STARTAN* textures/base_wall/basewall03
+wall STARBR2 textures/base_wall/basewall03
+wall STARGR* textures/base_wall/metalfloor_wall_11
+wall STARG* textures/base_wall/basewall01
+wall BROWN1 textures/base_wall/patch10_beatup2
+wall BROWN144 textures/base_wall/patch10_beatup2
+wall BROWN96 textures/base_wall/patch10_beatup2
+wall BROWNHUG textures/base_wall/patch10_beatup4
+wall BROWNPIP textures/base_support/vert_pipe1
+wall BROWNWEL textures/base_wall/patch10_beatup4
+wall BROWNGRN textures/organics/pjrock7d
+wall BROVINE* textures/organics/awall4j
+wall GRAYVINE textures/organics/pjrock7d
+wall GRAY* textures/base_wall/concrete
+wall ICKWALL* textures/base_wall/concrete_dark
+wall ICKDOOR1 textures/base_door/kcdm18talldoormetal
+wall SHAWN* textures/base_wall/c_met5_2
+wall COMPTALL textures/base_wall/atech1_b
+wall COMPUTE* textures/base_wall/atech1_b
+wall COMPSTA* textures/base_wall/atech1_e
+wall COMP2 textures/base_wall/atech1_a
+wall COMPWERD textures/base_wall/atech1_d
+wall COMPBLUE textures/base_wall/bluemetal2
+wall COMPTILE textures/base_wall/bluemetal3b
+wall COMPOHSO textures/base_wall/bluemetal3
+wall COMPSPAN textures/base_support/support1_1
+wall SUPPORT* textures/base_support/metal1_1
+wall DOORSTOP textures/base_support/support1_1
+wall DOORTRAK textures/base_support/support1_1
+wall METAL1 textures/base_wall/metalfloor_wall_10
+wall METAL textures/base_support/metal14_1
+wall PIPE* textures/base_support/vert_pipe1
+wall CRATINY textures/base_trim/panel03
+wall CRAT* textures/base_trim/panel02
+wall TEKWALL* textures/base_wall/metaltech10final
+wall DOOR1 textures/gothic_door/archpart8
+wall DOOR3 textures/gothic_door/archpart8
+wall BIGDOOR1 textures/gothic_door/archpart7
+wall BIGDOOR2 textures/gothic_door/archpart7
+wall BIGDOOR3 textures/gothic_door/archpart9
+wall BIGDOOR4 textures/gothic_door/archpart9
+wall BIGDOOR5 textures/gothic_ceiling/woodceiling1a
+wall BIGDOOR6 textures/gothic_ceiling/woodceiling1b_dark
+wall BIGDOOR7 textures/gothic_door/archpart1
+wall SPCDOOR* textures/gothic_door/archpart7
+wall STEP* textures/base_trim/pewterstep
+wall CEMENT* textures/gothic_wall/support2b
+
+# --- hell walls --------------------------------------------------------------
+
+wall MARBFAC* textures/gothic_block/gkc14b
+wall MARBFACE textures/gothic_block/gkc14b
+wall SP_FACE1 textures/gothic_block/gkc16b
+wall MARBLOD1 textures/gothic_block/blocks18cblood
+wall MARBLE* textures/gothic_block/blocks17g
+wall GSTFONT* textures/gothic_block/blocks18cbloodhead
+wall GSTGARG textures/gothic_block/gkc19a
+wall GSTLION textures/gothic_block/gkc19a
+wall GSTSATYR textures/gothic_block/gkc19a
+wall GSTVINE* textures/gothic_block/blocks17i
+wall GSTONE* textures/gothic_block/blocks17g
+wall STONGARG textures/gothic_block/blocks18cbloodhead
+wall STONE2 textures/gothic_block/blocks11b
+wall STONE3 textures/gothic_block/blocks11b
+wall STONE textures/gothic_block/blocks18b
+wall SLADWALL textures/gothic_block/blocks17g
+wall SLADSKUL textures/gothic_block/blocks18cbloodhead
+wall SKINMET* textures/gothic_wall/metalciclesrust
+wall SKINTEK* textures/gothic_wall/metalciclesrust
+wall SKINSYMB textures/gothic_floor/pent_metalbridge06
+wall SKINFACE textures/skin/chapthroat2
+wall SKINCUT textures/skin/skin6
+wall SKINEDGE textures/skin/skin5
+wall SKINBORD textures/skin/skin5
+wall SKINLOW textures/skin/skin1
+wall SKINSCAB textures/skin/skin7_teeth
+wall SKIN* textures/skin/skin6
+wall SKSNAKE* textures/skin/surface8
+wall SKSPINE* textures/skin/tongue
+wall SKULWAL* textures/gothic_wall/skull4
+wall SP_HOT1 textures/gothic_wall/pitted_rust3blood2
+wall SP_ROCK* textures/stone/pjrock16
+wall SP_DUDE* textures/gothic_block/gkc15b
+wall ROCKRED* textures/gothic_wall/oct20clava
+wall REDWALL* textures/gothic_wall/pitted_rust3blood2
+wall ASHWALL textures/stone/rockwall
+wall WOODGARG textures/gothic_ceiling/woodceiling1b_dark
+wall WOODSKUL textures/gothic_ceiling/woodceiling1b_dark
+wall WOOD* textures/gothic_ceiling/woodceiling1a
+wall EXITSTON textures/gothic_block/blocks11b
+
+# --- flats ---------------------------------------------------------------------
+
+flat FLOOR4_8 textures/base_floor/tilefloor7
+flat FLOOR4_* textures/base_floor/clang_floor
+flat FLOOR5_* textures/base_floor/clangdark
+flat FLOOR0_1 textures/gothic_ceiling/woodceiling1a
+flat FLOOR0_2 textures/gothic_ceiling/woodceiling1a
+flat FLOOR0_3 textures/gothic_ceiling/woodceiling1a
+flat FLOOR0_* textures/base_floor/diamond2c
+flat FLOOR1_1 textures/base_wall/bluemetal2
+flat FLOOR1_6 textures/gothic_floor/blocks17floor2
+flat FLOOR3_3 textures/gothic_floor/goopq1metal7_98d
+flat FLOOR6_1 textures/gothic_floor/metalbridge06b_blood
+flat FLOOR6_2 textures/stone/pjrock21
+flat FLOOR7_1 textures/gothic_floor/largerblock3b4
+flat FLOOR7_2 textures/gothic_floor/q1metal7_99
+flat FLAT1 textures/base_floor/concrete
+flat FLAT1_1 textures/gothic_floor/largerblock3b3
+flat FLAT1_2 textures/gothic_floor/largerblock3b3
+flat FLAT1_3 textures/base_floor/clanggrate
+flat FLAT3 textures/base_floor/diamond2c
+flat FLAT4 textures/base_floor/clanggrate2
+flat FLAT5 textures/gothic_ceiling/woodceiling1a
+flat FLAT5_1 textures/gothic_ceiling/woodceiling1a
+flat FLAT5_2 textures/gothic_ceiling/woodceiling1a
+flat FLAT5_3 textures/gothic_floor/blocks17floor2
+flat FLAT5_4 textures/base_floor/concrete
+flat FLAT5_5 textures/organics/dirt
+flat FLAT5_6 textures/gothic_wall/skull4
+flat FLAT5_7 textures/gothic_wall/skull2
+flat FLAT5_8 textures/gothic_wall/skull2
+flat FLAT8 textures/gothic_floor/largerblock3b4
+flat FLAT9 textures/base_floor/metfloor1
+flat FLAT10 textures/organics/dirt2
+flat FLAT14 textures/base_wall/bluemetal3
+flat FLAT18 textures/base_floor/diamond2
+flat FLAT19 textures/base_floor/metfloor1
+flat FLAT20 textures/base_floor/proto_grill
+flat FLAT23 textures/base_floor/metalbridge06
+flat CEIL3_* textures/base_floor/clang_floor2
+flat CEIL4_* textures/base_wall/bluemetal2
+flat CEIL5_* textures/base_floor/clangdark
+flat CEIL1_1 textures/gothic_ceiling/woodceiling1a
+flat CONS1_* textures/base_wall/atech1_e
+flat COMP01 textures/base_wall/atech1_b
+flat CRATOP* textures/base_trim/panel01
+flat STEP* textures/base_floor/clang_floor3b
+flat MFLR8_1 textures/gothic_floor/metalbridge06
+flat MFLR8_2 textures/stone/pjrock21
+flat MFLR8_3 textures/stone/pjrock16
+flat MFLR8_4 textures/stone/pjrock1
+flat SFLR* textures/skin/surface8
+flat DEM1_* textures/gothic_floor/goopq1metal7_98d
+flat FLAT* textures/base_floor/concrete
+
+# --- items (3D models) --------------------------------------------------------
+
+item 2014 models/powerups/health/small_cross.md3 models/powerups/health/small_sphere.md3
+item 2011 models/powerups/health/medium_cross.md3 models/powerups/health/medium_sphere.md3
+item 2012 models/powerups/health/large_cross.md3 models/powerups/health/large_sphere.md3
+item 2013 models/powerups/health/mega_cross.md3 models/powerups/health/mega_sphere.md3
+item 2015 models/powerups/armor/shard.md3 models/powerups/armor/shard_sphere.md3
+item 2018 models/powerups/armor/armor_yel.md3
+item 2019 models/powerups/armor/armor_red.md3
+item 2007 models/powerups/ammo/machinegunam.md3
+item 2048 models/powerups/ammo/machinegunam.md3 - 1.3
+item 2008 models/powerups/ammo/shotgunam.md3
+item 2049 models/powerups/ammo/shotgunam.md3 - 1.3
+item 2010 models/ammo/rocket/rocket.md3
+item 2046 models/powerups/ammo/rocketam.md3
+item 2047 models/powerups/ammo/plasmaam.md3
+item 17 models/powerups/ammo/plasmaam.md3 - 1.3
+item 2023 models/powerups/instant/quad.md3 models/powerups/instant/quad_ring.md3
+item 2024 models/powerups/instant/invis.md3 models/powerups/instant/invis_ring.md3
+item 2025 models/powerups/instant/enviro.md3 models/powerups/instant/enviro_ring.md3

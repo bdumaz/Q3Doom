@@ -680,13 +680,14 @@ static int DoomFadedLight( int level, const vec3_t xyz )
 	return ( 32 - map ) * 255 / 32;
 }
 
-static void RB_CalcDoomSectorColors( unsigned char *colors )
+static void RB_CalcDoomSectorColors( unsigned char *colors, qboolean quake )
 {
-	int		i, sector, level;
+	int		i, sector, level, c;
 	qboolean	fade = r_doomLightFade->integer != 0;
+	float	bright = r_quakeVisualsBright->value;
 
 	if ( !tr.numDoomSectorLights ) {
-		Com_Memcpy( colors, tess.vertexColors, tess.numVertexes * sizeof( tess.vertexColors[0] ) );
+		Com_Memset( colors, 255 >> tr.overbrightBits, tess.numVertexes * sizeof( tess.vertexColors[0] ) );
 		return;
 	}
 	for ( i = 0 ; i < tess.numVertexes ; i++, colors += 4 ) {
@@ -700,6 +701,18 @@ static void RB_CalcDoomSectorColors( unsigned char *colors )
 		}
 		if ( fade ) {
 			level = DoomFadedLight( level, tess.xyz[i] );
+		}
+		// Quake Visuals: Quake 3 textures are made for overbright lightmaps,
+		// so the sector light is brightened; the baked point lights (vertex
+		// colors, shifted down like map vertex colors) add their color
+		if ( quake ) {
+			for ( c = 0 ; c < 3 ; c++ ) {
+				int v = (int)( level * bright ) + ( tess.vertexColors[i][c] << tr.overbrightBits );
+
+				colors[c] = ( v > 255 ? 255 : v ) >> tr.overbrightBits;
+			}
+			colors[3] = 255;
+			continue;
 		}
 		colors[0] = colors[1] = colors[2] = level >> tr.overbrightBits;
 		colors[3] = 255;
@@ -729,7 +742,10 @@ static void ComputeColors( shaderStage_t *pStage )
 			Com_Memcpy( tess.svars.colors, tess.vertexColors, tess.numVertexes * sizeof( tess.vertexColors[0] ) );
 			break;
 		case CGEN_DOOM_SECTOR:
-			RB_CalcDoomSectorColors( ( unsigned char * ) tess.svars.colors );
+			RB_CalcDoomSectorColors( ( unsigned char * ) tess.svars.colors, qfalse );
+			break;
+		case CGEN_DOOM_QUAKE:
+			RB_CalcDoomSectorColors( ( unsigned char * ) tess.svars.colors, qtrue );
 			break;
 		case CGEN_CONST:
 			for ( i = 0; i < tess.numVertexes; i++ ) {

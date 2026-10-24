@@ -616,6 +616,33 @@ static int CmdNear( const doom_wad_t *wad, const char *name, double x, double y,
 	return 0;
 }
 
+/*
+=================
+CmdThings
+
+things <map> [type]: the map's things (of one doomednum type)
+=================
+*/
+static int CmdThings( const doom_wad_t *wad, const char *name, int type ) {
+	doom_map_t	map;
+	char		err[256];
+	int			i;
+
+	if ( doom_map_load( wad, name, &map, err, sizeof( err ) ) ) {
+		fprintf( stderr, "%s\n", err );
+		return 1;
+	}
+	for ( i = 0 ; i < map.num_things ; i++ ) {
+		const doom_thing_t *t = &map.things[i];
+
+		if ( type < 0 || t->type == type ) {
+			printf( "thing %d: type %d at %d %d angle %d flags 0x%x\n", i, t->type, t->x, t->y, t->angle, t->flags );
+		}
+	}
+	doom_map_free( &map );
+	return 0;
+}
+
 static void PutU32( FILE *f, uint32_t v ) {
 	fputc( v & 255, f ); fputc( ( v >> 8 ) & 255, f ); fputc( ( v >> 16 ) & 255, f ); fputc( v >> 24, f );
 }
@@ -726,6 +753,7 @@ int main( int argc, char **argv ) {
 			"       doomtool <wad> build <name|all> [outdir]\n"
 			"       doomtool <wad> line <map> <linedef>\n"
 			"       doomtool <wad> near <map> <x> <y> [radius]\n"
+			"       doomtool <wad> things <map> [type]\n"
 			"       doomtool <wad> music <lump> <out.wav> [seconds]\n" );
 		return 1;
 	}
@@ -748,6 +776,8 @@ int main( int argc, char **argv ) {
 		ret = CmdLine( wad, argv[3], atoi( argv[4] ) );
 	} else if ( !strcmp( argv[2], "build" ) && argc >= 4 ) {
 		ret = CmdBuild( wad, argv[3], argc >= 5 ? argv[4] : NULL );
+	} else if ( !strcmp( argv[2], "things" ) && argc >= 4 ) {
+		ret = CmdThings( wad, argv[3], argc >= 5 ? atoi( argv[4] ) : -1 );
 	} else if ( !strcmp( argv[2], "near" ) && argc >= 6 ) {
 		ret = CmdNear( wad, argv[3], atof( argv[4] ), atof( argv[5] ), argc >= 7 ? atof( argv[6] ) : 64 );
 	} else if ( !strcmp( argv[2], "music" ) && argc >= 5 ) {

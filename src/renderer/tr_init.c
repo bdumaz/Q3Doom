@@ -101,6 +101,8 @@ cvar_t	*r_flares;
 cvar_t	*r_mode;
 cvar_t	*r_doomTextureFilter;
 cvar_t	*r_doomLightFade;
+cvar_t	*r_quakeVisuals;
+cvar_t	*r_quakeVisualsBright;
 qboolean	glNPOTSupported;
 cvar_t	*r_nobind;
 cvar_t	*r_singleShader;
@@ -988,6 +990,8 @@ void R_Register( void )
 	r_mode = ri.Cvar_Get( "r_mode", "-2", CVAR_ARCHIVE | CVAR_LATCH );	// -2: desktop resolution
 	r_doomTextureFilter = ri.Cvar_Get( "r_doomTextureFilter", "0", CVAR_ARCHIVE );
 	r_doomLightFade = ri.Cvar_Get( "r_doomLightFade", "0", CVAR_ARCHIVE );
+	r_quakeVisuals = ri.Cvar_Get( "r_quakeVisuals", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	r_quakeVisualsBright = ri.Cvar_Get( "r_quakeVisualsBright", "1.5", CVAR_ARCHIVE );
 	r_fullscreen = ri.Cvar_Get( "r_fullscreen", "2", CVAR_ARCHIVE | CVAR_LATCH );	// Q3Doom: 2 borderless window (GLimp_SetMode)
 	r_customwidth = ri.Cvar_Get( "r_customwidth", "1600", CVAR_ARCHIVE | CVAR_LATCH );
 	r_customheight = ri.Cvar_Get( "r_customheight", "1024", CVAR_ARCHIVE | CVAR_LATCH );

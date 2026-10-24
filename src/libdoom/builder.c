@@ -966,6 +966,300 @@ static void SurfacePolygon( builder_t *b, surfbuilder_t *sb, int n, const float 
 }
 
 /*
+=====================================================================
+
+POINT LIGHTS (Quake Visuals)
+
+Colored point lights at Doom's light sources, baked into the vertex
+colors: lamps, candles and torches, and lit flats (light panels,
+teleporter gates, lava, nukage) on a grid over their sector. A light
+reaches a vertex unless a wall stands between them in the 2D map, or an
+opening between two sectors is too low or too high for the straight line
+(the starting heights: closed doors block). Linear falloff, Lambert
+shading. The renderer adds them to the sector light only with
+r_quakeVisuals (CGEN_DOOM_QUAKE); the other renderings ignore the colors.
+
+=====================================================================
+*/
+
+typedef struct {
+	float	x, y, z;
+	float	color[3];		// 0..1
+	float	radius;
+} blight_t;
+
+#define MAX_BAKED_LIGHTS		2048
+#define LIGHT_GRID				160		// spacing of the lights over a lit flat
+
+typedef struct {
+	int		ednum;
+	float	r, g, b, radius, z;
+} lightthing_t;
+
+static const lightthing_t lightThings[] = {
+	{ 2028,	1.0f, 0.95f, 0.8f,	288, 48 },		// floor lamp
+	{ 85,	0.8f, 0.9f, 1.0f,	320, 72 },		// tall techno lamp
+	{ 86,	0.8f, 0.9f, 1.0f,	240, 48 },		// short techno lamp
+	{ 34,	1.0f, 0.75f, 0.45f,	112, 12 },		// candle
+	{ 35,	1.0f, 0.75f, 0.45f,	224, 48 },		// candelabra
+	{ 44,	0.35f, 0.45f, 1.0f,	288, 64 },		// tall blue torch
+	{ 45,	0.35f, 1.0f, 0.4f,	288, 64 },		// tall green torch
+	{ 46,	1.0f, 0.4f, 0.25f,	288, 64 },		// tall red torch
+	{ 55,	0.35f, 0.45f, 1.0f,	208, 40 },		// short blue torch
+	{ 56,	0.35f, 1.0f, 0.4f,	208, 40 },		// short green torch
+	{ 57,	1.0f, 0.4f, 0.25f,	208, 40 },		// short red torch
+	{ 70,	1.0f, 0.6f, 0.3f,	224, 40 }		// burning barrel
+};
+
+typedef struct {
+	const char	*flat;
+	float		r, g, b, radius;
+	int			floor;		// lit from the floor (liquids, gates), else the ceiling
+} lightflat_t;
+
+static const lightflat_t lightFlats[] = {
+	{ "TLITE6_",	1.0f, 0.95f, 0.85f,	256, 0 },
+	{ "CEIL1_2",	1.0f, 1.0f, 0.95f,	224, 0 },
+	{ "CEIL1_3",	1.0f, 1.0f, 0.95f,	224, 0 },
+	{ "CEIL3_4",	1.0f, 0.95f, 0.85f,	224, 0 },
+	{ "CEIL3_6",	1.0f, 0.95f, 0.85f,	224, 0 },
+	{ "FLAT2",		1.0f, 1.0f, 1.0f,	224, 0 },
+	{ "FLAT17",		1.0f, 1.0f, 1.0f,	224, 0 },
+	{ "FLAT22",		0.4f, 0.5f, 1.0f,	224, 0 },
+	{ "FLOOR1_7",	1.0f, 0.3f, 0.25f,	192, 1 },
+	{ "GATE1",		1.0f, 0.3f, 0.2f,	160, 1 },
+	{ "GATE2",		1.0f, 0.3f, 0.2f,	160, 1 },
+	{ "GATE3",		1.0f, 0.3f, 0.2f,	160, 1 },
+	{ "GATE4",		0.9f, 0.9f, 1.0f,	160, 1 },
+	{ "LAVA",		1.0f, 0.45f, 0.15f,	224, 1 },
+	{ "NUKAGE",		0.35f, 0.9f, 0.3f,	176, 1 }
+};
+
+static void AddLight( blight_t *lights, int *count, float x, float y, float z, const float color[3], float radius ) {
+	blight_t *l;
+
+	if ( *count >= MAX_BAKED_LIGHTS ) {
+		return;
+	}
+	l = &lights[( *count )++];
+	l->x = x;
+	l->y = y;
+	l->z = z;
+	l->color[0] = color[0];
+	l->color[1] = color[1];
+	l->color[2] = color[2];
+	l->radius = radius;
+}
+
+static int CollectLights( builder_t *b, blight_t *lights ) {
+	const doom_map_t	*map = b->map;
+	int					count = 0, i, j;
+
+	for ( i = 0 ; i < map->num_things ; i++ ) {
+		const doom_thing_t *t = &map->things[i];
+
+		for ( j = 0 ; j < (int)( sizeof( lightThings ) / sizeof( lightThings[0] ) ) ; j++ ) {
+			const lightthing_t	*lt = &lightThings[j];
+			int					sector;
+			float				color[3];
+
+			if ( t->type != lt->ednum ) {
+				continue;
+			}
+			sector = doom_map_sector_at( map, t->x + 0.25, t->y + 0.25 );
+			if ( sector < 0 ) {
+				break;
+			}
+			color[0] = lt->r;
+			color[1] = lt->g;
+			color[2] = lt->b;
+			AddLight( lights, &count, t->x, t->y, map->sectors[sector].floor_height + lt->z, color, lt->radius );
+			break;
+		}
+	}
+
+	// lit flats: a grid of lights over the sector, under its ceiling or over its floor
+	for ( i = 0 ; i < map->num_sectors ; i++ ) {
+		const doom_sector_t	*sec = &map->sectors[i];
+		double				mins[2] = { 1e9, 1e9 }, maxs[2] = { -1e9, -1e9 }, x, y;
+		int					k, lit = -1, side, placed = 0;
+
+		for ( side = 0 ; side < 2 && lit < 0 ; side++ ) {
+			const char *flat = side ? sec->floor_flat : sec->ceiling_flat;
+
+			for ( j = 0 ; j < (int)( sizeof( lightFlats ) / sizeof( lightFlats[0] ) ) ; j++ ) {
+				if ( lightFlats[j].floor == side && !strncmp( flat, lightFlats[j].flat, strlen( lightFlats[j].flat ) ) ) {
+					lit = j;
+					break;
+				}
+			}
+		}
+		if ( lit < 0 ) {
+			continue;
+		}
+		// the sector's extent, from its lines
+		for ( k = 0 ; k < map->num_linedefs ; k++ ) {
+			const doom_linedef_t *ld = &map->linedefs[k];
+			int v;
+
+			if ( map->sidedefs[ld->side[0]].sector != i && ( ld->side[1] == DOOM_NO_SIDE || map->sidedefs[ld->side[1]].sector != i ) ) {
+				continue;
+			}
+			for ( v = 0 ; v < 2 ; v++ ) {
+				const doom_vertex_t *vx = &map->vertexes[v ? ld->v2 : ld->v1];
+
+				mins[0] = vx->x < mins[0] ? vx->x : mins[0];
+				mins[1] = vx->y < mins[1] ? vx->y : mins[1];
+				maxs[0] = vx->x > maxs[0] ? vx->x : maxs[0];
+				maxs[1] = vx->y > maxs[1] ? vx->y : maxs[1];
+			}
+		}
+		if ( mins[0] > maxs[0] ) {
+			continue;
+		}
+		{
+			const lightflat_t	*lf = &lightFlats[lit];
+			float				color[3] = { lf->r, lf->g, lf->b };
+			float				z = lf->floor ? sec->floor_height + 16 : sec->ceiling_height - 8;
+			double				stepx = ( maxs[0] - mins[0] ) / ( floor( ( maxs[0] - mins[0] ) / LIGHT_GRID ) + 1 );
+			double				stepy = ( maxs[1] - mins[1] ) / ( floor( ( maxs[1] - mins[1] ) / LIGHT_GRID ) + 1 );
+
+			for ( x = mins[0] + stepx * 0.5 ; x < maxs[0] && placed < 64 ; x += stepx ) {
+				for ( y = mins[1] + stepy * 0.5 ; y < maxs[1] && placed < 64 ; y += stepy ) {
+					if ( doom_map_sector_at( map, x, y ) == i ) {
+						AddLight( lights, &count, (float)x, (float)y, z, color, lf->radius );
+						placed++;
+					}
+				}
+			}
+			// small or odd sectors: at least one light, in the middle of a line's inner side
+			if ( !placed ) {
+				AddLight( lights, &count, (float)( ( mins[0] + maxs[0] ) * 0.5 ), (float)( ( mins[1] + maxs[1] ) * 0.5 ), z, color, lf->radius );
+			}
+		}
+	}
+	return count;
+}
+
+// true if the 2D map blocks the straight line from the light to the point
+static int LightBlocked( const doom_map_t *map, const int *lines, int numLines, const blight_t *l, const float p[3] ) {
+	double	dx = p[0] - l->x, dy = p[1] - l->y, len = sqrt( dx * dx + dy * dy );
+	int		i;
+
+	if ( len < 1 ) {
+		return 0;
+	}
+	for ( i = 0 ; i < numLines ; i++ ) {
+		const doom_linedef_t	*ld = &map->linedefs[lines[i]];
+		const doom_vertex_t		*a = &map->vertexes[ld->v1], *c = &map->vertexes[ld->v2];
+		double					ex = c->x - a->x, ey = c->y - a->y, den = dx * ey - dy * ex, u, t;
+
+		if ( fabs( den ) < 1e-9 ) {
+			continue;
+		}
+		u = ( ( a->x - l->x ) * ey - ( a->y - l->y ) * ex ) / den;		// along light -> point
+		t = ( ( a->x - l->x ) * dy - ( a->y - l->y ) * dx ) / den;		// along the line
+		if ( u <= 0 || t < 0 || t > 1 || ( 1 - u ) * len < 1.0 ) {
+			continue;		// not between them, or the point is on this line
+		}
+		if ( ld->side[1] == DOOM_NO_SIDE ) {
+			return 1;
+		}
+		{
+			const doom_sector_t	*s0 = &map->sectors[map->sidedefs[ld->side[0]].sector];
+			const doom_sector_t	*s1 = &map->sectors[map->sidedefs[ld->side[1]].sector];
+			double				z = l->z + u * ( p[2] - l->z );
+			double				bottom = s0->floor_height > s1->floor_height ? s0->floor_height : s1->floor_height;
+			double				top = s0->ceiling_height < s1->ceiling_height ? s0->ceiling_height : s1->ceiling_height;
+
+			if ( z < bottom - 0.5 || z > top + 0.5 ) {
+				return 1;
+			}
+		}
+	}
+	return 0;
+}
+
+static void BakeLights( builder_t *b ) {
+	const doom_map_t	*map = b->map;
+	blight_t			*lights = malloc( sizeof( blight_t ) * MAX_BAKED_LIGHTS );
+	float				*sum;
+	int					*lines = malloc( sizeof( int ) * map->num_linedefs );
+	int					numLights, s, i, v, total = 0, base;
+
+	numLights = CollectLights( b, lights );
+	for ( s = 0 ; s < b->surfVerts.count ; s++ ) {
+		total += BufAt( &b->surfVerts, dbuf_t, s )->count;
+	}
+	sum = calloc( total * 3 + 1, sizeof( float ) );
+
+	for ( i = 0 ; i < numLights ; i++ ) {
+		const blight_t	*l = &lights[i];
+		int				numLines = 0, k;
+
+		// the lines in reach of the light
+		for ( k = 0 ; k < map->num_linedefs ; k++ ) {
+			const doom_linedef_t	*ld = &map->linedefs[k];
+			const doom_vertex_t		*a = &map->vertexes[ld->v1], *c = &map->vertexes[ld->v2];
+			double					minx = a->x < c->x ? a->x : c->x, maxx = a->x > c->x ? a->x : c->x;
+			double					miny = a->y < c->y ? a->y : c->y, maxy = a->y > c->y ? a->y : c->y;
+
+			if ( minx > l->x + l->radius || maxx < l->x - l->radius || miny > l->y + l->radius || maxy < l->y - l->radius ) {
+				continue;
+			}
+			lines[numLines++] = k;
+		}
+
+		for ( s = 0, base = 0 ; s < b->surfVerts.count ; s++ ) {
+			dbuf_t *verts = BufAt( &b->surfVerts, dbuf_t, s );
+
+			for ( v = 0 ; v < verts->count ; v++ ) {
+				const overt_t	*vt = BufAt( verts, overt_t, v );
+				float			dir[3], d, att, lambert;
+
+				dir[0] = l->x - vt->xyz[0];
+				dir[1] = l->y - vt->xyz[1];
+				dir[2] = l->z - vt->xyz[2];
+				d = (float)sqrt( dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2] );
+				if ( d >= l->radius ) {
+					continue;
+				}
+				lambert = d > 0.01f ? ( dir[0] * vt->normal[0] + dir[1] * vt->normal[1] + dir[2] * vt->normal[2] ) / d : 1;
+				if ( lambert <= 0 ) {
+					continue;
+				}
+				if ( LightBlocked( map, lines, numLines, l, vt->xyz ) ) {
+					continue;
+				}
+				att = ( 1 - d / l->radius ) * lambert;
+				sum[( base + v ) * 3 + 0] += l->color[0] * att;
+				sum[( base + v ) * 3 + 1] += l->color[1] * att;
+				sum[( base + v ) * 3 + 2] += l->color[2] * att;
+			}
+			base += verts->count;
+		}
+	}
+
+	// into the vertex colors (LightByte scale: the renderer shifts them back up)
+	for ( s = 0, base = 0 ; s < b->surfVerts.count ; s++ ) {
+		dbuf_t *verts = BufAt( &b->surfVerts, dbuf_t, s );
+
+		for ( v = 0 ; v < verts->count ; v++ ) {
+			overt_t *vt = BufAt( verts, overt_t, v );
+			int c;
+
+			for ( c = 0 ; c < 3 ; c++ ) {
+				vt->color[c] = LightByte( (int)( sum[( base + v ) * 3 + c] * 255 ) );
+			}
+		}
+		base += verts->count;
+	}
+	free( sum );
+	free( lines );
+	free( lights );
+}
+
+/*
 =================
 PackSurfaces
 
@@ -1836,6 +2130,7 @@ int doom_build_bsp( const doom_wad_t *wad, const doom_map_t *map, uint8_t **outD
 	worldSurfaces = b.surfaces.count;
 	worldBrushes = b.brushes.count;
 	BuildMovers( &b );
+	BakeLights( &b );
 	PackSurfaces( &b );
 	BuildEntities( &b );
 
