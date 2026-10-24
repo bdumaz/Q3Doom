@@ -759,6 +759,16 @@ static void MobjThinker( gentity_t *ent ) {
 
 	ThingHeightClip( ent );
 
+	// PIT_ChangeSector: a corpse the floor and ceiling close on is crushed to gibs
+	if ( ent->health <= 0 && mo->height > 0 && mo->ceilingz - mo->floorz < mo->height ) {
+		SetMobjState( ent, S_GIBS );
+		mo->flags &= ~MF_SOLID;
+		mo->height = 0;
+		mo->radius = 0;
+		LinkMobj( ent );
+		return;
+	}
+
 	if ( mo->mom[0] || mo->mom[1] || ( mo->flags & MF_SKULLFLY ) ) {
 		XYMovement( ent );
 		if ( !ent->inuse || ent->doomMobj != mo ) {
@@ -1714,6 +1724,28 @@ qboolean Doom_TeleportMobj( gentity_t *ent, int tag ) {
 		return qtrue;
 	}
 	return qfalse;
+}
+
+/*
+=================
+Doom_KillAllCommand
+
+doom_killall: every living monster dies, killed by the player (cheat, like
+Boom's TNTEM), so the boss deaths and the 100% kills rule can be tested
+=================
+*/
+void Doom_KillAllCommand( gentity_t *ent ) {
+	int		i, count = 0;
+
+	for ( i = MAX_CLIENTS ; i < level.num_entities ; i++ ) {
+		gentity_t *target = &g_entities[i];
+
+		if ( target->inuse && target->doomMobj && ( target->doomMobj->flags & MF_COUNTKILL ) && target->health > 0 ) {
+			Doom_DamageMobj( target, ent, ent, NULL, 10000, 0 );
+			count++;
+		}
+	}
+	trap_SendServerCommand( ent - g_entities, va( "print \"%d monsters killed\n\"", count ) );
 }
 
 /*

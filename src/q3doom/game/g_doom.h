@@ -178,6 +178,7 @@ void		Doom_NoiseAlert( gentity_t *emitter );
 float		Doom_ThingZ( gentity_t *ent );
 float		Doom_ThingHeight( gentity_t *ent );
 void		Doom_SpawnCommand( gentity_t *ent );
+void		Doom_KillAllCommand( gentity_t *ent );
 void		Doom_FireWeapon( gentity_t *ent, int parm );
 void		Doom_MissileImpact( gentity_t *ent, trace_t *trace );
 

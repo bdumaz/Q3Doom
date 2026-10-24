@@ -657,10 +657,34 @@ void CG_DoomThing( centity_t *cent ) {
 	const entityState_t	*es = &cent->currentState;
 	int					type = es->generic1;
 
+	vec3_t				delta, origin;
+	float				len, decay;
+
 	if ( !DOOM_MAP() || type <= 0 || type >= NUMMOBJTYPES || es->frame <= S_NULL || es->frame >= NUMSTATES ) {
 		return;
 	}
-	AddSprite( cent->lerpOrigin, es->angles[YAW], es->frame, -1, ( doom_mobjinfo[type].flags & MF_SHADOW ) != 0 );
+
+	// Doom moves a walking monster a full step at once every few tics: each
+	// jump goes into an offset that decays over about 100 ms, so the sprite
+	// glides. Capped at 24 units so fast movers do not trail; reset on
+	// teleports and after a gap.
+	VectorSubtract( cent->lerpOrigin, cent->doomLastOrigin, delta );
+	if ( !cent->doomDrawTime || cg.time - cent->doomDrawTime > 500 || cg.time < cent->doomDrawTime
+		|| VectorLength( delta ) > 64 ) {
+		VectorClear( cent->doomStepOffset );
+	} else {
+		VectorSubtract( cent->doomStepOffset, delta, cent->doomStepOffset );
+		decay = 1.0f - ( cg.time - cent->doomDrawTime ) / 100.0f;
+		VectorScale( cent->doomStepOffset, decay > 0 ? decay : 0, cent->doomStepOffset );
+		len = VectorLength( cent->doomStepOffset );
+		if ( len > 24 ) {
+			VectorScale( cent->doomStepOffset, 24 / len, cent->doomStepOffset );
+		}
+	}
+	VectorCopy( cent->lerpOrigin, cent->doomLastOrigin );
+	cent->doomDrawTime = cg.time;
+	VectorAdd( cent->lerpOrigin, cent->doomStepOffset, origin );
+	AddSprite( origin, es->angles[YAW], es->frame, -1, ( doom_mobjinfo[type].flags & MF_SHADOW ) != 0 );
 }
 
 /*

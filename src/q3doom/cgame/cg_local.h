@@ -198,6 +198,11 @@ typedef struct centity_s {
 	// exact interpolated position of entity on this frame
 	vec3_t			lerpOrigin;
 	vec3_t			lerpAngles;
+
+	// Q3Doom: a monster's sprite eased over Doom's steps (CG_DoomThing)
+	vec3_t			doomStepOffset;		// added to lerpOrigin, decays to 0
+	vec3_t			doomLastOrigin;
+	int				doomDrawTime;
 } centity_t;
 
 

@@ -1670,6 +1670,11 @@ void ClientCommand( int clientNum ) {
 		Cmd_Give_f (ent);
 	else if (!Q_stricmp (cmd, "idkfa") || !Q_stricmp (cmd, "idfa") || !Q_stricmp (cmd, "iddqd"))
 		Cmd_DoomCheat_f (ent, cmd);
+	else if (!Q_stricmp (cmd, "doom_killall")) {
+		if ( CheatsOk( ent ) ) {
+			Doom_KillAllCommand( ent );
+		}
+	}
 	else if (!Q_stricmp (cmd, "doom_spawn")) {
 		if ( CheatsOk( ent ) ) {
 			Doom_SpawnCommand( ent );

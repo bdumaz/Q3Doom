@@ -239,6 +239,7 @@ void S_Shutdown( void ) {
 		return;
 	}
 
+	S_StopBackgroundTrack();	// Q3Doom: the synthesizer is set to this device's rate
 	SNDDMA_Shutdown();
 
 	s_soundStarted = 0;

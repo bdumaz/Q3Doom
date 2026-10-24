@@ -439,6 +439,22 @@ void doom_sector_ranges( const doom_wad_t *wad, const doom_map_t *map, doom_plan
 		}
 	}
 
+	// A_BossDeath: the tag 666 sectors of E1M8 and E4M8 lower to the lowest
+	// floor around, E4M6's open like a door
+	for ( i = 0 ; i < map->num_sectors ; i++ ) {
+		doom_plane_range_t *r = &ranges[i];
+
+		if ( map->sectors[i].tag != 666 ) {
+			continue;
+		}
+		if ( !strcmp( map->name, "E1M8" ) || !strcmp( map->name, "E4M8" ) ) {
+			Extend( &r->floor_min, &r->floor_max, doom_find_lowest_floor_surrounding( map, i, NULL, NULL ) );
+		} else if ( !strcmp( map->name, "E4M6" ) ) {
+			Extend( &r->ceiling_min, &r->ceiling_max, doom_find_lowest_ceiling_surrounding( map, i, NULL, NULL ) - 4 );
+			Extend( &r->ceiling_min, &r->ceiling_max, map->sectors[i].floor_height );
+		}
+	}
+
 	for ( i = 0 ; i < map->num_linedefs ; i++ ) {
 		const doom_linedef_t	*ld = &map->linedefs[i];
 		const doom_special_t	*sp = doom_line_special( ld->special );
