@@ -8,6 +8,8 @@ doomtool - inspect and export Doom WAD contents with libdoom
                                       PNG, sounds as WAV, maps as SVG
   doomtool <wad> map <name> <out.svg> draw one map
   doomtool <wad> build <name|all> [dir] build Quake 3 BSPs, print stats
+  doomtool <wad> music <lump> <out.wav> [seconds]
+                                      render MUS music with the OPL synthesizer
 
 Part of Q3Doom. Licensed under the GNU General Public License version 2 or later.
 ===========================================================================
@@ -17,6 +19,8 @@ Part of Q3Doom. Licensed under the GNU General Public License version 2 or later
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
+#include <time.h>
 
 #ifdef _WIN32
 #include <direct.h>
@@ -571,6 +575,73 @@ static int CmdLine( const doom_wad_t *wad, const char *name, int index ) {
 	return 0;
 }
 
+static void PutU32( FILE *f, uint32_t v ) {
+	fputc( v & 255, f ); fputc( ( v >> 8 ) & 255, f ); fputc( ( v >> 16 ) & 255, f ); fputc( v >> 24, f );
+}
+
+static void PutU16( FILE *f, int v ) {
+	fputc( v & 255, f ); fputc( ( v >> 8 ) & 255, f );
+}
+
+/*
+=================
+CmdMusic
+
+music <lump> <out.wav> [seconds]: a MUS lump through the OPL synthesizer,
+as 44.1 kHz stereo; prints the peak and RMS level and the render speed
+=================
+*/
+static int CmdMusic( const doom_wad_t *wad, const char *name, const char *out, int seconds ) {
+	const int		rate = 44100;
+	doom_music_t	*m = doom_music_open( wad, name, rate, 0 );
+	int				total = rate * seconds, frames = 0, n, i, peak = 0;
+	int16_t			buf[4096 * 2];
+	double			sum = 0;
+	clock_t			start;
+	FILE			*f;
+
+	if ( !m ) {
+		fprintf( stderr, "can't open music %s\n", name );
+		return 1;
+	}
+	f = fopen( out, "wb" );
+	if ( !f ) {
+		doom_music_close( m );
+		return 1;
+	}
+	fwrite( "RIFF\0\0\0\0WAVEfmt ", 1, 16, f );
+	PutU32( f, 16 ); PutU16( f, 1 ); PutU16( f, 2 ); PutU32( f, rate ); PutU32( f, rate * 4 ); PutU16( f, 4 ); PutU16( f, 16 );
+	fwrite( "data\0\0\0\0", 1, 8, f );
+
+	start = clock();
+	while ( frames < total ) {
+		n = doom_music_render( m, buf, total - frames < 4096 ? total - frames : 4096 );
+		for ( i = 0 ; i < n * 2 ; i++ ) {
+			int a = abs( buf[i] );
+
+			if ( a > peak ) {
+				peak = a;
+			}
+			sum += (double)buf[i] * buf[i];
+		}
+		fwrite( buf, 4, n, f );
+		frames += n;
+		if ( n < 4096 && frames < total ) {
+			break;		// the score ended
+		}
+	}
+	fseek( f, 4, SEEK_SET );
+	PutU32( f, 36 + frames * 4 );
+	fseek( f, 40, SEEK_SET );
+	PutU32( f, frames * 4 );
+	fclose( f );
+	doom_music_close( m );
+
+	printf( "%s: %.1f s, peak %d, rms %.0f, rendered at %.0fx real time\n", name, (double)frames / rate, peak,
+		frames ? sqrt( sum / ( frames * 2.0 ) ) : 0.0, ( (double)frames / rate ) / ( (double)( clock() - start ) / CLOCKS_PER_SEC + 1e-9 ) );
+	return 0;
+}
+
 static doom_wad_t *LoadWad( const char *path ) {
 	FILE		*f = fopen( path, "rb" );
 	void		*data;
@@ -612,7 +683,8 @@ int main( int argc, char **argv ) {
 			"       doomtool <wad> export <dir>\n"
 			"       doomtool <wad> map <name> <out.svg>\n"
 			"       doomtool <wad> build <name|all> [outdir]\n"
-			"       doomtool <wad> line <map> <linedef>\n" );
+			"       doomtool <wad> line <map> <linedef>\n"
+			"       doomtool <wad> music <lump> <out.wav> [seconds]\n" );
 		return 1;
 	}
 
@@ -634,6 +706,8 @@ int main( int argc, char **argv ) {
 		ret = CmdLine( wad, argv[3], atoi( argv[4] ) );
 	} else if ( !strcmp( argv[2], "build" ) && argc >= 4 ) {
 		ret = CmdBuild( wad, argv[3], argc >= 5 ? argv[4] : NULL );
+	} else if ( !strcmp( argv[2], "music" ) && argc >= 5 ) {
+		ret = CmdMusic( wad, argv[3], argv[4], argc >= 6 ? atoi( argv[5] ) : 30 );
 	} else {
 		fprintf( stderr, "unknown command\n" );
 	}

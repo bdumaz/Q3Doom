@@ -121,6 +121,7 @@ extern doomLevel_t	doomLevel;
 // g_doom.c
 void		Doom_InitLevel( void );		// before the entities spawn
 void		Doom_StartLevel( void );	// after
+const char	*Doom_LevelMusic( void );
 void		Doom_ShutdownLevel( void );
 void		Doom_StatusCommand( void );
 void		Doom_RunFrame( void );

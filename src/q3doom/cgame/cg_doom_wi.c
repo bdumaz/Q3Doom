@@ -283,10 +283,12 @@ void CG_DoomIntermissionChanged( void ) {
 		wi.cntTime = wi.cntPar = -1;
 		wi.cntPause = DOOM_TICRATE;
 		InitAnimatedBack();
+		trap_S_StartBackgroundTrack( "doom/music/D_INTER", "" );
 		return;
 	}
 	if ( sscanf( s, "finale %d", &episode ) == 1 ) {
 		episode = Com_Clamp( 1, 4, episode );
+		trap_S_StartBackgroundTrack( "doom/music/D_VICTOR", "" );
 		wi.state = WI_FINALE;
 		wi.epsd = episode - 1;
 		wi.finaleText = finaleTexts[episode - 1];

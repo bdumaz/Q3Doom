@@ -279,6 +279,9 @@ void UI_MainMenu( void ) {
 	memset( &s_main, 0 ,sizeof(mainmenu_t) );
 	memset( &s_errorMessage, 0 ,sizeof(errorMessage_t) );
 
+	// Q3Doom: Doom's title music, once
+	trap_Cmd_ExecuteText( EXEC_APPEND, "music doom/music/D_INTRO -\n" );
+
 	// com_errorMessage would need that too
 	MainMenu_Cache();
 	

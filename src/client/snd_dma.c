@@ -31,6 +31,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "snd_local.h"
 #include "client.h"
+#include "../libdoom/doom.h"
 
 void S_Play_f(void);
 void S_SoundList_f(void);
@@ -46,6 +47,13 @@ static wavinfo_t	s_backgroundInfo;
 static int			s_backgroundSamples;
 static char		s_backgroundLoop[MAX_QPATH];
 //static char		s_backgroundMusic[MAX_QPATH]; //TTimo: unused
+
+// Q3Doom: "doom/music/<lump>" tracks are the WAD's MUS music, synthesized
+// (libdoom music.c) instead of streamed from a file
+#define DOOM_MUSIC_PREFIX	"doom/music/"
+static doom_music_t	*s_doomMusic;
+static char			s_doomMusicName[MAX_QPATH];
+static cvar_t		*s_doomMusicCvar;
 
 
 // =======================================================================
@@ -144,6 +152,7 @@ void S_Init( void ) {
 
 	s_volume = Cvar_Get ("s_volume", "0.8", CVAR_ARCHIVE);
 	s_musicVolume = Cvar_Get ("s_musicvolume", "0.25", CVAR_ARCHIVE);
+	s_doomMusicCvar = Cvar_Get ("s_doomMusic", "1", CVAR_ARCHIVE);	// Q3Doom: 0 turns Doom's music off
 	s_separation = Cvar_Get ("s_separation", "0.5", CVAR_ARCHIVE);
 	s_doppler = Cvar_Get ("s_doppler", "1", CVAR_ARCHIVE);
 	s_khz = Cvar_Get ("s_khz", "22", CVAR_ARCHIVE);
@@ -1417,6 +1426,12 @@ S_StopBackgroundTrack
 ======================
 */
 void S_StopBackgroundTrack( void ) {
+	if ( s_doomMusic ) {
+		doom_music_close( s_doomMusic );
+		s_doomMusic = NULL;
+		s_doomMusicName[0] = 0;
+		s_rawend = 0;
+	}
 	if ( !s_backgroundFile ) {
 		return;
 	}
@@ -1443,6 +1458,24 @@ void S_StartBackgroundTrack( const char *intro, const char *loop ){
 		loop = intro;
 	}
 	Com_DPrintf( "S_StartBackgroundTrack( %s, %s )\n", intro, loop );
+
+	// Q3Doom: Doom's music; the same track keeps playing (a level restart)
+	if ( !Q_stricmpn( intro, DOOM_MUSIC_PREFIX, strlen( DOOM_MUSIC_PREFIX ) ) ) {
+		if ( s_doomMusic && !Q_stricmp( s_doomMusicName, intro ) ) {
+			return;
+		}
+		S_StopBackgroundTrack();
+		if ( !s_soundStarted || !s_doomMusicCvar->integer || !Doom_GetWad() ) {
+			return;
+		}
+		s_doomMusic = doom_music_open( Doom_GetWad(), intro + strlen( DOOM_MUSIC_PREFIX ), dma.speed, loop[0] != '-' );
+		if ( !s_doomMusic ) {
+			Com_Printf( S_COLOR_YELLOW "WARNING: no Doom music %s\n", intro );
+			return;
+		}
+		Q_strncpyz( s_doomMusicName, intro, sizeof( s_doomMusicName ) );
+		return;
+	}
 
 	Q_strncpyz( name, intro, sizeof( name ) - 4 );
 	COM_DefaultExtension( name, sizeof( name ), ".wav" );
@@ -1529,6 +1562,33 @@ void S_UpdateBackgroundTrack( void ) {
 	int		fileBytes;
 	int		r;
 	static	float	musicVolume = 0.5f;
+
+	// Q3Doom: synthesize Doom's music ahead of the mixer
+	if ( s_doomMusic ) {
+		short	music[4096 * 2];
+
+		if ( !s_doomMusicCvar->integer ) {
+			S_StopBackgroundTrack();
+			return;
+		}
+		if ( s_musicVolume->value <= 0 ) {
+			return;
+		}
+		if ( s_rawend < s_soundtime ) {
+			s_rawend = s_soundtime;
+		}
+		while ( s_rawend < s_soundtime + MAX_RAW_SAMPLES - 4096 ) {
+			int n = doom_music_render( s_doomMusic, music, 4096 );
+
+			S_RawSamples( n, dma.speed, 2, 2, (byte *)music, s_musicVolume->value );
+			if ( n < 4096 ) {
+				// a track that does not loop ended
+				S_StopBackgroundTrack();
+				return;
+			}
+		}
+		return;
+	}
 
 	if ( !s_backgroundFile ) {
 		return;

@@ -141,6 +141,24 @@ int					doom_load_sound( const doom_wad_t *wad, const char *name, doom_sound_t *
 /*
 =====================================================================
 
+MUSIC
+
+MUS lumps (D_E1M1 ...) played with the GENMIDI instruments on an OPL2-style
+FM synthesizer (music.c). The player reads the WAD's data, which must stay
+loaded while it plays.
+
+=====================================================================
+*/
+
+typedef struct doom_music_s doom_music_t;
+
+doom_music_t		*doom_music_open( const doom_wad_t *wad, const char *name, int rate, int loop );	// NULL if missing
+int					doom_music_render( doom_music_t *m, int16_t *out, int frames );	// stereo; fewer frames at the end
+void				doom_music_close( doom_music_t *m );
+
+/*
+=====================================================================
+
 MAP MODEL
 
 The editable, in-memory form of a Doom level. Only the "source" lumps are

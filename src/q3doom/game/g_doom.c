@@ -956,6 +956,30 @@ void Doom_StartLevel( void ) {
 	Doom_SpawnItems();
 	Doom_SpawnMobjs();
 	Doom_InitFrag();
+	trap_SetConfigstring( CS_MUSIC, Doom_LevelMusic() );
+}
+
+/*
+=================
+Doom_LevelMusic
+
+S_Start: the music of the level, played by the clients through libdoom's
+synthesizer; episode 4 reuses tracks of the first three
+=================
+*/
+const char *Doom_LevelMusic( void ) {
+	static const char	*e4[9] = { "E3M4", "E3M2", "E3M3", "E1M5", "E2M7", "E2M4", "E2M6", "E2M5", "E1M9" };
+	char				map[MAX_QPATH];
+
+	trap_Cvar_VariableStringBuffer( "mapname", map, sizeof( map ) );
+	Q_strupr( map );
+	if ( strlen( map ) == 4 && map[0] == 'E' && map[2] == 'M' && map[3] >= '1' && map[3] <= '9' ) {
+		if ( map[1] == '4' ) {
+			return va( "doom/music/D_%s", e4[map[3] - '1'] );
+		}
+		return va( "doom/music/D_%s", map );
+	}
+	return "";		// Doom II's MAPxx tracks have other names
 }
 
 void Doom_ShutdownLevel( void ) {
