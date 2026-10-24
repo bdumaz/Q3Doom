@@ -7,10 +7,11 @@ GameData/
 # Upstream source snapshots (cloned separately, see PLAN.md M0)
 external/
 
-# Build outputs and runtime folder
+# Build outputs, runtime folder and packaged releases
 build/
 out/
 run/
+release/
 
 # IDE
 .vs/
