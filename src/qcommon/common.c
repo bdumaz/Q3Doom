@@ -2505,16 +2505,8 @@ void Com_Init( char *commandLine ) {
 	com_frameTime = Com_Milliseconds();
 
 	// add + commands from command line
-	if ( !Com_AddStartupCommands() ) {
-		// if the user didn't give any commands, run default action
-		if ( !com_dedicated->integer ) {
-			Cbuf_AddText ("cinematic idlogo.RoQ\n");
-			if( !com_introPlayed->integer ) {
-				Cvar_Set( com_introPlayed->name, "1" );
-				Cvar_Set( "nextmap", "cinematic intro.RoQ" );
-			}
-		}
-	}
+	// Q3Doom: no id logo and Quake 3 intro videos at startup: straight to the menu
+	Com_AddStartupCommands();
 
 	// start in full screen ui mode
 	Cvar_Set("r_uiFullScreen", "1");
