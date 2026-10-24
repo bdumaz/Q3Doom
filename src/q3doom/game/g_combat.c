@@ -80,6 +80,11 @@ void TossClientItems( gentity_t *self ) {
 	int			i;
 	gentity_t	*drop;
 
+	// Q3Doom: Doom players drop nothing
+	if ( qtrue ) {
+		return;
+	}
+
 	// drop the weapon if not a gauntlet or machinegun
 	weapon = self->s.weapon;
 
@@ -314,7 +319,8 @@ char	*modNames[] = {
 	"MOD_KAMIKAZE",
 	"MOD_JUICED",
 #endif
-	"MOD_GRAPPLE"
+	"MOD_GRAPPLE",
+	"MOD_CHAINSAW"
 };
 
 #ifdef MISSIONPACK
@@ -704,15 +710,17 @@ int CheckArmor (gentity_t *ent, int damage, int dflags)
 	if (dflags & DAMAGE_NO_ARMOR)
 		return 0;
 
-	// armor
-	count = client->ps.stats[STAT_ARMOR];
-	save = ceil( damage * ARMOR_PROTECTION );
-	if (save >= count)
-		save = count;
-
-	if (!save)
+	// Q3Doom: Doom armor (P_DamageMobj): green saves a third, blue half,
+	// and the type is lost with the last point
+	if ( !client->ps.stats[STAT_DOOM_ARMORTYPE] ) {
 		return 0;
-
+	}
+	count = client->ps.stats[STAT_ARMOR];
+	save = client->ps.stats[STAT_DOOM_ARMORTYPE] == 1 ? damage / 3 : damage / 2;
+	if ( count <= save ) {
+		save = count;
+		client->ps.stats[STAT_DOOM_ARMORTYPE] = 0;
+	}
 	client->ps.stats[STAT_ARMOR] -= save;
 
 	return save;
@@ -860,6 +868,8 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 	if ( targ->s.eType == ET_MOVER ) {
 		if ( targ->use && targ->moverState == MOVER_POS1 ) {
 			targ->use( targ, inflictor, attacker );
+		} else if ( targ->pain ) {
+			targ->pain( targ, attacker, damage );		// Q3Doom: shootable Doom doors
 		}
 		return;
 	}
@@ -961,6 +971,16 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		if ( targ->flags & FL_GODMODE ) {
 			return;
 		}
+
+		// Q3Doom: invulnerability (all but a telefrag)
+		if ( client && client->ps.powerups[DPW_INVULNERABILITY] && damage < 1000 ) {
+			return;
+		}
+	}
+
+	// Q3Doom: half damage to players in baby mode
+	if ( client && g_doomSkill.integer == DOOM_SK_BABY ) {
+		damage >>= 1;
 	}
 
 	// battlesuit protects from all radius damage (but takes knockback)

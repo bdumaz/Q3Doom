@@ -464,9 +464,10 @@ static consoleCommand_t	commands[] = {
 	{ "-zoom", CG_ZoomUp_f },
 	{ "sizeup", CG_SizeUp_f },
 	{ "sizedown", CG_SizeDown_f },
-	{ "weapnext", CG_NextWeapon_f },
-	{ "weapprev", CG_PrevWeapon_f },
-	{ "weapon", CG_Weapon_f },
+	{ "weapnext", CG_DoomNextWeapon_f },		// Q3Doom: Doom weapons
+	{ "weapprev", CG_DoomPrevWeapon_f },
+	{ "weapon", CG_DoomWeapon_f },
+	{ "doom_automap", CG_DoomAutomap_f },
 	{ "tell_target", CG_TellTarget_f },
 	{ "tell_attacker", CG_TellAttacker_f },
 	{ "vtell_target", CG_VoiceTellTarget_f },
@@ -560,6 +561,9 @@ void CG_InitConsoleCommands( void ) {
 	trap_AddCommand ("vosay_team");
 	trap_AddCommand ("votell");
 	trap_AddCommand ("give");
+	trap_AddCommand ("idkfa");		// Q3Doom: Doom cheats (g_cmds.c)
+	trap_AddCommand ("idfa");
+	trap_AddCommand ("iddqd");
 	trap_AddCommand ("god");
 	trap_AddCommand ("notarget");
 	trap_AddCommand ("noclip");

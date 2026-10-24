@@ -453,17 +453,8 @@ void ClientTimerActions( gentity_t *ent, int msec ) {
 				G_AddEvent( ent, EV_POWERUP_REGEN, 0 );
 			}
 #endif
-		} else {
-			// count down health when over max
-			if ( ent->health > client->ps.stats[STAT_MAX_HEALTH] ) {
-				ent->health--;
-			}
 		}
-
-		// count down armor when over max
-		if ( client->ps.stats[STAT_ARMOR] > client->ps.stats[STAT_MAX_HEALTH] ) {
-			client->ps.stats[STAT_ARMOR]--;
-		}
+		// Q3Doom: health and armor above 100 stay, as in Doom
 	}
 #ifdef MISSIONPACK
 	if( bg_itemlist[client->ps.stats[STAT_PERSISTANT_POWERUP]].giTag == PW_AMMOREGEN ) {
@@ -559,7 +550,7 @@ void ClientEvents( gentity_t *ent, int oldEventSequence ) {
 			if ( ent->s.eType != ET_PLAYER ) {
 				break;		// not in the player model
 			}
-			if ( g_dmflags.integer & DF_NO_FALLING ) {
+			if ( ( g_dmflags.integer & DF_NO_FALLING ) || !g_fallDamage.integer ) {
 				break;
 			}
 			if ( event == EV_FALL_FAR ) {
@@ -573,7 +564,8 @@ void ClientEvents( gentity_t *ent, int oldEventSequence ) {
 			break;
 
 		case EV_FIRE_WEAPON:
-			FireWeapon( ent );
+			// Q3Doom: the Doom action that fired
+			Doom_FireWeapon( ent, client->ps.eventParms[ i & (MAX_PS_EVENTS-1) ] );
 			break;
 
 		case EV_USE_ITEM1:		// teleporter
@@ -853,23 +845,13 @@ void ClientThink_real( gentity_t *ent ) {
 		client->ps.speed *= 1.3;
 	}
 
-	// Let go of the hook if we aren't firing
-	if ( client->ps.weapon == WP_GRAPPLING_HOOK &&
-		client->hook && !( ucmd->buttons & BUTTON_ATTACK ) ) {
-		Weapon_HookFree(client->hook);
-	}
 
 	// set up for pmove
 	oldEventSequence = client->ps.eventSequence;
 
 	memset (&pm, 0, sizeof(pm));
 
-	// check for the hit-scan gauntlet, don't let the action
-	// go through as an attack unless it actually hits something
-	if ( client->ps.weapon == WP_GAUNTLET && !( ucmd->buttons & BUTTON_TALK ) &&
-		( ucmd->buttons & BUTTON_ATTACK ) && client->ps.weaponTime <= 0 ) {
-		pm.gauntletHit = CheckGauntletAttack( ent );
-	}
+	// Q3Doom: no gauntlet (ps.weapon holds Doom weapons, the fist is Doom's)
 
 	if ( ent->flags & FL_FORCE_GESTURE ) {
 		ent->flags &= ~FL_FORCE_GESTURE;
@@ -1018,8 +1000,8 @@ void ClientThink_real( gentity_t *ent ) {
 				return;
 			}
 		
-			// pressing attack or use is the normal respawn method
-			if ( ucmd->buttons & ( BUTTON_ATTACK | BUTTON_USE_HOLDABLE ) ) {
+			// pressing attack or use is the normal respawn method (Q3Doom: +use too)
+			if ( ucmd->buttons & ( BUTTON_ATTACK | BUTTON_USE_HOLDABLE | BUTTON_USE ) ) {
 				respawn( ent );
 			}
 		}
@@ -1128,8 +1110,11 @@ void ClientEndFrame( gentity_t *ent ) {
 
 	pers = &ent->client->pers;
 
-	// turn off any expired powerups
+	// turn off any expired powerups (Q3Doom: berserk and the computer map last until death)
 	for ( i = 0 ; i < MAX_POWERUPS ; i++ ) {
+		if ( i == DPW_STRENGTH || i == DPW_ALLMAP ) {
+			continue;
+		}
 		if ( ent->client->ps.powerups[ i ] < level.time ) {
 			ent->client->ps.powerups[ i ] = 0;
 		}

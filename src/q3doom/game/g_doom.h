@@ -95,6 +95,23 @@ void		Doom_ChangeSwitchTexture( int line, qboolean useAgain );
 void		Doom_SetFlat( int sector, const char *flat );
 void		Doom_PlaySectorSound( int sector, const char *sound );
 
+void		Doom_Message( gentity_t *ent, const char *message );
+
+// g_doom_weapon.c
+int			Doom_Random( void );
+qboolean	Doom_IsTarget( gentity_t *ent );
+gentity_t	*Doom_AimLineAttack( gentity_t *shooter, const vec3_t eye, float yaw, float range, float *pitch );
+void		Doom_SpawnFx( const vec3_t origin, int state, int flags );
+void		Doom_FireWeapon( gentity_t *ent, int parm );
+void		Doom_MissileImpact( gentity_t *ent, trace_t *trace );
+
+// g_doom_items.c
+void		Doom_SpawnItems( void );
+void		Doom_UpdateItems( void );
+int			Doom_TouchItem( gentity_t *ent, gentity_t *other );
+void		Doom_GivePlayerStart( gclient_t *client );
+void		Doom_GiveAll( gentity_t *ent, qboolean keys );
+
 // g_doom_mover.c
 void		SP_func_doom_plane( gentity_t *ent );
 void		Doom_UpdateHeights( void );

@@ -158,7 +158,7 @@ target_link_libraries(q3doom_qagame PRIVATE libdoom)
 
 file(GLOB QD_CGAME_SRC ${QD}/cgame/*.c)
 q3_module(q3doom_cgame cgame q3doom ${SRC}/cgame/cgame.def ${QD_CGAME_SRC}
-  ${QD}/game/bg_misc.c ${QD}/game/bg_pmove.c ${QD}/game/bg_slidemove.c ${QD}/game/bg_doom.c
+  ${QD}/game/bg_misc.c ${QD}/game/bg_pmove.c ${QD}/game/bg_slidemove.c ${QD}/game/bg_doom.c ${QD}/game/bg_doom_weapon.c
   ${SRC}/game/q_math.c ${SRC}/game/q_shared.c)
 target_link_libraries(q3doom_cgame PRIVATE libdoom)
 

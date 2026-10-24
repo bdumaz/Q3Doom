@@ -275,6 +275,12 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 #endif
 	other = &g_entities[trace->entityNum];
 
+	// Q3Doom: rockets, plasma and BFG balls
+	if ( ent->doomMissile ) {
+		Doom_MissileImpact( ent, trace );
+		return;
+	}
+
 	// check for bounce
 	if ( !other->takedamage &&
 		( ent->s.eFlags & ( EF_BOUNCE | EF_BOUNCE_HALF ) ) ) {

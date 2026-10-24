@@ -233,8 +233,6 @@ void Cmd_Give_f (gentity_t *ent)
 	gitem_t		*it;
 	int			i;
 	qboolean	give_all;
-	gentity_t		*it_ent;
-	trace_t		trace;
 
 	if ( !CheatsOk( ent ) ) {
 		return;
@@ -247,77 +245,85 @@ void Cmd_Give_f (gentity_t *ent)
 	else
 		give_all = qfalse;
 
-	if (give_all || Q_stricmp( name, "health") == 0)
+	// Q3Doom: Doom's inventory
+	if (give_all)
 	{
-		ent->health = ent->client->ps.stats[STAT_MAX_HEALTH];
-		if (!give_all)
-			return;
+		Doom_GiveAll( ent, qtrue );
+		ent->health = ent->client->ps.stats[STAT_HEALTH] = 100;
+		return;
 	}
 
-	if (give_all || Q_stricmp(name, "weapons") == 0)
+	if (Q_stricmp( name, "health") == 0)
 	{
-		ent->client->ps.stats[STAT_WEAPONS] = (1 << WP_NUM_WEAPONS) - 1 - 
-			( 1 << WP_GRAPPLING_HOOK ) - ( 1 << WP_NONE );
-		if (!give_all)
-			return;
+		ent->health = ent->client->ps.stats[STAT_HEALTH] = 100;
+		return;
 	}
 
-	if (give_all || Q_stricmp(name, "ammo") == 0)
+	if (Q_stricmp(name, "weapons") == 0)
 	{
-		for ( i = 0 ; i < MAX_WEAPONS ; i++ ) {
-			ent->client->ps.ammo[i] = 999;
+		for ( i = 0 ; i < DWP_NUMWEAPONS ; i++ ) {
+			if ( i != DWP_SUPERSHOTGUN ) {
+				ent->client->ps.stats[STAT_WEAPONS] |= 1 << DOOM_WP( i );
+			}
 		}
-		if (!give_all)
-			return;
+		return;
 	}
 
-	if (give_all || Q_stricmp(name, "armor") == 0)
+	if (Q_stricmp(name, "ammo") == 0)
+	{
+		for ( i = 0 ; i < DAM_NUMAMMO ; i++ ) {
+			ent->client->ps.ammo[i] = BG_DoomMaxAmmo( &ent->client->ps, i );
+		}
+		return;
+	}
+
+	if (Q_stricmp(name, "armor") == 0)
 	{
 		ent->client->ps.stats[STAT_ARMOR] = 200;
-
-		if (!give_all)
-			return;
-	}
-
-	if (Q_stricmp(name, "excellent") == 0) {
-		ent->client->ps.persistant[PERS_EXCELLENT_COUNT]++;
-		return;
-	}
-	if (Q_stricmp(name, "impressive") == 0) {
-		ent->client->ps.persistant[PERS_IMPRESSIVE_COUNT]++;
-		return;
-	}
-	if (Q_stricmp(name, "gauntletaward") == 0) {
-		ent->client->ps.persistant[PERS_GAUNTLET_FRAG_COUNT]++;
-		return;
-	}
-	if (Q_stricmp(name, "defend") == 0) {
-		ent->client->ps.persistant[PERS_DEFEND_COUNT]++;
-		return;
-	}
-	if (Q_stricmp(name, "assist") == 0) {
-		ent->client->ps.persistant[PERS_ASSIST_COUNT]++;
+		ent->client->ps.stats[STAT_DOOM_ARMORTYPE] = 2;
 		return;
 	}
 
-	// spawn a specific item right on the player
-	if ( !give_all ) {
-		it = BG_FindItem (name);
-		if (!it) {
+	if (Q_stricmp(name, "keys") == 0)
+	{
+		ent->client->ps.stats[STAT_DOOM_KEYS] = ( 1 << ( DOOM_IT_REDSKULL + 1 ) ) - 1;
+		return;
+	}
+
+	// a specific item, by class name with or without "doom_" (give shotgun)
+	for ( it = bg_itemlist + 1 ; it->classname ; it++ ) {
+		if ( !Q_stricmp( it->classname, name ) || !Q_stricmp( it->classname + 5, name ) ) {
+			gentity_t	fake;
+
+			memset( &fake, 0, sizeof( fake ) );
+			fake.item = it;
+			if ( Doom_TouchItem( &fake, ent ) ) {
+				G_AddEvent( ent, EV_ITEM_PICKUP, it - bg_itemlist );
+			}
 			return;
 		}
-
-		it_ent = G_Spawn();
-		VectorCopy( ent->r.currentOrigin, it_ent->s.origin );
-		it_ent->classname = it->classname;
-		G_SpawnItem (it_ent, it);
-		FinishSpawningItem(it_ent );
-		memset( &trace, 0, sizeof( trace ) );
-		Touch_Item (it_ent, ent, &trace);
-		if (it_ent->inuse) {
-			G_FreeEntity( it_ent );
-		}
 	}
+	trap_SendServerCommand( ent-g_entities, va( "print \"give: no item %s\n\"", name ) );
+}
+
+/*
+==================
+Cmd_DoomCheat_f
+
+Q3Doom: idkfa (everything and the keys), idfa (no keys), iddqd (god mode)
+==================
+*/
+void Cmd_DoomCheat_f( gentity_t *ent, const char *cheat ) {
+	if ( !CheatsOk( ent ) ) {
+		return;
+	}
+	if ( !Q_stricmp( cheat, "iddqd" ) ) {
+		ent->flags ^= FL_GODMODE;
+		trap_SendServerCommand( ent-g_entities, va( "dmsg \"%s\"", ( ent->flags & FL_GODMODE ) ? "Degreelessness Mode On" : "Degreelessness Mode Off" ) );
+		return;
+	}
+	Doom_GiveAll( ent, !Q_stricmp( cheat, "idkfa" ) );
+	trap_SendServerCommand( ent-g_entities, va( "dmsg \"%s\"", !Q_stricmp( cheat, "idkfa" ) ? "Very Happy Ammo Added" : "Ammo (no keys) Added" ) );
 }
 
 
@@ -1660,6 +1666,8 @@ void ClientCommand( int clientNum ) {
 
 	if (Q_stricmp (cmd, "give") == 0)
 		Cmd_Give_f (ent);
+	else if (!Q_stricmp (cmd, "idkfa") || !Q_stricmp (cmd, "idfa") || !Q_stricmp (cmd, "iddqd"))
+		Cmd_DoomCheat_f (ent, cmd);
 	else if (Q_stricmp (cmd, "god") == 0)
 		Cmd_God_f (ent);
 	else if (Q_stricmp (cmd, "notarget") == 0)

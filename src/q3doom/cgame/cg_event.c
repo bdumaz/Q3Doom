@@ -434,6 +434,13 @@ void CG_PainEvent( centity_t *cent, int health ) {
 		return;
 	}
 
+	// Q3Doom: Doom's player pain sound
+	if ( CG_DoomPainSound( cent ) ) {
+		cent->pe.painTime = cg.time;
+		cent->pe.painDirection ^= 1;
+		return;
+	}
+
 	if ( health < 25 ) {
 		snd = "*pain25_1.wav";
 	} else if ( health < 50 ) {
@@ -479,6 +486,11 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 
 	if ( !event ) {
 		DEBUGNAME("ZEROEVENT");
+		return;
+	}
+
+	// Q3Doom: Doom weapons, sounds, effects and pickups
+	if ( CG_DoomEntityEvent( cent, position, event ) ) {
 		return;
 	}
 

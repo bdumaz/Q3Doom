@@ -1147,7 +1147,17 @@ netField_t	playerStateFields[] =
 { PSF(grapplePoint[1]), 0 },
 { PSF(grapplePoint[2]), 0 },
 { PSF(jumppad_ent), 10 },
-{ PSF(loopSound), 16 }
+{ PSF(loopSound), 16 },
+// Q3Doom: Doom weapon sprites
+{ PSF(doomWeaponState), 11 },
+{ PSF(doomWeaponTics), -8 },
+{ PSF(doomFlashState), 11 },
+{ PSF(doomFlashTics), -8 },
+{ PSF(doomWeaponY), 8 },
+{ PSF(doomTicFrac), 10 },
+{ PSF(doomWeaponFlags), 16 },
+{ PSF(doomPendingWeapon), 4 },
+{ PSF(doomCmdWeapon), 8 }
 };
 
 /*

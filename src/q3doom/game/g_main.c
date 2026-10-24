@@ -81,6 +81,8 @@ vmCvar_t	pmove_fixed;
 vmCvar_t	g_stepHeight;
 vmCvar_t	g_doomSkill;
 vmCvar_t	g_doomAllKeys;
+vmCvar_t	g_fallDamage;
+vmCvar_t	g_autoaim;
 vmCvar_t	pmove_msec;
 vmCvar_t	g_rankings;
 vmCvar_t	g_listEntity;
@@ -185,6 +187,10 @@ static cvarTable_t		gameCvarTable[] = {
 	// cgame reads it from the serverinfo
 	{ &g_doomSkill, "g_doomSkill", DOOM_DEFAULT_SKILL, CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_LATCH, 0, qfalse},
 	{ &g_doomAllKeys, "g_doomAllKeys", "0", CVAR_CHEAT, 0, qfalse},
+	// Q3Doom: Quake 3 falling damage (Doom has none), 0 turns it off
+	{ &g_fallDamage, "g_fallDamage", "1", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},
+	// Q3Doom: Doom's vertical autoaim on hitscan shots and missiles (off: free aim)
+	{ &g_autoaim, "g_autoaim", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},
 	{ &pmove_msec, "pmove_msec", "8", CVAR_SYSTEMINFO, 0, qfalse},
 
 	{ &g_rankings, "g_rankings", "0", 0, 0, qfalse}

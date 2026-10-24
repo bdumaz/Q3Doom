@@ -374,9 +374,40 @@ LINE SPECIALS
 =====================================================================
 */
 
+/*
+=================
+Doom_PlayerHasKey
+
+A card or the skull of the color (DOOM_KEY_*) opens the door;
+g_doomAllKeys (cheat) opens every door
+=================
+*/
 qboolean Doom_PlayerHasKey( gentity_t *ent, int key ) {
-	// keys are picked up in M5; g_doomAllKeys (cheat) lets every door open
-	return g_doomAllKeys.integer != 0;
+	int		keys;
+
+	if ( g_doomAllKeys.integer ) {
+		return qtrue;
+	}
+	if ( !ent || !ent->client || key < DOOM_KEY_BLUE || key > DOOM_KEY_RED ) {
+		return qfalse;
+	}
+	keys = ent->client->ps.stats[STAT_DOOM_KEYS];
+	// DOOM_KEY_BLUE..RED follow the card order, the skulls come 3 later
+	return ( keys & ( ( 1 << ( key - 1 ) ) | ( 1 << ( key - 1 + 3 ) ) ) ) != 0;
+}
+
+/*
+=================
+Doom_Message
+
+A message on the player's Doom message line (top left)
+=================
+*/
+void Doom_Message( gentity_t *ent, const char *message ) {
+	if ( !ent || !ent->client ) {
+		return;
+	}
+	trap_SendServerCommand( ent - g_entities, va( "dmsg \"%s\"", message ) );
 }
 
 void Doom_KeyMessage( gentity_t *ent, int key ) {
@@ -385,8 +416,8 @@ void Doom_KeyMessage( gentity_t *ent, int key ) {
 	if ( !ent || !ent->client ) {
 		return;
 	}
-	trap_SendServerCommand( ent - g_entities, va( "cp \"You need a %s key to open this door\n\"", colors[key] ) );
-	SoundAt( ent->r.currentOrigin, "DSOOF" );
+	Doom_Message( ent, va( "You need a %s key to open this door", colors[key] ) );
+	G_AddEvent( ent, EV_DOOM_SOUND, sfx_oof );
 }
 
 /*
@@ -643,6 +674,7 @@ static void PlayerInSpecialSector( gentity_t *ent, int tic ) {
 	const float	*o = ent->client->ps.origin;
 	int			sector = doom_map_sector_at( doomLevel.map, o[0], o[1] );
 	int			damage = 0;
+	qboolean	ironfeet;
 
 	if ( sector < 0 || ent->health <= 0 ) {
 		return;
@@ -652,15 +684,26 @@ static void PlayerInSpecialSector( gentity_t *ent, int tic ) {
 		return;
 	}
 
+	// the radiation suit protects, but not always from the worst floors
+	ironfeet = ent->client->ps.powerups[DPW_IRONFEET] != 0;
 	switch ( doomLevel.special[sector] ) {
 	case 5:		// hellslime
+		if ( ironfeet ) {
+			return;
+		}
 		damage = 10;
 		break;
 	case 7:		// nukage
+		if ( ironfeet ) {
+			return;
+		}
 		damage = 5;
 		break;
 	case 16:	// super hellslime
 	case 4:		// strobe hurt
+		if ( ironfeet && Doom_Random() >= 5 ) {
+			return;
+		}
 		damage = 20;
 		break;
 	case 11:	// exit when almost dead (E1M8)
@@ -672,7 +715,7 @@ static void PlayerInSpecialSector( gentity_t *ent, int tic ) {
 	case 9:		// secret
 		doomLevel.special[sector] = 0;
 		doomLevel.secretsFound++;
-		trap_SendServerCommand( ent - g_entities, "cp \"You found a secret area!\n\"" );
+		Doom_Message( ent, "You found a secret area!" );
 		return;
 	default:
 		return;
@@ -689,6 +732,7 @@ void Doom_RunFrame( void ) {
 		return;
 	}
 	Doom_UpdateHeights();
+	Doom_UpdateItems();
 
 	tic = ( level.time - level.startTime ) * DOOM_TICRATE / 1000;
 	while ( doomLevel.lastTic < tic ) {
@@ -825,6 +869,7 @@ void Doom_StartLevel( void ) {
 	Doom_SpawnSectorSpecials();
 	Doom_SpawnDoorTriggers();
 	SpawnThingBlockers();
+	Doom_SpawnItems();
 }
 
 void Doom_ShutdownLevel( void ) {
@@ -864,4 +909,16 @@ void Doom_StatusCommand( void ) {
 		}
 	}
 	G_Printf( "secrets found: %d\n", doomLevel.secretsFound );
+
+	for ( i = 0 ; i < level.maxclients ; i++ ) {
+		gclient_t	*cl = &level.clients[i];
+
+		if ( cl->pers.connected != CON_CONNECTED ) {
+			continue;
+		}
+		G_Printf( "player %d: health %d armor %d (type %d) weapon %d state %d keys %d ammo %d %d %d %d weapons 0x%x\n", i,
+			cl->ps.stats[STAT_HEALTH], cl->ps.stats[STAT_ARMOR], cl->ps.stats[STAT_DOOM_ARMORTYPE], DOOM_DWP( cl->ps.weapon ),
+			cl->ps.doomWeaponState, cl->ps.stats[STAT_DOOM_KEYS], cl->ps.ammo[DAM_CLIP], cl->ps.ammo[DAM_SHELL],
+			cl->ps.ammo[DAM_CELL], cl->ps.ammo[DAM_MISL], cl->ps.stats[STAT_WEAPONS] );
+	}
 }

@@ -416,9 +416,6 @@ Touch_Item
 ===============
 */
 void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
-	int			respawn;
-	qboolean	predict;
-
 	if (!other->client)
 		return;
 	if (other->health < 1)
@@ -429,125 +426,20 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 		return;
 	}
 
+	// Q3Doom: Doom's rules (P_TouchSpecialThing); a Doom item is used up
+	if ( !Doom_TouchItem( ent, other ) ) {
+		return;
+	}
+
 	G_LogPrintf( "Item: %i %s\n", other->s.number, ent->item->classname );
 
-	predict = other->client->pers.predictItemPickup;
-
-	// call the item-specific pickup function
-	switch( ent->item->giType ) {
-	case IT_WEAPON:
-		respawn = Pickup_Weapon(ent, other);
-//		predict = qfalse;
-		break;
-	case IT_AMMO:
-		respawn = Pickup_Ammo(ent, other);
-//		predict = qfalse;
-		break;
-	case IT_ARMOR:
-		respawn = Pickup_Armor(ent, other);
-		break;
-	case IT_HEALTH:
-		respawn = Pickup_Health(ent, other);
-		break;
-	case IT_POWERUP:
-		respawn = Pickup_Powerup(ent, other);
-		predict = qfalse;
-		break;
-#ifdef MISSIONPACK
-	case IT_PERSISTANT_POWERUP:
-		respawn = Pickup_PersistantPowerup(ent, other);
-		break;
-#endif
-	case IT_TEAM:
-		respawn = Pickup_Team(ent, other);
-		break;
-	case IT_HOLDABLE:
-		respawn = Pickup_Holdable(ent, other);
-		break;
-	default:
-		return;
-	}
-
-	if ( !respawn ) {
-		return;
-	}
-
-	// play the normal pickup sound
-	if (predict) {
-		G_AddPredictableEvent( other, EV_ITEM_PICKUP, ent->s.modelindex );
-	} else {
-		G_AddEvent( other, EV_ITEM_PICKUP, ent->s.modelindex );
-	}
-
-	// powerup pickups are global broadcasts
-	if ( ent->item->giType == IT_POWERUP || ent->item->giType == IT_TEAM) {
-		// if we want the global sound to play
-		if (!ent->speed) {
-			gentity_t	*te;
-
-			te = G_TempEntity( ent->s.pos.trBase, EV_GLOBAL_ITEM_PICKUP );
-			te->s.eventParm = ent->s.modelindex;
-			te->r.svFlags |= SVF_BROADCAST;
-		} else {
-			gentity_t	*te;
-
-			te = G_TempEntity( ent->s.pos.trBase, EV_GLOBAL_ITEM_PICKUP );
-			te->s.eventParm = ent->s.modelindex;
-			// only send this temp entity to a single client
-			te->r.svFlags |= SVF_SINGLECLIENT;
-			te->r.singleClient = other->s.number;
-		}
-	}
+	// the pickup sound, message and flash, predicted by the client
+	G_AddPredictableEvent( other, EV_ITEM_PICKUP, ent->s.modelindex );
 
 	// fire item targets
 	G_UseTargets (ent, other);
 
-	// wait of -1 will not respawn
-	if ( ent->wait == -1 ) {
-		ent->r.svFlags |= SVF_NOCLIENT;
-		ent->s.eFlags |= EF_NODRAW;
-		ent->r.contents = 0;
-		ent->unlinkAfterEvent = qtrue;
-		return;
-	}
-
-	// non zero wait overrides respawn time
-	if ( ent->wait ) {
-		respawn = ent->wait;
-	}
-
-	// random can be used to vary the respawn time
-	if ( ent->random ) {
-		respawn += crandom() * ent->random;
-		if ( respawn < 1 ) {
-			respawn = 1;
-		}
-	}
-
-	// dropped items will not respawn
-	if ( ent->flags & FL_DROPPED_ITEM ) {
-		ent->freeAfterEvent = qtrue;
-	}
-
-	// picked up items still stay around, they just don't
-	// draw anything.  This allows respawnable items
-	// to be placed on movers.
-	ent->r.svFlags |= SVF_NOCLIENT;
-	ent->s.eFlags |= EF_NODRAW;
-	ent->r.contents = 0;
-
-	// ZOID
-	// A negative respawn times means to never respawn this item (but don't 
-	// delete it).  This is used by items that are respawned by third party 
-	// events such as ctf flags
-	if ( respawn <= 0 ) {
-		ent->nextthink = 0;
-		ent->think = 0;
-	} else {
-		ent->nextthink = level.time + respawn * 1000;
-		ent->think = RespawnItem;
-	}
-	trap_LinkEntity( ent );
+	G_FreeEntity( ent );
 }
 
 
@@ -800,9 +692,7 @@ ClearRegisteredItems
 void ClearRegisteredItems( void ) {
 	memset( itemRegistered, 0, sizeof( itemRegistered ) );
 
-	// players always start with the base weapon
-	RegisterItem( BG_FindItemForWeapon( WP_MACHINEGUN ) );
-	RegisterItem( BG_FindItemForWeapon( WP_GAUNTLET ) );
+	// Q3Doom: the starting fist and pistol are drawn as Doom sprites, nothing to register
 #ifdef MISSIONPACK
 	if( g_gametype.integer == GT_HARVESTER ) {
 		RegisterItem( BG_FindItem( "Red Cube" ) );

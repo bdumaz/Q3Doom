@@ -1208,6 +1208,17 @@ typedef struct playerState_s {
 	int			loopSound;
 	int			jumppad_ent;	// jumppad entity hit this frame
 
+	// Q3Doom: the Doom weapon sprites (p_pspr.c), run by Pmove so they are predicted
+	int			doomWeaponState;	// Doom state of the weapon sprite, 0 (S_NULL) when none
+	int			doomWeaponTics;		// tics left in it, -1 forever
+	int			doomFlashState;		// muzzle flash sprite
+	int			doomFlashTics;
+	int			doomWeaponY;		// height of the weapon sprite (32 up .. 128 down)
+	int			doomTicFrac;		// msec * 35 not yet run as Doom tics
+	int			doomWeaponFlags;	// refire count, attack held, extra light (DOOMWF_*)
+	int			doomPendingWeapon;	// weapon to raise once the current one is down, 0 none
+	int			doomCmdWeapon;		// usercmd weapon last seen: only new selections count
+
 	// not communicated over the net at all
 	int			ping;			// server to game info for scoreboard
 	int			pmove_framecount;	// FIXME: don't transmit over the network

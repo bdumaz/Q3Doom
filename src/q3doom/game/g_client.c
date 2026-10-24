@@ -1176,19 +1176,10 @@ void ClientSpawn(gentity_t *ent) {
 
 	client->ps.clientNum = index;
 
-	client->ps.stats[STAT_WEAPONS] = ( 1 << WP_MACHINEGUN );
-	if ( g_gametype.integer == GT_TEAM ) {
-		client->ps.ammo[WP_MACHINEGUN] = 50;
-	} else {
-		client->ps.ammo[WP_MACHINEGUN] = 100;
-	}
-
-	client->ps.stats[STAT_WEAPONS] |= ( 1 << WP_GAUNTLET );
-	client->ps.ammo[WP_GAUNTLET] = -1;
-	client->ps.ammo[WP_GRAPPLING_HOOK] = -1;
-
-	// health will count down towards max_health
-	ent->health = client->ps.stats[STAT_HEALTH] = client->ps.stats[STAT_MAX_HEALTH] + 25;
+	// Q3Doom: Doom's starting inventory (G_PlayerReborn), raising the pistol
+	trap_GetUsercmd( client - level.clients, &ent->client->pers.cmd );
+	Doom_GivePlayerStart( client );
+	ent->health = client->ps.stats[STAT_HEALTH];
 
 	G_SetOrigin( ent, spawn_origin );
 	VectorCopy( spawn_origin, client->ps.origin );
@@ -1205,9 +1196,6 @@ void ClientSpawn(gentity_t *ent) {
 		G_KillBox( ent );
 		trap_LinkEntity (ent);
 
-		// force the base weapon up
-		client->ps.weapon = WP_MACHINEGUN;
-		client->ps.weaponstate = WEAPON_READY;
 
 	}
 
@@ -1229,15 +1217,7 @@ void ClientSpawn(gentity_t *ent) {
 		// fire the targets of the spawn point
 		G_UseTargets( spawnPoint, ent );
 
-		// select the highest weapon number available, after any
-		// spawn given items have fired
-		client->ps.weapon = 1;
-		for ( i = WP_NUM_WEAPONS - 1 ; i > 0 ; i-- ) {
-			if ( client->ps.stats[STAT_WEAPONS] & ( 1 << i ) ) {
-				client->ps.weapon = i;
-				break;
-			}
-		}
+
 	}
 
 	// run a client frame to drop exactly to the floor,

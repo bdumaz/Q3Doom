@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../game/q_shared.h"
 #include "tr_types.h"
 #include "../game/bg_public.h"
+#include "../game/bg_doom.h"
 #include "cg_public.h"
 
 
@@ -1123,6 +1124,7 @@ extern	vmCvar_t		cg_gun_x;
 extern	vmCvar_t		cg_gun_y;
 extern	vmCvar_t		cg_gun_z;
 extern	vmCvar_t		cg_drawGun;
+extern	vmCvar_t		cg_hudStyle;		// Q3Doom: 0 Doom status bar, 1 Quake 3 HUD
 extern	vmCvar_t		cg_viewsize;
 extern	vmCvar_t		cg_tracerChance;
 extern	vmCvar_t		cg_tracerWidth;
@@ -1678,6 +1680,41 @@ void		CG_DoomLightsChanged( void );
 void		CG_DoomAddToScene( void );
 void		CG_DoomClipMove( const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int mask, trace_t *tr );
 int			CG_DoomPointContents( const vec3_t point );
+qboolean	CG_DoomMap( void );
+const struct doom_map_s *CG_DoomMapData( void );
+const struct doom_wad_s *CG_DoomWad( void );
+int			CG_DoomSectorAt( const vec3_t point );
+int			CG_DoomSectorLight( int sector );
+int			CG_DoomPowerTics( int power );
+qboolean	CG_DoomPowerActive( int power );
+int			CG_DoomSpriteLump( int state, int rotation, qboolean *flip );
+int			CG_DoomAnimatedState( int state, int tics );
+void		CG_DoomAddSprite( const vec3_t origin, float angle, int state, int light );
+void		CG_DoomSpawnFx( const vec3_t origin, int state, int flags );
+void		CG_DoomItem( centity_t *cent );
+void		CG_DoomMissile( centity_t *cent );
+sfxHandle_t	CG_DoomSound( int sfx );
+
+// cg_doom_weapon.c (Q3Doom)
+void		CG_DoomDrawWeapon( void );
+void		CG_DoomWeapon_f( void );
+void		CG_DoomNextWeapon_f( void );
+void		CG_DoomPrevWeapon_f( void );
+void		CG_DoomWeaponFrame( void );
+qboolean	CG_DoomEntityEvent( centity_t *cent, vec3_t position, int event );
+qboolean	CG_DoomPainSound( centity_t *cent );
+
+// cg_doom_hud.c (Q3Doom)
+void		CG_DoomHudInit( void );
+void		CG_DoomHudShutdown( void );
+void		CG_DoomHudScale( float *x0, float *sx, float *sy );
+qhandle_t	CG_DoomPatchShader( int lump );
+qboolean	CG_DoomHudActive( void );
+void		CG_DoomDraw2D( void );
+void		CG_DoomMessage( const char *text );
+void		CG_DoomBonus( void );
+void		CG_DoomDamage( int damage, int yawByte );
+void		CG_DoomAutomap_f( void );
 
 // the engine's Doom data, shared read-only with this native module
 const struct doom_map_s *trap_Doom_GetMap( const char *mapname );

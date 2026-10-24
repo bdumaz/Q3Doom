@@ -80,4 +80,6 @@ void PM_AddEvent( int newEvent );
 qboolean	PM_SlideMove( qboolean gravity );
 void		PM_StepSlideMove( qboolean gravity );
 
+void		PM_DoomWeapon( void );		// Q3Doom: bg_doom_weapon.c
+
 

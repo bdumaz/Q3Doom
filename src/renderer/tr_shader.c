@@ -86,6 +86,24 @@ static shader_t *R_DoomShader( const char *name ) {
 	image_t		*image;
 	int			numFrames, i;
 
+	// cgame overlays: the invulnerability colormap (inverts what is under it)
+	// and the automap lines (vertex colors)
+	if ( !Q_stricmp( name, "doom/invert" ) ) {
+		stages[0].bundle[0].image[0] = tr.whiteImage;
+		stages[0].active = qtrue;
+		stages[0].rgbGen = CGEN_IDENTITY;
+		stages[0].stateBits = GLS_SRCBLEND_ONE_MINUS_DST_COLOR | GLS_DSTBLEND_ZERO;
+		return FinishShader();
+	}
+	if ( !Q_stricmp( name, "doom/amline" ) ) {
+		stages[0].bundle[0].image[0] = tr.whiteImage;
+		stages[0].active = qtrue;
+		stages[0].rgbGen = CGEN_VERTEX;
+		stages[0].stateBits = GLS_DEFAULT;
+		shader.cullType = CT_TWO_SIDED;
+		return FinishShader();
+	}
+
 	if ( !slash || slash - s >= sizeof( kind ) ) {
 		shader.defaultShader = qtrue;
 		return FinishShader();
@@ -2580,7 +2598,8 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 
 
 	// Q3Doom: Doom world surfaces and sprites
-	if ( !Q_stricmpn( name, "doom/thing/", 11 ) || ( !Q_stricmpn( name, "doom/", 5 ) && lightmapIndex != LIGHTMAP_2D ) ) {
+	if ( !Q_stricmpn( name, "doom/thing/", 11 ) || !Q_stricmp( name, "doom/invert" ) || !Q_stricmp( name, "doom/amline" )
+		|| ( !Q_stricmpn( name, "doom/", 5 ) && lightmapIndex != LIGHTMAP_2D ) ) {
 		return R_DoomShader( name );
 	}
 

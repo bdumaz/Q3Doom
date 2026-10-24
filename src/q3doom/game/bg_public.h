@@ -28,7 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define	GAME_VERSION		"baseq3-1"
 
 #define	DEFAULT_GRAVITY		800
-#define	GIB_HEALTH			-40
+#define	GIB_HEALTH			-100	// Q3Doom: Doom gibs below -spawnhealth (P_KillMobj)
 #define	ARMOR_PROTECTION	0.66
 
 #define	MAX_ITEMS			256
@@ -221,8 +221,23 @@ typedef enum {
 	STAT_ARMOR,				
 	STAT_DEAD_YAW,					// look this direction when dead (FIXME: get rid of?)
 	STAT_CLIENTS_READY,				// bit mask of clients wishing to exit the intermission (FIXME: configstring?)
-	STAT_MAX_HEALTH					// health / armor limit, changable by handicap
+	STAT_MAX_HEALTH,				// health / armor limit, changable by handicap
+
+	// Q3Doom
+	STAT_DOOM_ARMORTYPE,			// 0 none, 1 green (saves 1/3), 2 blue (saves 1/2)
+	STAT_DOOM_KEYS,					// 1 << DOOM_IT_* (cards and skulls)
+	STAT_DOOM_BACKPACK				// 1 once a backpack doubled the ammo limits
 } statIndex_t;
+
+// Q3Doom: Doom powers in ps->powerups[] (above the Quake 3 ones the stock code
+// still reads). Timed ones hold the level.time they run out; berserk holds the
+// time it was picked up and the computer map 1, both until death.
+#define DPW_INVULNERABILITY		10
+#define DPW_STRENGTH			11
+#define DPW_INVISIBILITY		12
+#define DPW_IRONFEET			13
+#define DPW_ALLMAP				14
+#define DPW_INFRARED			15
 
 
 // player_state->persistant[] indexes
@@ -458,9 +473,18 @@ typedef enum {
 	EV_TAUNT_FOLLOWME,
 	EV_TAUNT_GETFLAG,
 	EV_TAUNT_GUARDBASE,
-	EV_TAUNT_PATROL
+	EV_TAUNT_PATROL,
+
+	// Q3Doom
+	EV_DOOM_SOUND,			// eventParm: a Doom sound (sfx_*), no configstring needed
+	EV_DOOM_FX				// a Doom sprite animation: s.frame the first state, eventParm DOOMFX_* flags
 
 } entity_event_t;
+
+// EV_DOOM_FX flags
+#define DOOMFX_RISE			1	// drifts up like a bullet puff
+#define DOOMFX_GRAVITY		2	// thrown up and falls like blood
+#define DOOMFX_RANDOMTICS	4	// first state shortened by 0-3 tics, like Doom's puffs and explosions
 
 
 typedef enum {
@@ -611,7 +635,8 @@ typedef enum {
 	MOD_KAMIKAZE,
 	MOD_JUICED,
 #endif
-	MOD_GRAPPLE
+	MOD_GRAPPLE,
+	MOD_CHAINSAW			// Q3Doom
 } meansOfDeath_t;
 
 
@@ -629,7 +654,8 @@ typedef enum {
 	IT_HOLDABLE,			// single use, holdable item
 							// EFX: rotate + bob
 	IT_PERSISTANT_POWERUP,
-	IT_TEAM
+	IT_TEAM,
+	IT_KEY					// Q3Doom: keycards and skull keys, giTag DOOM_IT_*
 } itemType_t;
 
 #define MAX_ITEM_MODELS 4
@@ -649,6 +675,8 @@ typedef struct gitem_s {
 
 	char		*precaches;		// string of all models and images this item will use
 	char		*sounds;		// string of all sounds this item will use
+
+	int			doomednum;		// Q3Doom: the map thing number (drawn with its sprite)
 } gitem_t;
 
 // included in both the game dll and the client

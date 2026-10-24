@@ -182,6 +182,8 @@ struct gentity_s {
 	struct doomPlane_s	*doomPlane;	// func_doom_plane: Doom thinker state
 	int			doomLine;		// door trigger or shootable door: its manual door line, -1 none
 	int			doomMessageTime;	// door trigger: last "you need a key" message
+	int			doomMissile;	// Doom missile: its mobj type + 1, 0 if not one
+	qboolean	doomDropped;	// item dropped (by a monster): half a clip (MF_DROPPED)
 };
 
 
@@ -766,6 +768,10 @@ extern	vmCvar_t	g_blueteam;
 extern	vmCvar_t	g_smoothClients;
 extern	vmCvar_t	pmove_fixed;
 extern	vmCvar_t	g_stepHeight;
+extern	vmCvar_t	g_doomSkill;
+extern	vmCvar_t	g_doomAllKeys;
+extern	vmCvar_t	g_fallDamage;
+extern	vmCvar_t	g_autoaim;
 extern	vmCvar_t	pmove_msec;
 extern	vmCvar_t	g_rankings;
 extern	vmCvar_t	g_enableDust;

@@ -127,6 +127,7 @@ vmCvar_t	cg_addMarks;
 vmCvar_t	cg_brassTime;
 vmCvar_t	cg_viewsize;
 vmCvar_t	cg_drawGun;
+vmCvar_t	cg_hudStyle;
 vmCvar_t	cg_gun_frame;
 vmCvar_t	cg_gun_x;
 vmCvar_t	cg_gun_y;
@@ -208,6 +209,7 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_ignore, "cg_ignore", "0", 0 },	// used for debugging
 	{ &cg_autoswitch, "cg_autoswitch", "1", CVAR_ARCHIVE },
 	{ &cg_drawGun, "cg_drawGun", "1", CVAR_ARCHIVE },
+	{ &cg_hudStyle, "cg_hudStyle", "0", CVAR_ARCHIVE },		// Q3Doom: 0 Doom status bar, 1 Quake 3 HUD
 	{ &cg_zoomFov, "cg_zoomfov", "22.5", CVAR_ARCHIVE },
 	{ &cg_fov, "cg_fov", "90", CVAR_ARCHIVE },
 	{ &cg_viewsize, "cg_viewsize", "100", CVAR_ARCHIVE },

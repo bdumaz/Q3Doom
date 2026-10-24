@@ -994,6 +994,12 @@ static void CG_ServerCommand( void ) {
 		return;
 	}
 
+	// Q3Doom: a line on the Doom message line (keys, secrets, cheats)
+	if ( !strcmp( cmd, "dmsg" ) ) {
+		CG_DoomMessage( CG_Argv(1) );
+		return;
+	}
+
 	if ( !strcmp( cmd, "cs" ) ) {
 		CG_ConfigStringModified();
 		return;

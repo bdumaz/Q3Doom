@@ -597,14 +597,13 @@ static void CG_DrawStatusBar( void ) {
 	//
 	// ammo
 	//
-	if ( cent->currentState.weapon ) {
-		value = ps->ammo[cent->currentState.weapon];
+	if ( cent->currentState.weapon > 0 && cent->currentState.weapon <= DWP_NUMWEAPONS ) {
+		// Q3Doom: the ammo of the Doom weapon, nothing for the fist and the chainsaw
+		int ammo = bg_doomWeapons[DOOM_DWP( cent->currentState.weapon )].ammo;
+
+		value = ammo < DAM_NUMAMMO ? ps->ammo[ammo] : -1;
 		if ( value > -1 ) {
-			if ( cg.predictedPlayerState.weaponstate == WEAPON_FIRING
-				&& cg.predictedPlayerState.weaponTime > 100 ) {
-				// draw as dark grey when reloading
-				color = 2;	// dark grey
-			} else {
+			{
 				if ( value >= 0 ) {
 					color = 0;	// green
 				} else {
@@ -2511,6 +2510,9 @@ static void CG_Draw2D( void ) {
 		return;
 	}
 
+	// Q3Doom: the weapon, the Doom status bar, messages and palette flashes
+	CG_DoomDraw2D();
+
 /*
 	if (cg.cameraMode) {
 		return;
@@ -2530,17 +2532,23 @@ static void CG_Draw2D( void ) {
 				CG_DrawTimedMenus();
 			}
 #else
-			CG_DrawStatusBar();
+			if ( !CG_DoomHudActive() ) {
+				CG_DrawStatusBar();
+			}
 #endif
-      
-			CG_DrawAmmoWarning();
+
+			if ( !CG_DoomMap() ) {
+				CG_DrawAmmoWarning();
+			}
 
 #ifdef MISSIONPACK
 			CG_DrawProxWarning();
-#endif      
+#endif
 			CG_DrawCrosshair();
 			CG_DrawCrosshairNames();
-			CG_DrawWeaponSelect();
+			if ( !CG_DoomMap() ) {
+				CG_DrawWeaponSelect();
+			}
 
 #ifndef MISSIONPACK
 			CG_DrawHoldableItem();
@@ -2571,8 +2579,11 @@ static void CG_Draw2D( void ) {
 #endif
 
 #ifndef MISSIONPACK
-	CG_DrawLowerRight();
-	CG_DrawLowerLeft();
+	// Q3Doom: no Quake 3 powerup timers and pickup icons (under the Doom status bar)
+	if ( !CG_DoomMap() ) {
+		CG_DrawLowerRight();
+		CG_DrawLowerLeft();
+	}
 #endif
 
 	if ( !CG_DrawFollow() ) {

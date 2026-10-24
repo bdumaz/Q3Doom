@@ -6,11 +6,14 @@ Q3Doom - Doom map rendering in the cgame
   second on the base levels (map, or CS_DOOM_LIGHTS once a line special
   changed them); every frame the levels go to the renderer, which lights
   the map surfaces by sector (CGEN_DOOM_SECTOR)
-- static things (decorations, items until M5): sprites drawn as billboards
-  facing the view like Doom's, with its 8 rotations, mirrored frames,
-  offsets and animations (states)
+- static things (decorations): sprites drawn as billboards facing the view
+  like Doom's, with its 8 rotations, mirrored frames, offsets and
+  animations (states)
 - the solid ones are boxes the player prediction collides with, the same
   ones the server links (BG_DoomThingBlocks)
+- item and missile entities drawn with their Doom sprites, and short
+  sprite animations (puffs, blood, explosions) sent as EV_DOOM_FX
+- Doom sounds by number (EV_DOOM_SOUND)
 
 Licensed under the GNU General Public License version 2 or later.
 ===========================================================================
@@ -20,7 +23,7 @@ Licensed under the GNU General Public License version 2 or later.
 
 #define MAX_DOOM_THINGS		2048
 #define MAX_SPRITE_FRAMES	29
-#define DOOM_TICRATE		35
+#define MAX_DOOM_FX			256
 
 typedef struct {
 	short		lump;			// sprite lump, -1 none
@@ -41,6 +44,18 @@ typedef struct {
 	int			direction;		// glow
 	int			effect;			// the sector special that drives it
 } lightThinker_t;
+
+// a short sprite animation (EV_DOOM_FX)
+typedef struct {
+	qboolean	active;
+	int			state;
+	int			tics;			// left in the state
+	int			lastTic;
+	vec3_t		origin;
+	float		zvel;			// units per tic
+	qboolean	gravity;
+	float		floor;			// where falling stops
+} doomFx_t;
 
 static struct {
 	const doom_map_t	*map;
@@ -64,6 +79,9 @@ static struct {
 	byte				*levels;
 	int					lastTic;
 	unsigned			random;
+
+	doomFx_t			fx[MAX_DOOM_FX];
+	sfxHandle_t			sounds[NUMSFX];		// registered on first use, -1 missing
 } cgDoom;
 
 #define DOOM_MAP()	( cgDoom.map != NULL )
@@ -218,7 +236,7 @@ void CG_DoomLightsChanged( void ) {
 }
 
 static void UpdateLights( void ) {
-	int		tic = cg.time * DOOM_TICRATE / 1000, i, steps = 0;
+	int		tic = cg.time * DOOM_TICRATE / 1000, i, steps = 0, extra;
 
 	if ( tic < cgDoom.lastTic ) {
 		cgDoom.lastTic = tic;		// map restart
@@ -231,11 +249,69 @@ static void UpdateLights( void ) {
 	}
 	cgDoom.lastTic = tic;
 
+	// the gun flash lights the whole view a step or two (extralight); the
+	// light amplification visor makes everything full bright (but blinks
+	// in its last seconds)
+	extra = ( ( cg.predictedPlayerState.doomWeaponFlags & DOOMWF_LIGHTMASK ) >> DOOMWF_LIGHTSHIFT ) * 16;
+	if ( CG_DoomPowerActive( DPW_INFRARED ) ) {
+		extra = 255;
+	}
 	for ( i = 0 ; i < cgDoom.numSectors ; i++ ) {
-		int l = cgDoom.lights[i].level;
+		int l = cgDoom.lights[i].level + extra;
 		cgDoom.levels[i] = l < 0 ? 0 : l > 255 ? 255 : l;
 	}
 	trap_R_DoomSectorLights( cgDoom.levels, cgDoom.numSectors );
+}
+
+/*
+=================
+CG_DoomPowerTics
+
+Doom tics left of a timed power of the predicted player, 0 if none
+=================
+*/
+int CG_DoomPowerTics( int power ) {
+	int		end = cg.predictedPlayerState.powerups[power];
+
+	if ( !end || end <= cg.time ) {
+		return 0;
+	}
+	return ( end - cg.time ) * DOOM_TICRATE / 1000 + 1;
+}
+
+// a timed power that shows: steady, then blinking in its last 4 seconds
+// (Doom: powers > 4*32 || powers & 8)
+qboolean CG_DoomPowerActive( int power ) {
+	int		tics = CG_DoomPowerTics( power );
+
+	return tics > 4 * 32 || ( tics & 8 );
+}
+
+qboolean CG_DoomMap( void ) {
+	return cgDoom.map != NULL;
+}
+
+const doom_map_t *CG_DoomMapData( void ) {
+	return cgDoom.map;
+}
+
+const doom_wad_t *CG_DoomWad( void ) {
+	return cgDoom.wad;
+}
+
+int CG_DoomSectorAt( const vec3_t point ) {
+	if ( !DOOM_MAP() ) {
+		return -1;
+	}
+	return doom_map_sector_at( cgDoom.map, point[0], point[1] );
+}
+
+// the light of a sector as drawn this frame (effects, gun flash, visor)
+int CG_DoomSectorLight( int sector ) {
+	if ( sector < 0 || sector >= cgDoom.numSectors ) {
+		return 255;
+	}
+	return cgDoom.levels[sector];
 }
 
 /*
@@ -318,8 +394,33 @@ static qhandle_t LumpShader( int lump ) {
 	return cgDoom.lumpShader[lump];
 }
 
+/*
+=================
+CG_DoomSpriteLump
+
+The sprite lump of a state seen from rotation 0-7 (0: front), -1 if none
+=================
+*/
+int CG_DoomSpriteLump( int state, int rotation, qboolean *flip ) {
+	const doom_state_t	*st;
+	int					frame;
+
+	if ( !DOOM_MAP() || state <= S_NULL || state >= NUMSTATES ) {
+		return -1;
+	}
+	st = &doom_states[state];
+	frame = st->frame & DOOM_FF_FRAMEMASK;
+	if ( st->sprite < 0 || st->sprite >= NUMSPRITES || frame >= MAX_SPRITE_FRAMES ) {
+		return -1;
+	}
+	if ( flip ) {
+		*flip = cgDoom.frames[st->sprite][frame][rotation & 7].flip;
+	}
+	return cgDoom.frames[st->sprite][frame][rotation & 7].lump;
+}
+
 // the state a thing has reached 'tics' after it spawned in 'state'
-static int AnimatedState( int state, int tics ) {
+int CG_DoomAnimatedState( int state, int tics ) {
 	int		guard = 0;
 
 	while ( guard++ < 256 ) {
@@ -343,10 +444,11 @@ AddSprite
 
 A Doom sprite billboard: it faces the view direction (around the vertical
 axis only, as in Doom), rotation picked from the angle between the viewer
-and the thing (R_ProjectSprite).
+and the thing (R_ProjectSprite). 'origin' is the bottom of the thing;
+'light' -1 takes the light of the sector it is in.
 =================
 */
-static void AddSprite( const vec3_t origin, float angle, int state, int light ) {
+void CG_DoomAddSprite( const vec3_t origin, float angle, int state, int light ) {
 	const doom_state_t	*st = &doom_states[state];
 	const spriteRot_t	*rot;
 	const uint8_t		*header;
@@ -356,6 +458,9 @@ static void AddSprite( const vec3_t origin, float angle, int state, int light ) 
 
 	if ( state == S_NULL || st->sprite < 0 || st->sprite >= NUMSPRITES || frame >= MAX_SPRITE_FRAMES ) {
 		return;
+	}
+	if ( light < 0 ) {
+		light = CG_DoomSectorLight( CG_DoomSectorAt( origin ) );
 	}
 	viewToThing = RAD2DEG( atan2( origin[1] - cg.refdef.vieworg[1], origin[0] - cg.refdef.vieworg[0] ) );
 	r = (int)floor( AngleNormalize360( viewToThing - angle + 202.5f ) / 45.0f ) & 7;
@@ -397,6 +502,171 @@ static void AddSprite( const vec3_t origin, float angle, int state, int light ) 
 		verts[i].modulate[3] = 255;
 	}
 	trap_R_AddPolyToScene( LumpShader( rot->lump ), 4, verts );
+}
+
+/*
+=====================================================================
+
+EFFECTS, ITEMS AND MISSILES
+
+=====================================================================
+*/
+
+/*
+=================
+CG_DoomSpawnFx
+
+EV_DOOM_FX: a puff, blood or an explosion playing its Doom states where
+it was spawned. Puffs drift up a unit a tic, blood is thrown up and falls.
+=================
+*/
+void CG_DoomSpawnFx( const vec3_t origin, int state, int flags ) {
+	static int	next;
+	doomFx_t	*fx;
+	trace_t		tr;
+	vec3_t		down;
+
+	if ( !DOOM_MAP() || state <= S_NULL || state >= NUMSTATES ) {
+		return;
+	}
+	fx = &cgDoom.fx[next];
+	next = ( next + 1 ) % MAX_DOOM_FX;
+
+	fx->active = qtrue;
+	fx->state = state;
+	fx->tics = doom_states[state].tics;
+	if ( ( flags & DOOMFX_RANDOMTICS ) && fx->tics > 0 ) {
+		fx->tics -= rand() & 3;
+		if ( fx->tics < 1 ) {
+			fx->tics = 1;
+		}
+	}
+	fx->lastTic = cg.time * DOOM_TICRATE / 1000;
+	fx->zvel = ( flags & DOOMFX_RISE ) ? 1 : ( flags & DOOMFX_GRAVITY ) ? 2 : 0;
+	fx->gravity = ( flags & DOOMFX_GRAVITY ) != 0;
+	VectorCopy( origin, fx->origin );
+
+	// falling things stop on the floor below
+	fx->floor = -99999;
+	if ( fx->gravity ) {
+		VectorSet( down, origin[0], origin[1], origin[2] - 4096 );
+		CG_Trace( &tr, origin, NULL, NULL, down, ENTITYNUM_NONE, MASK_SOLID );
+		fx->floor = tr.endpos[2];
+	}
+}
+
+static void RunFx( void ) {
+	int		tic = cg.time * DOOM_TICRATE / 1000, i;
+
+	for ( i = 0 ; i < MAX_DOOM_FX ; i++ ) {
+		doomFx_t	*fx = &cgDoom.fx[i];
+		int			guard = 0;
+
+		if ( !fx->active ) {
+			continue;
+		}
+		if ( tic < fx->lastTic || tic - fx->lastTic > DOOM_TICRATE * 10 ) {
+			fx->active = qfalse;	// map restart, or something lasting forever
+			continue;
+		}
+		while ( fx->lastTic < tic && fx->active && guard++ < 64 ) {
+			fx->lastTic++;
+			fx->origin[2] += fx->zvel;
+			if ( fx->gravity ) {
+				fx->zvel -= 1;
+				if ( fx->origin[2] < fx->floor ) {
+					fx->origin[2] = fx->floor;
+					fx->zvel = 0;
+				}
+			}
+			if ( fx->tics == -1 || --fx->tics > 0 ) {
+				continue;
+			}
+			// next state, through zero-tic ones
+			do {
+				fx->state = doom_states[fx->state].nextstate;
+				if ( fx->state == S_NULL ) {
+					fx->active = qfalse;
+					break;
+				}
+				fx->tics = doom_states[fx->state].tics;
+			} while ( !fx->tics && guard++ < 64 );
+		}
+		if ( fx->active ) {
+			CG_DoomAddSprite( fx->origin, 0, fx->state, -1 );
+		}
+	}
+}
+
+/*
+=================
+CG_DoomItem
+
+An item entity: its Doom sprite and animation, standing on the floor
+=================
+*/
+void CG_DoomItem( centity_t *cent ) {
+	const entityState_t	*es = &cent->currentState;
+	int					type;
+
+	if ( !DOOM_MAP() || !es->modelindex || es->modelindex >= bg_numItems || ( es->eFlags & EF_NODRAW ) ) {
+		return;
+	}
+	type = doom_mobjtype_for_ednum( bg_itemlist[es->modelindex].doomednum );
+	if ( type < 0 ) {
+		return;
+	}
+	CG_DoomAddSprite( cent->lerpOrigin, es->angles[YAW],
+		CG_DoomAnimatedState( doom_mobjinfo[type].spawnstate, cg.time * DOOM_TICRATE / 1000 ), -1 );
+}
+
+/*
+=================
+CG_DoomMissile
+
+A rocket, plasma or BFG ball (s.generic1: mobj type), facing its way
+=================
+*/
+void CG_DoomMissile( centity_t *cent ) {
+	const entityState_t	*es = &cent->currentState;
+	int					type = es->generic1, tics;
+	float				angle;
+	vec3_t				origin;
+
+	if ( !DOOM_MAP() || type <= 0 || type >= NUMMOBJTYPES ) {
+		return;
+	}
+	angle = RAD2DEG( atan2( es->pos.trDelta[1], es->pos.trDelta[0] ) );
+	tics = ( cg.time - es->pos.trTime ) * DOOM_TICRATE / 1000;
+	VectorCopy( cent->lerpOrigin, origin );
+	origin[2] -= (float)doom_mobjinfo[type].height / DOOM_FRACUNIT * 0.5f;
+	CG_DoomAddSprite( origin, angle, CG_DoomAnimatedState( doom_mobjinfo[type].spawnstate, tics > 0 ? tics : 0 ), -1 );
+}
+
+/*
+=================
+CG_DoomSound
+
+A Doom sound effect (sfx_*), 0 if the WAD does not have it
+=================
+*/
+sfxHandle_t CG_DoomSound( int sfx ) {
+	if ( !DOOM_MAP() || sfx <= sfx_None || sfx >= NUMSFX ) {
+		return 0;
+	}
+	return cgDoom.sounds[sfx] > 0 ? cgDoom.sounds[sfx] : 0;
+}
+
+static void RegisterSounds( void ) {
+	int		i;
+
+	for ( i = sfx_None + 1 ; i < NUMSFX ; i++ ) {
+		char	lump[16];
+
+		Com_sprintf( lump, sizeof( lump ), "DS%s", doom_sfxnames[i] );
+		Q_strupr( lump );
+		cgDoom.sounds[i] = doom_wad_find( cgDoom.wad, lump ) >= 0 ? trap_S_RegisterSound( va( "doom/sound/%s", lump ), qfalse ) : -1;
+	}
 }
 
 /*
@@ -460,9 +730,13 @@ void CG_DoomInit( void ) {
 		}
 	}
 	CG_Printf( "Doom map %s: %d things drawn, %d solid\n", cgDoom.map->name, cgDoom.numThings, cgDoom.numBlockers );
+
+	RegisterSounds();
+	CG_DoomHudInit();
 }
 
 void CG_DoomShutdown( void ) {
+	CG_DoomHudShutdown();
 	free( cgDoom.frames );
 	free( cgDoom.lumpShader );
 	free( cgDoom.baseLight );
@@ -490,8 +764,10 @@ void CG_DoomAddToScene( void ) {
 	for ( i = 0 ; i < cgDoom.numThings ; i++ ) {
 		const doomThing_t *th = &cgDoom.things[i];
 
-		AddSprite( th->origin, th->angle, AnimatedState( doom_mobjinfo[th->type].spawnstate, tics ), cgDoom.levels[th->sector] );
+		CG_DoomAddSprite( th->origin, th->angle, CG_DoomAnimatedState( doom_mobjinfo[th->type].spawnstate, tics ), cgDoom.levels[th->sector] );
 	}
+
+	RunFx();
 }
 
 /*

@@ -623,6 +623,11 @@ void CG_RegisterWeapon( int weaponNum ) {
 	memset( weaponInfo, 0, sizeof( *weaponInfo ) );
 	weaponInfo->registered = qtrue;
 
+	// Q3Doom: weapons are Doom sprites (cg_doom_weapon.c), no models
+	if ( qtrue ) {
+		return;
+	}
+
 	for ( item = bg_itemlist + 1 ; item->classname ; item++ ) {
 		if ( item->giType == IT_WEAPON && item->giTag == weaponNum ) {
 			weaponInfo->item = item;
@@ -848,6 +853,11 @@ void CG_RegisterItemVisuals( int itemNum ) {
 
 	memset( itemInfo, 0, sizeof( &itemInfo ) );
 	itemInfo->registered = qtrue;
+
+	// Q3Doom: items are Doom sprites (cg_doom.c), no models
+	if ( item->doomednum ) {
+		return;
+	}
 
 	itemInfo->models[0] = trap_R_RegisterModel( item->world_model[0] );
 
@@ -1381,6 +1391,11 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 	}
 
 	if ( ps->pm_type == PM_INTERMISSION ) {
+		return;
+	}
+
+	// Q3Doom: the Doom weapon is drawn in 2D (CG_DoomDrawWeapon)
+	if ( CG_DoomMap() ) {
 		return;
 	}
 

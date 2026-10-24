@@ -40,6 +40,12 @@ void CG_CheckAmmo( void ) {
 	int		previous;
 	int		weapons;
 
+	// Q3Doom: no low ammo warning in Doom
+	if ( CG_DoomMap() ) {
+		cg.lowAmmoWarning = 0;
+		return;
+	}
+
 	// see about how many seconds of ammo we have remaining
 	weapons = cg.snap->ps.stats[ STAT_WEAPONS ];
 	total = 0;
@@ -95,6 +101,9 @@ void CG_DamageFeedback( int yawByte, int pitchByte, int damage ) {
 	vec3_t		angles;
 	float		dist;
 	float		yaw, pitch;
+
+	// Q3Doom: the red palette flash and the status bar face
+	CG_DoomDamage( damage, yawByte );
 
 	// show the attacking player's head and name in corner
 	cg.attackerTime = cg.time;
@@ -303,8 +312,9 @@ void CG_CheckLocalSounds( playerState_t *ps, playerState_t *ops ) {
 		return;
 	}
 
-	// hit changes
-	if ( ps->persistant[PERS_HITS] > ops->persistant[PERS_HITS] ) {
+	// hit changes (Q3Doom: Doom has no hit sounds)
+	if ( CG_DoomMap() ) {
+	} else if ( ps->persistant[PERS_HITS] > ops->persistant[PERS_HITS] ) {
 		armor  = ps->persistant[PERS_ATTACKEE_ARMOR] & 0xff;
 		health = ps->persistant[PERS_ATTACKEE_ARMOR] >> 8;
 #ifdef MISSIONPACK

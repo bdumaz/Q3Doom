@@ -237,6 +237,12 @@ static void CG_Item( centity_t *cent ) {
 		CG_Error( "Bad item index %i on entity", es->modelindex );
 	}
 
+	// Q3Doom: Doom items are Doom sprites
+	if ( CG_DoomMap() ) {
+		CG_DoomItem( cent );
+		return;
+	}
+
 	// if set to invisible, skip
 	if ( !es->modelindex || ( es->eFlags & EF_NODRAW ) ) {
 		return;
@@ -409,6 +415,13 @@ static void CG_Missile( centity_t *cent ) {
 //	int	col;
 
 	s1 = &cent->currentState;
+
+	// Q3Doom: Doom missiles (s.generic1: mobj type)
+	if ( CG_DoomMap() && s1->generic1 ) {
+		CG_DoomMissile( cent );
+		return;
+	}
+
 	if ( s1->weapon > WP_NUM_WEAPONS ) {
 		s1->weapon = 0;
 	}
