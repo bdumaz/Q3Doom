@@ -10,6 +10,7 @@ It has two single player modes:
 An optional **Quake Visuals** mode redraws the maps with Quake 3 textures, item models and lighting.
 
 > Windows 64-bit only for now. A Linux build is planned.
+> Multiplayer is hidden in the menu for now, but the plan is to get it working with Doom Deathmatch maps, as well as Quake 3 Modes using Doom Weapons.
 
 ## What you need
 
