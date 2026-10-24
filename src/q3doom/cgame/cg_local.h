@@ -1731,3 +1731,6 @@ qboolean	CG_DoomDrawIntermission( void );
 const struct doom_map_s *trap_Doom_GetMap( const char *mapname );
 const struct doom_wad_s *trap_Doom_GetWad( void );
 void		trap_R_DoomSectorLights( const byte *levels, int count );
+void		trap_R_DoomLevelShot( const char *name );
+qboolean	CG_DoomLevelShotFrame( void );
+void		CG_DoomUpdateLevelShot( void );

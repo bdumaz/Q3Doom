@@ -2505,6 +2505,11 @@ static void CG_Draw2D( void ) {
 		return;
 	}
 
+	// Q3Doom: nothing over the level's menu picture
+	if ( CG_DoomLevelShotFrame() ) {
+		return;
+	}
+
 	// Q3Doom: Doom's intermission or episode finale replace the Quake 3 one
 	if ( CG_DoomDrawIntermission() ) {
 		return;

@@ -529,6 +529,85 @@ levelshots are specialized 128*128 thumbnails for
 the menu system, sampled down from full screen distorted images
 ====================
 */
+/*
+==================
+R_DoomLevelShot
+
+Q3Doom: the frame being drawn is saved as 'name' (a 256x192 TGA, the 4:3
+middle of the screen) when its buffers are swapped: the first frame of a
+level becomes its picture in the campaign menu
+==================
+*/
+#define DOOM_SHOT_W		256
+#define DOOM_SHOT_H		192
+
+static char	doomLevelShotName[MAX_QPATH];
+
+static void RE_DoomLevelShot( const char *name ) {
+	Q_strncpyz( doomLevelShotName, name, sizeof( doomLevelShotName ) );
+}
+
+void R_DoomTakeLevelShot( void ) {
+	byte	*source, *buffer;
+	int		x, y, w43, x0;
+
+	if ( !doomLevelShotName[0] ) {
+		return;
+	}
+	w43 = glConfig.vidHeight * 4 / 3;
+	if ( w43 > glConfig.vidWidth ) {
+		w43 = glConfig.vidWidth;
+	}
+	x0 = ( glConfig.vidWidth - w43 ) / 2;
+
+	source = ri.Hunk_AllocateTempMemory( glConfig.vidWidth * glConfig.vidHeight * 3 );
+	buffer = ri.Hunk_AllocateTempMemory( DOOM_SHOT_W * DOOM_SHOT_H * 3 + 18 );
+	Com_Memset( buffer, 0, 18 );
+	buffer[2] = 2;		// uncompressed type
+	buffer[12] = DOOM_SHOT_W & 255;
+	buffer[13] = DOOM_SHOT_W >> 8;
+	buffer[14] = DOOM_SHOT_H & 255;
+	buffer[15] = DOOM_SHOT_H >> 8;
+	buffer[16] = 24;	// pixel size
+
+	qglPixelStorei( GL_PACK_ALIGNMENT, 1 );
+	qglReadPixels( 0, 0, glConfig.vidWidth, glConfig.vidHeight, GL_RGB, GL_UNSIGNED_BYTE, source );
+
+	// box filter the 4:3 middle down (rows bottom up, as the TGA)
+	for ( y = 0 ; y < DOOM_SHOT_H ; y++ ) {
+		int sy0 = y * glConfig.vidHeight / DOOM_SHOT_H, sy1 = ( y + 1 ) * glConfig.vidHeight / DOOM_SHOT_H;
+
+		for ( x = 0 ; x < DOOM_SHOT_W ; x++ ) {
+			int		sx0 = x0 + x * w43 / DOOM_SHOT_W, sx1 = x0 + ( x + 1 ) * w43 / DOOM_SHOT_W;
+			int		r = 0, g = 0, b = 0, n = 0, sx, sy;
+			byte	*dst = buffer + 18 + 3 * ( y * DOOM_SHOT_W + x );
+
+			for ( sy = sy0 ; sy < sy1 || sy == sy0 ; sy++ ) {
+				for ( sx = sx0 ; sx < sx1 || sx == sx0 ; sx++ ) {
+					byte *src = source + 3 * ( glConfig.vidWidth * sy + sx );
+
+					r += src[0];
+					g += src[1];
+					b += src[2];
+					n++;
+				}
+			}
+			dst[0] = b / n;
+			dst[1] = g / n;
+			dst[2] = r / n;
+		}
+	}
+	if ( ( tr.overbrightBits > 0 ) && glConfig.deviceSupportsGamma ) {
+		R_GammaCorrect( buffer + 18, DOOM_SHOT_W * DOOM_SHOT_H * 3 );
+	}
+	ri.FS_WriteFile( doomLevelShotName, buffer, DOOM_SHOT_W * DOOM_SHOT_H * 3 + 18 );
+	ri.Printf( PRINT_DEVELOPER, "Wrote %s\n", doomLevelShotName );
+
+	ri.Hunk_FreeTempMemory( buffer );
+	ri.Hunk_FreeTempMemory( source );
+	doomLevelShotName[0] = 0;
+}
+
 void R_LevelShot( void ) {
 	char		checkname[MAX_OSPATH];
 	byte		*buffer;
@@ -1214,6 +1293,7 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.RegisterFont = RE_RegisterFont;
 	re.RemapShader = R_RemapShader;
 	re.DoomSectorLights = R_DoomSectorLights;
+	re.DoomLevelShot = RE_DoomLevelShot;
 	re.GetEntityToken = R_GetEntityToken;
 	re.inPVS = R_inPVS;
 

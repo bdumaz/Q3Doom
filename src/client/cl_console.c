@@ -508,6 +508,11 @@ void Con_DrawNotify (void)
 	int		skip;
 	int		currentColor;
 
+	// Q3Doom: nothing over a level's menu picture
+	if ( CL_DoomLevelShotFrame() ) {
+		return;
+	}
+
 	currentColor = 7;
 	re.SetColor( g_color_table[currentColor] );
 

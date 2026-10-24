@@ -314,6 +314,15 @@ qboolean CG_DoomEntityEvent( centity_t *cent, vec3_t position, int event ) {
 	case EV_CHANGE_WEAPON:
 		return qtrue;
 
+	case EV_PLAYER_TELEPORT_IN:
+	case EV_PLAYER_TELEPORT_OUT:
+		// Doom's teleport fog, but nothing when the level starts
+		if ( cg.time > cgs.levelStartTime + 2000 ) {
+			CG_DoomSpawnFx( position, doom_mobjinfo[MT_TFOG].spawnstate, 0 );
+			StartDoomSound( es->number, CHAN_AUTO, sfx_telept );
+		}
+		return qtrue;
+
 	case EV_JUMP:
 		trap_S_StartSound( NULL, es->number, CHAN_VOICE, trap_S_RegisterSound( SARGE_SOUND( "jump1" ), qfalse ) );
 		return qtrue;

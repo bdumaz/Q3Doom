@@ -274,6 +274,79 @@ int Doom_AnimFrames( const char *path, char *frames, int frameSize, int maxFrame
 
 /*
 =================
+Doom_GeneratedImage
+
+doom/gen/<NAME>: pictures the campaign menu needs that Doom does not have,
+64x64: LOCK (a padlock), MEDAL1-4 (bronze, silver, gold, and the dark red
+disc the skull medal is drawn on)
+=================
+*/
+static byte *Doom_GeneratedImage( const char *name, int *width, int *height ) {
+	static const byte	medals[4][3] = { { 205, 127, 50 }, { 192, 192, 200 }, { 255, 205, 40 }, { 120, 10, 10 } };
+	byte				*pic;
+	int					x, y, medal = -1;
+
+	if ( !Q_stricmpn( name, "MEDAL", 5 ) && name[5] >= '1' && name[5] <= '4' ) {
+		medal = name[5] - '1';
+	} else if ( Q_stricmp( name, "LOCK" ) ) {
+		return NULL;
+	}
+	*width = *height = 64;
+	pic = Z_Malloc( 64 * 64 * 4 );
+	Com_Memset( pic, 0, 64 * 64 * 4 );
+
+	for ( y = 0 ; y < 64 ; y++ ) {
+		for ( x = 0 ; x < 64 ; x++ ) {
+			byte	*p = pic + ( y * 64 + x ) * 4;
+			float	dx = x + 0.5f - 32, dy = y + 0.5f - 32, r = sqrt( dx * dx + dy * dy ), shade;
+			int		c, color[3];
+
+			if ( medal >= 0 ) {
+				// a disc with a darker rim, lit from the top left
+				if ( r > 29 ) {
+					continue;
+				}
+				shade = 0.85f - ( dx + dy ) / 29 * 0.25f;
+				if ( r > 25 ) {
+					shade *= 0.6f;
+				}
+				for ( c = 0 ; c < 3 ; c++ ) {
+					color[c] = (int)( medals[medal][c] * shade );
+					p[c] = color[c] > 255 ? 255 : color[c];
+				}
+				p[3] = r > 28 ? (byte)( 255 * ( 29 - r ) ) : 255;
+				continue;
+			}
+			// the padlock: a grey shackle over a brass body with a keyhole
+			dx = x + 0.5f - 32;
+			dy = y + 0.5f - 28;
+			r = sqrt( dx * dx + dy * dy );
+			if ( y < 30 && r >= 9 && r <= 14 && dy <= 0 ) {
+				p[0] = p[1] = p[2] = (byte)( 170 - dy * 2 );
+				p[3] = 255;
+			} else if ( y >= 22 && y < 30 && ( ( x >= 18 && x < 23 ) || ( x >= 41 && x < 46 ) ) ) {
+				p[0] = p[1] = p[2] = 150;
+				p[3] = 255;
+			} else if ( x >= 12 && x < 52 && y >= 28 && y < 60 ) {
+				float kx = x + 0.5f - 32, ky = y + 0.5f - 40;
+
+				if ( kx * kx + ky * ky < 16 || ( fabs( kx ) < 2 && ky > 0 && ky < 10 ) ) {
+					p[0] = p[1] = p[2] = 20;
+				} else {
+					shade = 1.0f - ( y - 28 ) / 64.0f - ( x - 12 ) / 160.0f;
+					p[0] = (byte)( 210 * shade );
+					p[1] = (byte)( 160 * shade );
+					p[2] = (byte)( 60 * shade );
+				}
+				p[3] = 255;
+			}
+		}
+	}
+	return pic;
+}
+
+/*
+=================
 Doom_LoadImage
 
 Returns Z_Malloc'ed RGBA pixels (freed by the caller with Z_Free), or NULL.
@@ -300,6 +373,8 @@ byte *Doom_LoadImage( const char *path, int *width, int *height ) {
 		result = doom_load_patch( doom_wad, name, &img );
 	} else if ( !Q_stricmp( kind, "skybox" ) ) {
 		return Doom_SkyboxImage( name, width, height );
+	} else if ( !Q_stricmp( kind, "gen" ) ) {
+		return Doom_GeneratedImage( name, width, height );
 	} else {
 		return NULL;
 	}

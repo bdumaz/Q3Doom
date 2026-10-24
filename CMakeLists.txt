@@ -150,7 +150,7 @@ q3_module(stock_ui ui baseq3 ${SRC}/q3_ui/ui.def ${UI_SRC} ${UI_SHARED} ${SRC}/u
 
 # --- Q3Doom game modules (run/q3doom, the default fs_game) -------------------
 # Forked from the stock modules; headers shared with the engine are forwarded
-# to src/game, src/cgame and src/ui. The stock ui is used until it is forked.
+# to src/game, src/cgame and src/ui.
 set(QD ${SRC}/q3doom)
 file(GLOB QD_GAME_SRC ${QD}/game/*.c)
 q3_module(q3doom_qagame qagame q3doom ${SRC}/game/game.def ${QD_GAME_SRC} ${SRC}/game/q_math.c ${SRC}/game/q_shared.c)
@@ -161,6 +161,11 @@ q3_module(q3doom_cgame cgame q3doom ${SRC}/cgame/cgame.def ${QD_CGAME_SRC}
   ${QD}/game/bg_misc.c ${QD}/game/bg_pmove.c ${QD}/game/bg_slidemove.c ${QD}/game/bg_doom.c ${QD}/game/bg_doom_weapon.c
   ${SRC}/game/q_math.c ${SRC}/game/q_shared.c)
 target_link_libraries(q3doom_cgame PRIVATE libdoom)
+
+# the menus, forked from q3_ui (M8: the Doom single player menus)
+file(GLOB QD_UI_SRC ${QD}/ui/*.c)
+q3_module(q3doom_ui ui q3doom ${SRC}/q3_ui/ui.def ${QD_UI_SRC} ${UI_SHARED} ${SRC}/ui/ui_syscalls.c)
+target_link_libraries(q3doom_ui PRIVATE libdoom)
 
 # data files of the q3doom game directory (configs)
 add_custom_target(q3doom_data ALL

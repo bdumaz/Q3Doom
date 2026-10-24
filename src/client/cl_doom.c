@@ -157,6 +157,25 @@ static void CL_DoomGoto_f( void ) {
 }
 
 /*
+=================
+CL_DoomLevelShot
+
+The cgame saves this frame as a level's menu picture: the console notify
+lines stay off it
+=================
+*/
+static int	doomLevelShotFrame = -1;
+
+void CL_DoomLevelShot( const char *name ) {
+	doomLevelShotFrame = cls.framecount;
+	re.DoomLevelShot( name );
+}
+
+qboolean CL_DoomLevelShotFrame( void ) {
+	return doomLevelShotFrame == cls.framecount;
+}
+
+/*
 =====================================================================
 
 CAMPAIGN

@@ -87,6 +87,8 @@ static struct {
 
 #define DOOM_MAP()	( cgDoom.map != NULL )
 
+static int	levelShotState;		// the level's menu picture: 0 to check, 1 this frame, 2 done
+
 static int DoomRandom( void ) {
 	cgDoom.random = cgDoom.random * 1103515245 + 12345;
 	return ( cgDoom.random >> 16 ) & 255;
@@ -715,6 +717,7 @@ void CG_DoomInit( void ) {
 	int			i;
 
 	memset( &cgDoom, 0, sizeof( cgDoom ) );
+	levelShotState = 0;
 	COM_StripExtension( COM_SkipPath( cgs.mapname ), mapname );
 	cgDoom.map = trap_Doom_GetMap( mapname );
 	if ( !cgDoom.map ) {
@@ -777,6 +780,42 @@ void CG_DoomShutdown( void ) {
 	free( cgDoom.lights );
 	free( cgDoom.levels );
 	memset( &cgDoom, 0, sizeof( cgDoom ) );
+}
+
+/*
+=================
+CG_DoomUpdateLevelShot
+
+The first frame of a level becomes its picture in the campaign menu
+(levelshots/doom/<map>.tga), taken once, without the HUD
+=================
+*/
+void CG_DoomUpdateLevelShot( void ) {
+	char			name[MAX_QPATH];
+	fileHandle_t	f;
+
+	if ( levelShotState == 1 ) {
+		levelShotState = 2;
+	}
+	if ( !DOOM_MAP() || levelShotState || !cg.snap || cg.snap->ps.pm_type != PM_NORMAL
+		|| cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR || cg.time < cgs.levelStartTime + 1500 ) {
+		return;
+	}
+	Com_sprintf( name, sizeof( name ), "levelshots/doom/%s.tga", cgDoom.map->name );
+	if ( trap_FS_FOpenFile( name, &f, FS_READ ) > 0 ) {
+		trap_FS_FCloseFile( f );
+		levelShotState = 2;
+		return;
+	}
+	if ( f ) {
+		trap_FS_FCloseFile( f );
+	}
+	levelShotState = 1;
+	trap_R_DoomLevelShot( name );
+}
+
+qboolean CG_DoomLevelShotFrame( void ) {
+	return levelShotState == 1;
 }
 
 /*

@@ -98,6 +98,8 @@ typedef struct {
 
 	// Q3Doom: current light level (0-255) of every sector of the Doom map
 	void	(*DoomSectorLights)( const byte *levels, int count );
+	// Q3Doom: save the frame being drawn as a 256x192 menu picture
+	void	(*DoomLevelShot)( const char *name );
 	qboolean (*GetEntityToken)( char *buffer, int size );
 	qboolean (*inPVS)( const vec3_t p1, const vec3_t p2 );
 } refexport_t;

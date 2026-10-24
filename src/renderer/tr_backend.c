@@ -1055,6 +1055,9 @@ const void	*RB_SwapBuffers( const void *data ) {
 		qglFinish();
 	}
 
+	// Q3Doom: a level's first frame saved for the campaign menu
+	R_DoomTakeLevelShot();
+
 	GLimp_LogComment( "***************** RB_SwapBuffers *****************\n\n\n" );
 
 	GLimp_EndFrame();

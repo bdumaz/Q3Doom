@@ -208,7 +208,7 @@ static void CG_CalcVrect (void) {
 	cg.refdef.y = (cgs.glconfig.vidHeight - cg.refdef.height)/2;
 
 	// Q3Doom: the view stops above the Doom status bar (168 of 200 rows)
-	if ( CG_DoomHudActive() ) {
+	if ( CG_DoomHudActive() && !CG_DoomLevelShotFrame() ) {
 		cg.refdef.x = 0;
 		cg.refdef.y = 0;
 		cg.refdef.width = cgs.glconfig.vidWidth;
@@ -809,8 +809,9 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	// update cg.predictedPlayerState
 	CG_PredictPlayerState();
 
-	// Q3Doom: follow weapon changes made by the game
+	// Q3Doom: follow weapon changes made by the game; the level's menu picture
 	CG_DoomWeaponFrame();
+	CG_DoomUpdateLevelShot();
 
 	// decide on third person view (Q3Doom: Doom stays in first person when dead)
 	cg.renderingThirdPerson = cg_thirdPerson.integer || ( cg.snap->ps.stats[STAT_HEALTH] <= 0 && !CG_DoomMap() );

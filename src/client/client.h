@@ -454,6 +454,8 @@ void Con_Close( void );
 // cl_doom.c
 void	CL_InitDoomCommands( void );
 void	CL_DoomDrawOverlay( void );
+void	CL_DoomLevelShot( const char *name );
+qboolean CL_DoomLevelShotFrame( void );
 
 // cl_scrn.c
 //

@@ -453,6 +453,10 @@ const struct doom_wad_s *trap_Doom_GetWad( void ) {
 	return (const struct doom_wad_s *)syscall( CG_DOOM_GETWAD );
 }
 
+void trap_R_DoomLevelShot( const char *name ) {
+	syscall( CG_R_DOOM_LEVELSHOT, name );
+}
+
 void trap_R_DoomSectorLights( const byte *levels, int count ) {
 	syscall( CG_R_DOOM_SECTORLIGHTS, levels, count );
 }

@@ -187,7 +187,8 @@ typedef enum {
 	// Q3Doom: the engine's Doom data, shared read-only with the native module
 	CG_DOOM_GETMAP = 900,		// ( const char *mapname ) -> const doom_map_t *, NULL if not a Doom map
 	CG_DOOM_GETWAD,				// () -> const doom_wad_t *
-	CG_R_DOOM_SECTORLIGHTS		// ( const byte *levels, int count )
+	CG_R_DOOM_SECTORLIGHTS,		// ( const byte *levels, int count )
+	CG_R_DOOM_LEVELSHOT			// ( const char *name ): save this frame as a menu picture
 } cgameImport_t;
 
 

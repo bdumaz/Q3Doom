@@ -705,6 +705,9 @@ intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 	case CG_R_DOOM_SECTORLIGHTS:
 		re.DoomSectorLights( VMA(1), (int)args[2] );
 		return 0;
+	case CG_R_DOOM_LEVELSHOT:
+		CL_DoomLevelShot( VMA(1) );
+		return 0;
 
 	default:
 	        assert(0); // bk010102

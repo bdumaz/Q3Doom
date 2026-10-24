@@ -1234,6 +1234,7 @@ void		R_InitShaders( void );
 void		R_ShaderList_f( void );
 void    R_RemapShader(const char *oldShader, const char *newShader, const char *timeOffset);
 void	R_DoomSectorLights( const byte *levels, int count );
+void	R_DoomTakeLevelShot( void );
 
 /*
 ====================================================================
