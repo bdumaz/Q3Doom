@@ -110,6 +110,8 @@ typedef struct {
 	qboolean			finale;			// the episode is over
 	int					exitTics;		// the level time, for the tally
 	qboolean			restarting;		// the player died, the level reloads
+
+	int					weaponSet;		// DOOM_WEAPONS_*: DoomFrag's or the campaign's option
 } doomLevel_t;
 
 extern doomLevel_t	doomLevel;

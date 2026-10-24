@@ -926,6 +926,17 @@ void Doom_InitLevel( void ) {
 	}
 	Doom_InitMobjs();
 	Doom_InitCampaign();
+
+	// the weapons of this level: DoomFrag's option, the campaign's option,
+	// else Doom's; the clients read it from the serverinfo
+	if ( g_doomFrag.integer ) {
+		doomLevel.weaponSet = (int)Com_Clamp( DOOM_WEAPONS_DOOM, DOOM_WEAPONS_NONE, g_doomWeapons.integer );
+	} else if ( doomLevel.campaign && g_doomCampaignWeapons.integer ) {
+		doomLevel.weaponSet = DOOM_WEAPONS_Q3;
+	} else {
+		doomLevel.weaponSet = DOOM_WEAPONS_DOOM;
+	}
+	trap_Cvar_Set( "g_doomWeaponSet", va( "%d", doomLevel.weaponSet ) );
 }
 
 /*

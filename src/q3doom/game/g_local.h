@@ -777,6 +777,8 @@ extern	vmCvar_t	g_doomMonsters;
 extern	vmCvar_t	g_doomFrag;
 extern	vmCvar_t	g_doomPhysics;
 extern	vmCvar_t	g_doomWeapons;
+extern	vmCvar_t	g_doomCampaignWeapons;
+extern	vmCvar_t	g_doomWeaponSet;
 extern	vmCvar_t	g_doomLoadout;
 extern	vmCvar_t	g_doomFinish;
 extern	vmCvar_t	pmove_msec;

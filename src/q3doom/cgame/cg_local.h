@@ -1003,7 +1003,7 @@ typedef struct {
 	int				dmflags;
 	float			stepHeight;		// Q3Doom: g_stepHeight from the serverinfo
 	qboolean		doomFrag;		// Q3Doom: a DoomFrag run (g_doomFrag)
-	int				doomWeapons;	// Q3Doom: DOOM_WEAPONS_*, Doom outside DoomFrag
+	int				doomWeapons;	// Q3Doom: DOOM_WEAPONS_* of the level (g_doomWeaponSet)
 	int				teamflags;
 	int				fraglimit;
 	int				capturelimit;

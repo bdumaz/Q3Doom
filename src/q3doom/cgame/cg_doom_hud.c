@@ -374,8 +374,7 @@ The Doom status bar is up: the 3D view stops above it
 =================
 */
 qboolean CG_DoomHudActive( void ) {
-	// DoomFrag's Quake 3 weapons have no place on Doom's status bar
-	return hud.active && !cg_hudStyle.integer && cgs.doomWeapons != DOOM_WEAPONS_Q3 && cg.snap && cg.snap->ps.pm_type != PM_INTERMISSION
+	return hud.active && !cg_hudStyle.integer && cg.snap && cg.snap->ps.pm_type != PM_INTERMISSION
 		&& cg.snap->ps.persistant[PERS_TEAM] != TEAM_SPECTATOR;
 }
 
@@ -589,6 +588,30 @@ static void FillBorder( void ) {
 
 /*
 =================
+DrawQ3Weapons
+
+The Quake 3 weapon set on Doom's status bar: the ready weapon's ammo, and
+the ammo of the weapons in the places of Doom's bullets, shells, rockets
+and cells (the machinegun, shotgun, rocket launcher and plasma gun), out
+of Quake 3's 200
+=================
+*/
+static void DrawQ3Weapons( const playerState_t *ps ) {
+	static const int	q3Ammo[DAM_NUMAMMO] = { WP_MACHINEGUN, WP_SHOTGUN, WP_PLASMAGUN, WP_ROCKET_LAUNCHER };	// DAM_* order
+	static const int	ammoY[DAM_NUMAMMO] = { 173, 179, 191, 185 };
+	int					i;
+
+	if ( ps->weapon > WP_NONE && ps->weapon <= WP_BFG && ps->ammo[ps->weapon] >= 0 ) {
+		DrawNum( 44, 171, ps->ammo[ps->weapon], 3, hud.tallNum );
+	}
+	for ( i = 0 ; i < DAM_NUMAMMO ; i++ ) {
+		DrawNum( 288, ammoY[i], ps->ammo[q3Ammo[i]], 3, hud.shortNum );
+		DrawNum( 314, ammoY[i], 200, 3, hud.shortNum );
+	}
+}
+
+/*
+=================
 DrawStatusBar
 
 ST_drawWidgets: ammo, health, arms, face, armor, keys, ammo counts
@@ -601,8 +624,11 @@ static void DrawStatusBar( const playerState_t *ps ) {
 	FillBorder();
 	DrawPatch( 0, ST_Y, hud.sbar );
 
-	// ready weapon's ammo
-	if ( weapon >= 0 && weapon < DWP_NUMWEAPONS && bg_doomWeapons[weapon].ammo < DAM_NUMAMMO ) {
+	// the Quake 3 weapon set: its ammo in Doom's places
+	if ( cgs.doomWeapons == DOOM_WEAPONS_Q3 ) {
+		DrawQ3Weapons( ps );
+	} else if ( weapon >= 0 && weapon < DWP_NUMWEAPONS && bg_doomWeapons[weapon].ammo < DAM_NUMAMMO ) {
+		// ready weapon's ammo
 		DrawNum( 44, 171, ps->ammo[bg_doomWeapons[weapon].ammo], 3, hud.tallNum );
 	}
 
@@ -615,7 +641,10 @@ static void DrawStatusBar( const playerState_t *ps ) {
 	// arms: 2-7, yellow when owned
 	DrawPatch( 104, 168, hud.starms );
 	for ( i = 0 ; i < 6 ; i++ ) {
-		DrawPatch( 111 + ( i % 3 ) * 12, 172 + ( i / 3 ) * 10, DOOM_OWNS( ps, DWP_PISTOL + i ) ? hud.shortNum[i + 2] : hud.greyNum[i + 2] );
+		qboolean owned = cgs.doomWeapons == DOOM_WEAPONS_Q3 ? ( ps->stats[STAT_WEAPONS] & ( 1 << bg_doomQ3Weapon[DWP_PISTOL + i] ) ) != 0
+			: DOOM_OWNS( ps, DWP_PISTOL + i );
+
+		DrawPatch( 111 + ( i % 3 ) * 12, 172 + ( i / 3 ) * 10, owned ? hud.shortNum[i + 2] : hud.greyNum[i + 2] );
 	}
 
 	// face
@@ -635,9 +664,11 @@ static void DrawStatusBar( const playerState_t *ps ) {
 	}
 
 	// ammo and maximum ammo
-	for ( i = 0 ; i < DAM_NUMAMMO ; i++ ) {
-		DrawNum( 288, ammoY[i], ps->ammo[i], 3, hud.shortNum );
-		DrawNum( 314, ammoY[i], BG_DoomMaxAmmo( ps, i ), 3, hud.shortNum );
+	if ( cgs.doomWeapons != DOOM_WEAPONS_Q3 ) {
+		for ( i = 0 ; i < DAM_NUMAMMO ; i++ ) {
+			DrawNum( 288, ammoY[i], ps->ammo[i], 3, hud.shortNum );
+			DrawNum( 314, ammoY[i], BG_DoomMaxAmmo( ps, i ), 3, hud.shortNum );
+		}
 	}
 }
 

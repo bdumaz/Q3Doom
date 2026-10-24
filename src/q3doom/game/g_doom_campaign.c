@@ -160,20 +160,29 @@ THE INVENTORY BETWEEN LEVELS (G_PlayerFinishLevel)
 =====================================================================
 */
 
+// "<set> <health> <armor> <armortype> <weapons> <backpack> <weapon> <ammo 0> ... <ammo 9>":
+// ps->ammo holds Doom's ammo types (DAM_*) or the Quake 3 weapons' ammo (WP_*)
+#define CARRY_AMMO		( WP_BFG + 1 )
+#define CARRY_VALUES	( 7 + CARRY_AMMO )
+
 static void SaveCarry( void ) {
-	int		i;
+	int		i, j;
 
 	for ( i = 0 ; i < level.maxclients ; i++ ) {
 		gclient_t		*cl = &level.clients[i];
 		playerState_t	*ps = &cl->ps;
+		char			buf[256];
 
 		if ( cl->pers.connected != CON_CONNECTED || cl->sess.sessionTeam == TEAM_SPECTATOR || ps->stats[STAT_HEALTH] <= 0 ) {
 			trap_Cvar_Set( va( "g_doomCarry%d", i ), "" );
 			continue;
 		}
-		trap_Cvar_Set( va( "g_doomCarry%d", i ), va( "%d %d %d %d %d %d %d %d %d %d", ps->stats[STAT_HEALTH], ps->stats[STAT_ARMOR],
-			ps->stats[STAT_DOOM_ARMORTYPE], ps->stats[STAT_WEAPONS], ps->stats[STAT_DOOM_BACKPACK], ps->weapon,
-			ps->ammo[DAM_CLIP], ps->ammo[DAM_SHELL], ps->ammo[DAM_CELL], ps->ammo[DAM_MISL] ) );
+		Com_sprintf( buf, sizeof( buf ), "%d %d %d %d %d %d %d", DOOM_WEAPONSET( ps ), ps->stats[STAT_HEALTH], ps->stats[STAT_ARMOR],
+			ps->stats[STAT_DOOM_ARMORTYPE], ps->stats[STAT_WEAPONS], ps->stats[STAT_DOOM_BACKPACK], ps->weapon );
+		for ( j = 0 ; j < CARRY_AMMO ; j++ ) {
+			Q_strcat( buf, sizeof( buf ), va( " %d", ps->ammo[j] ) );
+		}
+		trap_Cvar_Set( va( "g_doomCarry%d", i ), buf );
 	}
 }
 
@@ -195,31 +204,43 @@ the previous level (once)
 */
 void Doom_ApplyCarry( gclient_t *client ) {
 	playerState_t	*ps = &client->ps;
-	char			buf[256];
-	int				v[10], n, num = client - level.clients;
+	char			buf[256], *p = buf, *token;
+	int				v[CARRY_VALUES], n, num = client - level.clients;
 
 	trap_Cvar_VariableStringBuffer( va( "g_doomCarry%d", num ), buf, sizeof( buf ) );
 	if ( !buf[0] ) {
 		return;
 	}
 	trap_Cvar_Set( va( "g_doomCarry%d", num ), "" );
-	n = sscanf( buf, "%d %d %d %d %d %d %d %d %d %d", &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8], &v[9] );
-	if ( n != 10 || v[0] <= 0 ) {
+	for ( n = 0 ; n < CARRY_VALUES ; n++ ) {
+		token = COM_Parse( &p );
+		if ( !token[0] ) {
+			break;
+		}
+		v[n] = atoi( token );
+	}
+	if ( n != CARRY_VALUES || v[1] <= 0 ) {
 		return;
 	}
-	ps->stats[STAT_HEALTH] = g_entities[num].health = v[0];
-	ps->stats[STAT_ARMOR] = v[1];
-	ps->stats[STAT_DOOM_ARMORTYPE] = v[2];
-	ps->stats[STAT_WEAPONS] = v[3];
-	ps->stats[STAT_DOOM_BACKPACK] = v[4];
-	ps->ammo[DAM_CLIP] = v[6];
-	ps->ammo[DAM_SHELL] = v[7];
-	ps->ammo[DAM_CELL] = v[8];
-	ps->ammo[DAM_MISL] = v[9];
-	if ( v[5] > 0 && v[5] <= DWP_NUMWEAPONS && ( v[3] & ( 1 << v[5] ) ) ) {
-		ps->weapon = v[5];
-		ps->doomPendingWeapon = 0;
-		BG_DoomBringUpWeapon( ps );
+	ps->stats[STAT_HEALTH] = g_entities[num].health = v[1];
+	ps->stats[STAT_ARMOR] = v[2];
+	ps->stats[STAT_DOOM_ARMORTYPE] = v[3];
+	ps->stats[STAT_DOOM_BACKPACK] = v[5];
+
+	// the weapons only stay with the same weapon set
+	if ( v[0] != DOOM_WEAPONSET( ps ) ) {
+		return;
+	}
+	ps->stats[STAT_WEAPONS] = v[4];
+	for ( n = 0 ; n < CARRY_AMMO ; n++ ) {
+		ps->ammo[n] = v[7 + n];
+	}
+	if ( v[6] > 0 && v[6] <= WP_BFG && ( v[4] & ( 1 << v[6] ) ) ) {
+		ps->weapon = v[6];
+		if ( v[0] == DOOM_WEAPONS_DOOM ) {
+			ps->doomPendingWeapon = 0;
+			BG_DoomBringUpWeapon( ps );
+		}
 	}
 }
 

@@ -42,6 +42,7 @@ enum {
 	ID_BACK,
 	ID_PLAY,
 	ID_SKILL,
+	ID_CAMPAIGNWEAPONS,
 	ID_MAPLIST,
 	ID_PHYSICS,
 	ID_WEAPONS,
@@ -71,6 +72,8 @@ static const char *levelNames[NUM_EPISODES][NUM_MAPS] = {
 static const char *skillNames[] = {
 	"I'm too young to die.", "Hey, not too rough.", "Hurt me plenty.", "Ultra-Violence.", "Nightmare!", NULL
 };
+
+static const char *campaignWeaponNames[] = { "Doom", "Quake 3", NULL };
 
 static const char *medalNames[] = { "", "Bronze", "Silver", "Gold", "Skull" };
 
@@ -174,6 +177,7 @@ static struct {
 	menutext_s		banner;
 	menubitmap_s	tiles[NUM_LEVELS];
 	menulist_s		skill;
+	menulist_s		weapons;
 	menutext_s		play;
 	menubitmap_s	back;
 
@@ -266,6 +270,7 @@ static void Campaign_Play( void ) {
 		return;
 	}
 	trap_Cvar_SetValue( "g_doomSkill", s_campaign.skill.curvalue );
+	trap_Cvar_SetValue( "g_doomCampaignWeapons", s_campaign.weapons.curvalue );
 	trap_Cmd_ExecuteText( EXEC_APPEND, va( "doom_campaign %s %d\n", LevelMap( s_campaign.selected ), s_campaign.skill.curvalue ) );
 }
 
@@ -297,6 +302,9 @@ static void Campaign_Event( void *ptr, int notification ) {
 		break;
 	case ID_SKILL:
 		trap_Cvar_SetValue( "g_doomSkill", s_campaign.skill.curvalue );
+		break;
+	case ID_CAMPAIGNWEAPONS:
+		trap_Cvar_SetValue( "g_doomCampaignWeapons", s_campaign.weapons.curvalue );
 		break;
 	case ID_BACK:
 		UI_PopMenu();
@@ -395,6 +403,18 @@ void UI_DoomCampaignMenu( void ) {
 	s_campaign.skill.itemnames = skillNames;
 	s_campaign.skill.curvalue = (int)Com_Clamp( 0, 4, trap_Cvar_VariableValue( "g_doomSkill" ) );
 	Menu_AddItem( &s_campaign.menu, &s_campaign.skill );
+
+	// Doom's or Quake 3's weapons: either set progresses the campaign
+	s_campaign.weapons.generic.type = MTYPE_SPINCONTROL;
+	s_campaign.weapons.generic.flags = QMF_PULSEIFFOCUS | QMF_SMALLFONT;
+	s_campaign.weapons.generic.name = "Weapons:";
+	s_campaign.weapons.generic.id = ID_CAMPAIGNWEAPONS;
+	s_campaign.weapons.generic.callback = Campaign_Event;
+	s_campaign.weapons.generic.x = 320;
+	s_campaign.weapons.generic.y = s_campaign.skill.generic.y + 18;
+	s_campaign.weapons.itemnames = campaignWeaponNames;
+	s_campaign.weapons.curvalue = (int)Com_Clamp( 0, 1, trap_Cvar_VariableValue( "g_doomCampaignWeapons" ) );
+	Menu_AddItem( &s_campaign.menu, &s_campaign.weapons );
 
 	s_campaign.play.generic.type = MTYPE_PTEXT;
 	s_campaign.play.generic.flags = QMF_RIGHT_JUSTIFY | QMF_PULSEIFFOCUS;

@@ -30,16 +30,18 @@ const doomWeaponInfo_t bg_doomWeapons[DWP_NUMWEAPONS] = {
 	{ DAM_SHELL,	S_DSGUNUP,		S_DSGUNDOWN,	S_DSGUN,	S_DSGUN1,	S_DSGUNFLASH1 }
 };
 
-// DoomFrag's Quake 3 weapon set: what each Doom weapon pickup gives
+// The Quake 3 weapon set: what each Doom weapon pickup gives. The machinegun
+// is Quake 3's starting weapon, so the chaingun gives the railgun; the
+// chainsaw, Doom's other close range weapon, gives the lightning gun.
 const int bg_doomQ3Weapon[DWP_NUMWEAPONS] = {
 	WP_GAUNTLET,		// fist
 	WP_MACHINEGUN,		// pistol
 	WP_SHOTGUN,
-	WP_LIGHTNING,		// chaingun
+	WP_RAILGUN,			// chaingun
 	WP_ROCKET_LAUNCHER,
 	WP_PLASMAGUN,
 	WP_BFG,
-	WP_RAILGUN,			// chainsaw
+	WP_LIGHTNING,		// chainsaw
 	WP_SHOTGUN			// super shotgun
 };
 
@@ -138,9 +140,9 @@ int BG_DoomStaticThing( const doom_thing_t *t, int skill ) {
 	if ( type < 0 || type == MT_PLAYER ) {
 		return -1;
 	}
-	// monsters come with M6, items are entities; invisible things
-	// (teleport destinations) are markers
-	if ( doom_mobjinfo[type].flags & ( MF_COUNTKILL | MF_SPECIAL | MF_NOSECTOR ) ) {
+	// monsters and barrels act (g_doom_mobj.c) and items are entities;
+	// invisible things (teleport destinations) are markers
+	if ( doom_mobjinfo[type].flags & ( MF_COUNTKILL | MF_SHOOTABLE | MF_SPECIAL | MF_NOSECTOR ) ) {
 		return -1;
 	}
 	return type;

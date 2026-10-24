@@ -166,14 +166,14 @@ void CG_DoomWeapon_f( void ) {
 	}
 	weapon = slot - 1;		// slots 1-7 are the weapons in Doom's order
 
-	// DoomFrag's Quake 3 set: the same slots with the Quake 3 weapons (the
-	// railgun in place of the chainsaw: 1 switches between it and the gauntlet)
+	// the Quake 3 set: the same slots with the Quake 3 weapons (the lightning
+	// gun in place of the chainsaw: 1 switches between it and the gauntlet)
 	if ( cgs.doomWeapons == DOOM_WEAPONS_Q3 ) {
 		int		q3 = bg_doomQ3Weapon[weapon];
 
-		if ( weapon == DWP_FIST && ( ps->stats[STAT_WEAPONS] & ( 1 << WP_RAILGUN ) ) && ps->ammo[WP_RAILGUN]
-			&& cg.weaponSelect != WP_RAILGUN ) {
-			q3 = WP_RAILGUN;
+		if ( weapon == DWP_FIST && ( ps->stats[STAT_WEAPONS] & ( 1 << WP_LIGHTNING ) ) && ps->ammo[WP_LIGHTNING]
+			&& cg.weaponSelect != WP_LIGHTNING ) {
+			q3 = WP_LIGHTNING;
 		}
 		if ( ( ps->stats[STAT_WEAPONS] & ( 1 << q3 ) ) && ps->ammo[q3] ) {
 			cg.weaponSelectTime = cg.time;

@@ -141,9 +141,14 @@ static qboolean GivePower( gentity_t *ent, int power ) {
 =================
 GiveQ3
 
-DoomFrag's Quake 3 weapon set: a Doom weapon gives its Quake 3 counterpart
+The Quake 3 weapon set: a Doom weapon gives its Quake 3 counterpart
 (bg_doomQ3Weapon) with that weapon's ammo, and Doom ammo gives the ammo of
-the Quake 3 weapons that took the place of the Doom ones using it
+the Quake 3 weapons that took the place of the Doom ones using it:
+	clip, box of bullets	machinegun bullets, railgun slugs (the chaingun)
+	shells					shotgun shells
+	rocket, box of rockets	rockets
+	cell, cell pack			plasma cells, lightning ammo, BFG ammo
+A backpack gives one clip of each.
 =================
 */
 static void AddQ3Ammo( playerState_t *ps, int weapon, int count ) {
@@ -175,17 +180,17 @@ static qboolean GiveQ3( playerState_t *ps, const gitem_t *item ) {
 		switch ( i ) {
 		case DAM_CLIP:
 			AddQ3Ammo( ps, WP_MACHINEGUN, 10 * clips );
-			AddQ3Ammo( ps, WP_LIGHTNING, 20 * clips );
+			AddQ3Ammo( ps, WP_RAILGUN, 2 * clips );
 			break;
 		case DAM_SHELL:
 			AddQ3Ammo( ps, WP_SHOTGUN, 4 * clips );
-			AddQ3Ammo( ps, WP_RAILGUN, 2 * clips );
 			break;
 		case DAM_MISL:
 			AddQ3Ammo( ps, WP_ROCKET_LAUNCHER, clips );
 			break;
 		case DAM_CELL:
 			AddQ3Ammo( ps, WP_PLASMAGUN, 20 * clips );
+			AddQ3Ammo( ps, WP_LIGHTNING, 20 * clips );
 			AddQ3Ammo( ps, WP_BFG, clips );
 			break;
 		}
@@ -285,12 +290,9 @@ G_PlayerReborn: 100 health, the fist and the pistol with 50 bullets
 */
 void Doom_GivePlayerStart( gclient_t *client ) {
 	playerState_t	*ps = &client->ps;
-	int				set = DOOM_WEAPONS_DOOM, i;
+	int				set = doomLevel.weaponSet, i;
 
-	// DoomFrag's weapon set and physics, in the player state for the prediction
-	if ( g_doomFrag.integer ) {
-		set = (int)Com_Clamp( DOOM_WEAPONS_DOOM, DOOM_WEAPONS_NONE, g_doomWeapons.integer );
-	}
+	// the weapon set and DoomFrag's physics, in the player state for the prediction
 	ps->stats[STAT_DOOM_RULES] = set | ( g_doomFrag.integer && g_doomPhysics.integer ? DOOMRULES_CPM : 0 );
 
 	memset( ps->ammo, 0, sizeof( ps->ammo ) );
@@ -312,7 +314,7 @@ void Doom_GivePlayerStart( gclient_t *client ) {
 		// Quake 3's start: the gauntlet and the machinegun, or everything
 		ps->stats[STAT_WEAPONS] = ( 1 << WP_GAUNTLET ) | ( 1 << WP_MACHINEGUN );
 		ps->ammo[WP_MACHINEGUN] = 100;
-		if ( g_doomLoadout.integer ) {
+		if ( g_doomFrag.integer && g_doomLoadout.integer ) {
 			for ( i = WP_MACHINEGUN ; i <= WP_BFG ; i++ ) {
 				ps->stats[STAT_WEAPONS] |= 1 << i;
 				ps->ammo[i] = 200;
@@ -409,8 +411,7 @@ void Doom_SpawnItems( void ) {
 			continue;
 		}
 		// DoomFrag without weapons: no weapons and ammo to pick up
-		if ( g_doomFrag.integer && g_doomWeapons.integer == DOOM_WEAPONS_NONE
-			&& ( bg_itemlist[itemNum].giType == IT_WEAPON || bg_itemlist[itemNum].giType == IT_AMMO ) ) {
+		if ( doomLevel.weaponSet == DOOM_WEAPONS_NONE && ( bg_itemlist[itemNum].giType == IT_WEAPON || bg_itemlist[itemNum].giType == IT_AMMO ) ) {
 			continue;
 		}
 		ent = Doom_SpawnItemAt( itemNum, t->x + 0.25f, t->y + 0.25f, qfalse );

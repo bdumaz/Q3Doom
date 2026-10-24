@@ -90,6 +90,8 @@ vmCvar_t	g_doomPhysics;
 vmCvar_t	g_doomWeapons;
 vmCvar_t	g_doomLoadout;
 vmCvar_t	g_doomFinish;
+vmCvar_t	g_doomCampaignWeapons;
+vmCvar_t	g_doomWeaponSet;
 vmCvar_t	pmove_msec;
 vmCvar_t	g_rankings;
 vmCvar_t	g_listEntity;
@@ -208,6 +210,9 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_doomWeapons, "g_doomWeapons", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},		// 0 Doom, 1 Quake 3, 2 none
 	{ &g_doomLoadout, "g_doomLoadout", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},		// 0 pick up, 1 all from the start
 	{ &g_doomFinish, "g_doomFinish", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},		// 0 exit, 1 all monsters dead first
+	// Q3Doom: the campaign's weapons (0 Doom, 1 Quake 3), and the set of this level for the clients (Doom_InitLevel)
+	{ &g_doomCampaignWeapons, "g_doomCampaignWeapons", "0", CVAR_ARCHIVE, 0, qfalse},
+	{ &g_doomWeaponSet, "g_doomWeaponSet", "0", CVAR_SERVERINFO, 0, qfalse},
 	{ &pmove_msec, "pmove_msec", "8", CVAR_SYSTEMINFO, 0, qfalse},
 
 	{ &g_rankings, "g_rankings", "0", 0, 0, qfalse}
