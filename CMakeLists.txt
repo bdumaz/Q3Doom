@@ -11,8 +11,9 @@ set(RUN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/run CACHE PATH "Runtime folder (binaries
 set(ARCH_STRING x86_64)
 
 # --- SDL2 --------------------------------------------------------------------
-if(WIN32)
-  set(SDL2_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/SDL2/SDL2-2.32.10/cmake)
+# on Windows the VC development package, by default in external/ (-DSDL2_DIR to use another)
+if(WIN32 AND NOT SDL2_DIR)
+  set(SDL2_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/SDL2/SDL2-2.32.10/cmake CACHE PATH "SDL2 cmake folder")
 endif()
 find_package(SDL2 REQUIRED CONFIG)
 
