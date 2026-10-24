@@ -520,9 +520,25 @@ static void AddSprite( const vec3_t origin, float angle, int state, int light, q
 		verts[i].st[0] = rot->flip ? 1.0f - s : s;
 		verts[i].st[1] = ( i < 2 ) ? 0.0f : 1.0f;
 		verts[i].modulate[0] = verts[i].modulate[1] = verts[i].modulate[2] = color;
-		verts[i].modulate[3] = fuzz ? 160 : 255;
+		verts[i].modulate[3] = 255;
 	}
-	trap_R_AddPolyToScene( fuzz ? FuzzShader( rot->lump ) : LumpShader( rot->lump ), 4, verts );
+	if ( !fuzz ) {
+		trap_R_AddPolyToScene( LumpShader( rot->lump ), 4, verts );
+		return;
+	}
+
+	// Doom's fuzz scrambles the pixels behind a spectre, so its outline
+	// shimmers: the darkened shape is jittered and flickers every frame
+	for ( i = 0 ; i < 4 ; i++ ) {
+		float	dx = crandom() * 2.5f, dz = crandom() * 2.5f;
+
+		verts[i].xyz[0] += right[0] * dx;
+		verts[i].xyz[1] += right[1] * dx;
+		verts[i].xyz[2] += dz;
+		// the alpha also cuts out the shape (alpha test at 0x80): above it
+		verts[i].modulate[3] = 135 + ( rand() % 60 );
+	}
+	trap_R_AddPolyToScene( FuzzShader( rot->lump ), 4, verts );
 }
 
 void CG_DoomAddSprite( const vec3_t origin, float angle, int state, int light ) {

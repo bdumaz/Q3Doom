@@ -223,12 +223,10 @@ void SV_Startup( void ) {
 	SV_BoundMaxClients( 1 );
 
 	svs.clients = Z_Malloc (sizeof(client_t) * sv_maxclients->integer );
-	if ( com_dedicated->integer ) {
-		svs.numSnapshotEntities = sv_maxclients->integer * PACKET_BACKUP * 64;
-	} else {
-		// we don't need nearly as many when playing locally
-		svs.numSnapshotEntities = sv_maxclients->integer * 4 * 64;
-	}
+	// Q3Doom: Doom maps send several hundred entities per snapshot (every
+	// item, monster and moving sector): room for all of them in every
+	// snapshot kept for delta compression, also when playing locally
+	svs.numSnapshotEntities = sv_maxclients->integer * PACKET_BACKUP * 256;
 	svs.initialized = qtrue;
 
 	Cvar_Set( "sv_running", "1" );
@@ -293,12 +291,10 @@ void SV_ChangeMaxClients( void ) {
 	Hunk_FreeTempMemory( oldClients );
 	
 	// allocate new snapshot entities
-	if ( com_dedicated->integer ) {
-		svs.numSnapshotEntities = sv_maxclients->integer * PACKET_BACKUP * 64;
-	} else {
-		// we don't need nearly as many when playing locally
-		svs.numSnapshotEntities = sv_maxclients->integer * 4 * 64;
-	}
+	// Q3Doom: Doom maps send several hundred entities per snapshot (every
+	// item, monster and moving sector): room for all of them in every
+	// snapshot kept for delta compression, also when playing locally
+	svs.numSnapshotEntities = sv_maxclients->integer * PACKET_BACKUP * 256;
 }
 
 /*

@@ -75,7 +75,7 @@ typedef struct {
 // the parseEntities array must be large enough to hold PACKET_BACKUP frames of
 // entities, so that when a delta compressed message arives from the server
 // it can be un-deltad from the original 
-#define	MAX_PARSE_ENTITIES	2048
+#define	MAX_PARSE_ENTITIES	8192	// Q3Doom: was 2048, several snapshots of up to 1024 entities
 
 extern int g_console_field_width;
 
