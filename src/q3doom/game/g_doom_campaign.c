@@ -256,12 +256,16 @@ tally goes to the clients. After an episode's last map comes its finale
 (no tally in Doom).
 =================
 */
-void Doom_ExitLevel( qboolean secret ) {
+qboolean Doom_ExitLevel( gentity_t *activator, qboolean secret ) {
 	char	map[MAX_QPATH];
 	int		episode, mapnum;
 
 	if ( doomLevel.intermission ) {
-		return;
+		return qtrue;
+	}
+	// a DoomFrag run ends here (or not yet, with monsters left)
+	if ( Doom_FragActive() ) {
+		return Doom_FragExit( activator );
 	}
 	trap_Cvar_VariableStringBuffer( "mapname", map, sizeof( map ) );
 	NextMapName( map, secret, doomLevel.nextMap, sizeof( doomLevel.nextMap ) );
@@ -280,17 +284,18 @@ void Doom_ExitLevel( qboolean secret ) {
 		// not an episode map: straight to the next one
 		trap_SetConfigstring( CS_DOOM_INTERMISSION, "" );
 		doomLevel.finale = qfalse;
-		return;
+		return qtrue;
 	}
 	if ( mapnum == 8 ) {
 		doomLevel.finale = qtrue;
 		trap_SetConfigstring( CS_DOOM_INTERMISSION, va( "finale %d", episode ) );
-		return;
+		return qtrue;
 	}
 	trap_SetConfigstring( CS_DOOM_INTERMISSION, va( "wi %d %d %d %d %d %d %d %d %d %d %d %d", episode - 1, mapnum - 1,
 		doomLevel.nextMap[3] - '1', secret || mapnum == 9 || trap_Cvar_VariableIntegerValue( "g_doomDidSecret" ),
 		doomLevel.kills, doomLevel.totalKills, doomLevel.items, doomLevel.totalItems,
 		doomLevel.secretsFound, doomLevel.totalSecrets, doomLevel.exitTics, doom_par_time( episode, mapnum ) * DOOM_TICRATE ) );
+	return qtrue;
 }
 
 // G_WorldDone: the next map, with what the players carry
@@ -302,8 +307,9 @@ static void WorldDone( void ) {
 void Doom_CampaignFrame( void ) {
 	char	cs[16];
 
-	// a level that is not an episode map goes on at once
-	if ( doomLevel.intermission && !doomLevel.finale ) {
+	// a level that is not an episode map goes on at once (not a DoomFrag run:
+	// it shows its result)
+	if ( doomLevel.intermission && !doomLevel.finale && !Doom_FragActive() ) {
 		trap_GetConfigstring( CS_DOOM_INTERMISSION, cs, sizeof( cs ) );
 		if ( !cs[0] && !doomLevel.restarting ) {
 			doomLevel.restarting = qtrue;
@@ -322,7 +328,7 @@ The clients' "doom_worlddone" (the intermission is over) and
 */
 qboolean Doom_CampaignCommand( gentity_t *ent, const char *cmd ) {
 	if ( !Q_stricmp( cmd, "doom_worlddone" ) ) {
-		if ( doomLevel.intermission && !doomLevel.finale && !doomLevel.restarting ) {
+		if ( doomLevel.intermission && !doomLevel.finale && !doomLevel.restarting && !Doom_FragActive() ) {
 			doomLevel.restarting = qtrue;
 			WorldDone();
 		}

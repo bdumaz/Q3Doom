@@ -138,9 +138,18 @@ qboolean	Doom_TeleportMobj( gentity_t *ent, int tag );
 void		Doom_PlayerBump( gentity_t *ent );
 void		Doom_ShootSwitch( gentity_t *attacker, const vec3_t start, const vec3_t end );
 
+// g_doom_frag.c
+void		Doom_InitFrag( void );
+qboolean	Doom_FragActive( void );
+qboolean	Doom_FragWaiting( void );
+void		Doom_FragInput( gentity_t *ent, const usercmd_t *cmd );
+void		Doom_FragUpdate( void );
+qboolean	Doom_FragExit( gentity_t *activator );
+qboolean	Doom_FragCommand( gentity_t *ent, const char *cmd );
+
 // g_doom_campaign.c
 void		Doom_InitCampaign( void );
-void		Doom_ExitLevel( qboolean secret );
+qboolean	Doom_ExitLevel( gentity_t *activator, qboolean secret );
 void		Doom_CampaignFrame( void );
 qboolean	Doom_CampaignCommand( gentity_t *ent, const char *cmd );
 qboolean	Doom_PlayerDied( gentity_t *ent );

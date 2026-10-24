@@ -2,13 +2,17 @@
 ===========================================================================
 Q3Doom - the single player menus
 
-SINGLE PLAYER opens a choice between the Doom Campaign and DoomFrag (M9).
+SINGLE PLAYER opens a choice between the Doom Campaign and DoomFrag.
 The Campaign screen shows the 36 levels of The Ultimate Doom as tiles, a
 row per episode: the level's first frame (captured the first time it is
 played), its name and the best medal earned; locked levels are dark with
 a padlock. A click selects a level, Play or a double click starts it at
 the difficulty picked below the tiles. The progress comes from
 campaign.dat, written by the game (libdoom's doom_progress_*).
+
+The DoomFrag screen lists every map with the best time for the options
+picked below the list (doomfrag.dat, libdoom's doom_records_*) and the par
+time; Start or a double click runs the map (the doomfrag command).
 
 Licensed under the GNU General Public License version 2 or later.
 ===========================================================================
@@ -38,6 +42,13 @@ enum {
 	ID_BACK,
 	ID_PLAY,
 	ID_SKILL,
+	ID_MAPLIST,
+	ID_PHYSICS,
+	ID_WEAPONS,
+	ID_LOADOUT,
+	ID_MONSTERS,
+	ID_FINISH,
+	ID_START,
 	ID_TILE0 = 100
 };
 
@@ -91,6 +102,9 @@ static void DoomSP_Event( void *ptr, int notification ) {
 	case ID_CAMPAIGN:
 		UI_DoomCampaignMenu();
 		break;
+	case ID_DOOMFRAG:
+		UI_DoomFragMenu();
+		break;
 	case ID_BACK:
 		UI_PopMenu();
 		break;
@@ -119,9 +133,8 @@ void UI_DoomSinglePlayerMenu( void ) {
 	s_doomsp.campaign.color = color_red;
 	s_doomsp.campaign.style = UI_CENTER;
 
-	// the time trials come with M9
 	s_doomsp.doomfrag.generic.type = MTYPE_PTEXT;
-	s_doomsp.doomfrag.generic.flags = QMF_CENTER_JUSTIFY | QMF_GRAYED;
+	s_doomsp.doomfrag.generic.flags = QMF_CENTER_JUSTIFY | QMF_PULSEIFFOCUS;
 	s_doomsp.doomfrag.generic.x = 320;
 	s_doomsp.doomfrag.generic.y = 196 + 40;
 	s_doomsp.doomfrag.generic.id = ID_DOOMFRAG;
@@ -408,4 +421,257 @@ void UI_DoomCampaignMenu( void ) {
 
 	UI_PushMenu( &s_campaign.menu );
 	Menu_SetCursorToItem( &s_campaign.menu, &s_campaign.tiles[s_campaign.selected] );
+}
+
+/*
+=====================================================================
+
+DOOMFRAG
+
+=====================================================================
+*/
+
+#define FRAG_ROWS			16
+#define FRAG_LIST_Y			72
+#define FRAG_COLS			46		// characters in a row of the list
+
+static const char *physicsNames[] = { "VQ3", "CPM", NULL };
+static const char *weaponSetNames[] = { "Doom", "Quake 3", "None", NULL };
+static const char *loadoutNames[] = { "Pick up", "All from the start", NULL };
+static const char *monsterNames[] = {
+	"I'm too young to die.", "Hey, not too rough.", "Hurt me plenty.", "Ultra-Violence.", "Nightmare!", "No monsters", NULL
+};
+static const char *finishNames[] = { "Exit", "100% kills, then exit", NULL };
+
+static struct {
+	menuframework_s	menu;
+	menutext_s		banner;
+	menulist_s		maps;
+	menulist_s		physics;
+	menulist_s		weapons;
+	menulist_s		loadout;
+	menulist_s		monsters;
+	menulist_s		finish;
+	menutext_s		start;
+	menubitmap_s	back;
+
+	doom_records_t	records;
+	char			rows[NUM_LEVELS][FRAG_COLS + 1];
+	const char		*rowPtrs[NUM_LEVELS + 1];
+	int				lastClickTime, lastClickRow;
+} s_frag;
+
+static int	fragLastMap;		// the map picked the last time the screen was open
+
+static const char *FragTime( int msec ) {
+	return va( "%d:%02d.%03d", msec / 60000, msec / 1000 % 60, msec % 1000 );
+}
+
+static void Frag_LoadRecords( void ) {
+	fileHandle_t	f;
+	int				len = trap_FS_FOpenFile( "doomfrag.dat", &f, FS_READ );
+	static char		text[65536];
+
+	text[0] = 0;
+	if ( f ) {
+		if ( len > 0 && len < (int)sizeof( text ) ) {
+			trap_FS_Read( text, len, f );
+			text[len] = 0;
+		}
+		trap_FS_FCloseFile( f );
+	}
+	doom_records_parse( text, &s_frag.records );
+}
+
+// the options picked, as recorded with the times (g_doom_frag.c)
+static void Frag_Options( char *out, int size ) {
+	doom_frag_options( out, size, s_frag.physics.curvalue, s_frag.weapons.curvalue, s_frag.loadout.curvalue,
+		s_frag.monsters.curvalue, s_frag.finish.curvalue );
+}
+
+/*
+=================
+Frag_BuildRows
+
+A row per map: the map, its name, the best time with the options picked
+and the par time
+=================
+*/
+static void Frag_BuildRows( void ) {
+	char	options[DOOM_OPTIONS_LEN + 1];
+	int		i;
+
+	Frag_Options( options, sizeof( options ) );
+	for ( i = 0 ; i < NUM_LEVELS ; i++ ) {
+		int		best = doom_record_get( &s_frag.records, LevelMap( i ), options );
+		int		par = doom_par_time( i / NUM_MAPS + 1, i % NUM_MAPS + 1 );
+
+		Com_sprintf( s_frag.rows[i], sizeof( s_frag.rows[i] ), "%-5s %-21.21s %10s %6s", LevelMap( i ),
+			levelNames[i / NUM_MAPS][i % NUM_MAPS], best ? FragTime( best ) : "-", par ? va( "%d:%02d", par / 60, par % 60 ) : "-" );
+		s_frag.rowPtrs[i] = s_frag.rows[i];
+	}
+	s_frag.rowPtrs[NUM_LEVELS] = NULL;
+}
+
+static void Frag_Start( void ) {
+	int		monsters = s_frag.monsters.curvalue;
+
+	fragLastMap = s_frag.maps.curvalue;
+	trap_Cvar_SetValue( "g_doomPhysics", s_frag.physics.curvalue );
+	trap_Cvar_SetValue( "g_doomWeapons", s_frag.weapons.curvalue );
+	trap_Cvar_SetValue( "g_doomLoadout", s_frag.loadout.curvalue );
+	trap_Cvar_SetValue( "g_doomFinish", s_frag.finish.curvalue );
+	trap_Cvar_SetValue( "g_doomMonsters", monsters < 5 );
+	if ( monsters < 5 ) {
+		trap_Cvar_SetValue( "g_doomSkill", monsters );
+	}
+	trap_Cmd_ExecuteText( EXEC_APPEND, va( "doomfrag %s\n", LevelMap( s_frag.maps.curvalue ) ) );
+}
+
+static void Frag_Event( void *ptr, int notification ) {
+	int		id = ( (menucommon_s *)ptr )->id;
+
+	if ( id == ID_MAPLIST ) {
+		fragLastMap = s_frag.maps.curvalue;
+		return;
+	}
+	if ( notification != QM_ACTIVATED ) {
+		return;
+	}
+	switch ( id ) {
+	case ID_PHYSICS:
+	case ID_WEAPONS:
+	case ID_LOADOUT:
+	case ID_MONSTERS:
+	case ID_FINISH:
+		Frag_BuildRows();
+		break;
+	case ID_START:
+		Frag_Start();
+		break;
+	case ID_BACK:
+		UI_PopMenu();
+		break;
+	}
+}
+
+/*
+=================
+Frag_Key
+
+A double click on a map runs it; the mouse wheel scrolls the list
+=================
+*/
+static sfxHandle_t Frag_Key( int key ) {
+	if ( Menu_ItemAtCursor( &s_frag.menu ) == &s_frag.maps ) {
+		if ( key == K_MWHEELUP ) {
+			key = K_UPARROW;
+		} else if ( key == K_MWHEELDOWN ) {
+			key = K_DOWNARROW;
+		} else if ( key == K_ENTER || key == K_KP_ENTER ) {
+			Frag_Start();
+			return menu_in_sound;
+		} else if ( key == K_MOUSE1 ) {
+			int			before = s_frag.maps.curvalue;
+			sfxHandle_t	s = Menu_DefaultKey( &s_frag.menu, key );
+
+			if ( s_frag.maps.curvalue == before && s_frag.lastClickRow == before
+				&& uis.realtime - s_frag.lastClickTime < DOUBLECLICK_MSEC ) {
+				Frag_Start();
+				return menu_in_sound;
+			}
+			s_frag.lastClickRow = s_frag.maps.curvalue;
+			s_frag.lastClickTime = uis.realtime;
+			return s;
+		}
+	}
+	return Menu_DefaultKey( &s_frag.menu, key );
+}
+
+static void Frag_Draw( void ) {
+	UI_DrawString( s_frag.maps.generic.x, FRAG_LIST_Y - SMALLCHAR_HEIGHT - 6,
+		va( "%-5s %-21s %10s %6s", "MAP", "NAME", "BEST", "PAR" ), UI_LEFT | UI_SMALLFONT, doomRed );
+	UI_DrawRect( s_frag.maps.generic.x - 4, FRAG_LIST_Y - 4, FRAG_COLS * SMALLCHAR_WIDTH + 8, FRAG_ROWS * SMALLCHAR_HEIGHT + 8, colorMdGrey );
+	Menu_Draw( &s_frag.menu );
+}
+
+static void Frag_Spin( menulist_s *s, const char *name, int id, const char **items, int value, int y ) {
+	s->generic.type = MTYPE_SPINCONTROL;
+	s->generic.flags = QMF_PULSEIFFOCUS | QMF_SMALLFONT;
+	s->generic.name = name;
+	s->generic.id = id;
+	s->generic.callback = Frag_Event;
+	s->generic.x = 320;
+	s->generic.y = y;
+	s->itemnames = items;
+	s->curvalue = value;
+	Menu_AddItem( &s_frag.menu, s );
+}
+
+void UI_DoomFragMenu( void ) {
+	int		y = FRAG_LIST_Y + FRAG_ROWS * SMALLCHAR_HEIGHT + 20;
+
+	memset( &s_frag, 0, sizeof( s_frag ) );
+	s_frag.menu.fullscreen = qtrue;
+	s_frag.menu.draw = Frag_Draw;
+	s_frag.menu.key = Frag_Key;
+	s_frag.lastClickRow = -1;
+	Frag_LoadRecords();
+
+	s_frag.banner.generic.type = MTYPE_BTEXT;
+	s_frag.banner.generic.x = 320;
+	s_frag.banner.generic.y = 16;
+	s_frag.banner.string = "DOOMFRAG";
+	s_frag.banner.color = color_white;
+	s_frag.banner.style = UI_CENTER;
+	Menu_AddItem( &s_frag.menu, &s_frag.banner );
+
+	// the options first: the rows show the records for them
+	Frag_Spin( &s_frag.physics, "Physics:", ID_PHYSICS, physicsNames, (int)Com_Clamp( 0, 1, trap_Cvar_VariableValue( "g_doomPhysics" ) ), y );
+	Frag_Spin( &s_frag.weapons, "Weapons:", ID_WEAPONS, weaponSetNames, (int)Com_Clamp( 0, 2, trap_Cvar_VariableValue( "g_doomWeapons" ) ), y + 18 );
+	Frag_Spin( &s_frag.loadout, "Loadout:", ID_LOADOUT, loadoutNames, (int)Com_Clamp( 0, 1, trap_Cvar_VariableValue( "g_doomLoadout" ) ), y + 36 );
+	Frag_Spin( &s_frag.monsters, "Monsters:", ID_MONSTERS, monsterNames,
+		trap_Cvar_VariableValue( "g_doomMonsters" ) ? (int)Com_Clamp( 0, 4, trap_Cvar_VariableValue( "g_doomSkill" ) ) : 5, y + 54 );
+	Frag_Spin( &s_frag.finish, "Finish:", ID_FINISH, finishNames, (int)Com_Clamp( 0, 1, trap_Cvar_VariableValue( "g_doomFinish" ) ), y + 72 );
+	Frag_BuildRows();
+
+	s_frag.maps.generic.type = MTYPE_SCROLLLIST;
+	s_frag.maps.generic.flags = QMF_PULSEIFFOCUS;
+	s_frag.maps.generic.id = ID_MAPLIST;
+	s_frag.maps.generic.callback = Frag_Event;
+	s_frag.maps.generic.x = 320 - FRAG_COLS * SMALLCHAR_WIDTH / 2;
+	s_frag.maps.generic.y = FRAG_LIST_Y;
+	s_frag.maps.width = FRAG_COLS;
+	s_frag.maps.height = FRAG_ROWS;
+	s_frag.maps.numitems = NUM_LEVELS;
+	s_frag.maps.itemnames = s_frag.rowPtrs;
+	Menu_AddItem( &s_frag.menu, &s_frag.maps );
+	s_frag.maps.curvalue = fragLastMap;
+	s_frag.maps.top = fragLastMap >= FRAG_ROWS ? fragLastMap - FRAG_ROWS + 1 : 0;
+
+	s_frag.start.generic.type = MTYPE_PTEXT;
+	s_frag.start.generic.flags = QMF_RIGHT_JUSTIFY | QMF_PULSEIFFOCUS;
+	s_frag.start.generic.id = ID_START;
+	s_frag.start.generic.callback = Frag_Event;
+	s_frag.start.generic.x = 640 - 24;
+	s_frag.start.generic.y = 480 - 48;
+	s_frag.start.string = "START";
+	s_frag.start.color = color_red;
+	s_frag.start.style = UI_RIGHT;
+	Menu_AddItem( &s_frag.menu, &s_frag.start );
+
+	s_frag.back.generic.type = MTYPE_BITMAP;
+	s_frag.back.generic.name = ART_BACK0;
+	s_frag.back.generic.flags = QMF_LEFT_JUSTIFY | QMF_PULSEIFFOCUS;
+	s_frag.back.generic.id = ID_BACK;
+	s_frag.back.generic.callback = Frag_Event;
+	s_frag.back.generic.x = 0;
+	s_frag.back.generic.y = 480 - 64;
+	s_frag.back.width = 128;
+	s_frag.back.height = 64;
+	s_frag.back.focuspic = ART_BACK1;
+	Menu_AddItem( &s_frag.menu, &s_frag.back );
+
+	UI_PushMenu( &s_frag.menu );
+	Menu_SetCursorToItem( &s_frag.menu, &s_frag.maps );
 }

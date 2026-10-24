@@ -1021,6 +1021,13 @@ qboolean UI_ConsoleCommand( int realTime ) {
 		UI_DoomCampaignMenu();
 		return qtrue;
 	}
+	if ( Q_stricmp (cmd, "doom_fragmenu") == 0 ) {
+		trap_Cvar_Set( "cl_paused", "0" );
+		trap_Key_SetCatcher( KEYCATCH_UI );
+		uis.menusp = 0;
+		UI_DoomFragMenu();
+		return qtrue;
+	}
 
 	if ( Q_stricmp (cmd, "postgame") == 0 ) {
 		UI_SPPostgameMenu_f();

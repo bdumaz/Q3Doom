@@ -85,6 +85,11 @@ vmCvar_t	g_fallDamage;
 vmCvar_t	g_autoaim;
 vmCvar_t	g_doomMonsters;
 vmCvar_t	g_doomCampaign;
+vmCvar_t	g_doomFrag;
+vmCvar_t	g_doomPhysics;
+vmCvar_t	g_doomWeapons;
+vmCvar_t	g_doomLoadout;
+vmCvar_t	g_doomFinish;
 vmCvar_t	pmove_msec;
 vmCvar_t	g_rankings;
 vmCvar_t	g_listEntity;
@@ -197,6 +202,12 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_doomMonsters, "g_doomMonsters", "1", CVAR_SERVERINFO | CVAR_LATCH, 0, qfalse},
 	// Q3Doom: playing the campaign (set by doom_campaign): progress is saved
 	{ &g_doomCampaign, "g_doomCampaign", "0", 0, 0, qfalse},
+	// Q3Doom: DoomFrag (set by the doomfrag command): a time trial with these options
+	{ &g_doomFrag, "g_doomFrag", "0", CVAR_SERVERINFO, 0, qfalse},
+	{ &g_doomPhysics, "g_doomPhysics", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},		// 0 VQ3, 1 CPM
+	{ &g_doomWeapons, "g_doomWeapons", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},		// 0 Doom, 1 Quake 3, 2 none
+	{ &g_doomLoadout, "g_doomLoadout", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},		// 0 pick up, 1 all from the start
+	{ &g_doomFinish, "g_doomFinish", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},		// 0 exit, 1 all monsters dead first
 	{ &pmove_msec, "pmove_msec", "8", CVAR_SYSTEMINFO, 0, qfalse},
 
 	{ &g_rankings, "g_rankings", "0", 0, 0, qfalse}

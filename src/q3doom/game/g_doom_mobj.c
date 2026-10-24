@@ -818,6 +818,7 @@ static void KillMobj( gentity_t *source, gentity_t *target ) {
 	target->takedamage = qfalse;
 	if ( mo->flags & MF_COUNTKILL ) {
 		doomLevel.kills++;
+		Doom_FragUpdate();
 	}
 
 	if ( target->health < -mo->info->spawnhealth && mo->info->xdeathstate ) {
@@ -1373,7 +1374,7 @@ static void BossDeath( gentity_t *ent ) {
 		}
 	}
 	if ( e2m8 || e3m8 ) {
-		Doom_ExitLevel( qfalse );
+		Doom_ExitLevel( NULL, qfalse );
 		return;
 	}
 	for ( i = 0 ; i < doomLevel.numSectors ; i++ ) {

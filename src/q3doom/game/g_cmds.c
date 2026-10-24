@@ -1664,7 +1664,7 @@ void ClientCommand( int clientNum ) {
 		return;
 	}
 
-	if ( Doom_CampaignCommand( ent, cmd ) )
+	if ( Doom_CampaignCommand( ent, cmd ) || Doom_FragCommand( ent, cmd ) )
 		;
 	else if (Q_stricmp (cmd, "give") == 0)
 		Cmd_Give_f (ent);

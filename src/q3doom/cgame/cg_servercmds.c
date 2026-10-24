@@ -155,6 +155,8 @@ void CG_ParseServerinfo( void ) {
 	cgs.timelimit = atoi( Info_ValueForKey( info, "timelimit" ) );
 	cgs.maxclients = atoi( Info_ValueForKey( info, "sv_maxclients" ) );
 	cgs.stepHeight = atof( Info_ValueForKey( info, "g_stepHeight" ) );
+	cgs.doomFrag = atoi( Info_ValueForKey( info, "g_doomFrag" ) ) != 0;
+	cgs.doomWeapons = cgs.doomFrag ? Com_Clamp( 0, 2, atoi( Info_ValueForKey( info, "g_doomWeapons" ) ) ) : DOOM_WEAPONS_DOOM;
 	mapname = Info_ValueForKey( info, "mapname" );
 	Com_sprintf( cgs.mapname, sizeof( cgs.mapname ), "maps/%s.bsp", mapname );
 	Q_strncpyz( cgs.redTeam, Info_ValueForKey( info, "g_redTeam" ), sizeof(cgs.redTeam) );

@@ -9,6 +9,7 @@ Q3Doom - client side Doom asset test commands
 	doom_goto <x> <y> [angle]		teleport to a Doom map position (needs devmap / cheats)
 	doom_campaign [map] [skill]		play an unlocked campaign level
 	doom_progress					print the saved campaign progress
+	doomfrag <map>					a DoomFrag time trial with the g_doom* options
 
 Licensed under the GNU General Public License version 2 or later.
 ===========================================================================
@@ -218,11 +219,31 @@ static void CL_DoomCampaign_f( void ) {
 	}
 	Cvar_Set( "g_doomSkill", va( "%d", skill ) );
 	Cvar_Set( "g_doomCampaign", "1" );
+	Cvar_Set( "g_doomFrag", "0" );
+	Cvar_Set( "g_doomMonsters", "1" );
 	Cvar_Set( "g_doomDidSecret", "0" );
 	for ( i = 0 ; i < MAX_CLIENTS ; i++ ) {
 		Cvar_Set( va( "g_doomCarry%d", i ), "" );
 	}
 	Cbuf_AddText( va( "map %s\n", map ) );
+}
+
+/*
+=================
+CL_DoomFrag_f
+
+doomfrag <map>: a DoomFrag run on any map, with the options in g_doomPhysics,
+g_doomWeapons, g_doomLoadout, g_doomSkill, g_doomMonsters and g_doomFinish
+=================
+*/
+static void CL_DoomFrag_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "usage: doomfrag <map>\n" );
+		return;
+	}
+	Cvar_Set( "g_doomFrag", "1" );
+	Cvar_Set( "g_doomCampaign", "0" );
+	Cbuf_AddText( va( "map %s\n", Cmd_Argv( 1 ) ) );
 }
 
 /*
@@ -249,6 +270,7 @@ static void CL_DoomProgress_f( void ) {
 void CL_InitDoomCommands( void ) {
 	Cmd_AddCommand( "doom_campaign", CL_DoomCampaign_f );
 	Cmd_AddCommand( "doom_progress", CL_DoomProgress_f );
+	Cmd_AddCommand( "doomfrag", CL_DoomFrag_f );
 	Cmd_AddCommand( "doom_showimage", CL_DoomShowImage_f );
 	Cmd_AddCommand( "doom_playsound", CL_DoomPlaySound_f );
 	Cmd_AddCommand( "doom_where", CL_DoomWhere_f );

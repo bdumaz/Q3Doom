@@ -593,6 +593,7 @@ extern uiStatic_t	uis;
 // ui_doom.c (Q3Doom)
 void UI_DoomSinglePlayerMenu( void );
 void UI_DoomCampaignMenu( void );
+void UI_DoomFragMenu( void );
 
 // ui_spLevel.c
 //

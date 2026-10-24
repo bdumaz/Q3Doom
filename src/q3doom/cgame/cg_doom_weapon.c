@@ -151,9 +151,13 @@ already holding it with berserk (P_PlayerThink).
 =================
 */
 void CG_DoomWeapon_f( void ) {
-	const playerState_t	*ps = &cg.snap->ps;
+	const playerState_t	*ps;
 	int					slot = atoi( CG_Argv( 1 ) ), weapon;
 
+	if ( !cg.snap ) {
+		return;
+	}
+	ps = &cg.snap->ps;
 	if ( ps->pm_flags & PMF_FOLLOW ) {
 		return;
 	}
@@ -161,6 +165,26 @@ void CG_DoomWeapon_f( void ) {
 		return;
 	}
 	weapon = slot - 1;		// slots 1-7 are the weapons in Doom's order
+
+	// DoomFrag's Quake 3 set: the same slots with the Quake 3 weapons (the
+	// railgun in place of the chainsaw: 1 switches between it and the gauntlet)
+	if ( cgs.doomWeapons == DOOM_WEAPONS_Q3 ) {
+		int		q3 = bg_doomQ3Weapon[weapon];
+
+		if ( weapon == DWP_FIST && ( ps->stats[STAT_WEAPONS] & ( 1 << WP_RAILGUN ) ) && ps->ammo[WP_RAILGUN]
+			&& cg.weaponSelect != WP_RAILGUN ) {
+			q3 = WP_RAILGUN;
+		}
+		if ( ( ps->stats[STAT_WEAPONS] & ( 1 << q3 ) ) && ps->ammo[q3] ) {
+			cg.weaponSelectTime = cg.time;
+			cg.weaponSelect = q3;
+		}
+		return;
+	}
+	if ( cgs.doomWeapons == DOOM_WEAPONS_NONE ) {
+		return;
+	}
+
 	if ( weapon == DWP_FIST && DOOM_OWNS( ps, DWP_CHAINSAW )
 		&& !( ps->weapon == DOOM_WP( DWP_CHAINSAW ) && ps->powerups[DPW_STRENGTH] ) ) {
 		weapon = DWP_CHAINSAW;
@@ -171,9 +195,21 @@ void CG_DoomWeapon_f( void ) {
 }
 
 static void Cycle( int dir ) {
-	const playerState_t	*ps = &cg.snap->ps;
+	const playerState_t	*ps;
 	int					n = sizeof( cycle ) / sizeof( cycle[0] ), i, current = 0;
 
+	if ( !cg.snap || cgs.doomWeapons == DOOM_WEAPONS_NONE ) {
+		return;
+	}
+	if ( cgs.doomWeapons == DOOM_WEAPONS_Q3 ) {
+		if ( dir > 0 ) {
+			CG_NextWeapon_f();
+		} else {
+			CG_PrevWeapon_f();
+		}
+		return;
+	}
+	ps = &cg.snap->ps;
 	if ( ps->pm_flags & PMF_FOLLOW ) {
 		return;
 	}
@@ -249,6 +285,11 @@ qboolean CG_DoomEntityEvent( centity_t *cent, vec3_t position, int event ) {
 		return qfalse;
 	}
 
+	// DoomFrag's Quake 3 weapons fire and switch the Quake 3 way
+	if ( cgs.doomWeapons == DOOM_WEAPONS_Q3 && ( event == EV_FIRE_WEAPON || event == EV_NOAMMO || event == EV_CHANGE_WEAPON ) ) {
+		return qfalse;
+	}
+
 	switch ( event ) {
 	case EV_FIRE_WEAPON:
 		// the sounds of the attacks that always make one (punch and saw
@@ -307,6 +348,16 @@ qboolean CG_DoomEntityEvent( centity_t *cent, vec3_t position, int event ) {
 			trap_S_StartSound( NULL, es->number, CHAN_AUTO, trap_S_RegisterSound( bg_itemlist[es->eventParm].pickup_sound, qfalse ) );
 			CG_DoomMessage( bg_itemlist[es->eventParm].pickup_name );
 			CG_DoomBonus();
+			// the Quake 3 set switches to the matching Quake 3 weapon (the
+			// Doom set switches in Pmove)
+			if ( cgs.doomWeapons == DOOM_WEAPONS_Q3 && bg_itemlist[es->eventParm].giType == IT_WEAPON && cg_autoswitch.integer ) {
+				int q3 = bg_doomQ3Weapon[bg_itemlist[es->eventParm].giTag];
+
+				if ( q3 != WP_MACHINEGUN && q3 != cg.weaponSelect ) {
+					cg.weaponSelectTime = cg.time;
+					cg.weaponSelect = q3;
+				}
+			}
 		}
 		return qtrue;
 

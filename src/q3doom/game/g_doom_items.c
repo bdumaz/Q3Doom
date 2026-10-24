@@ -139,6 +139,62 @@ static qboolean GivePower( gentity_t *ent, int power ) {
 
 /*
 =================
+GiveQ3
+
+DoomFrag's Quake 3 weapon set: a Doom weapon gives its Quake 3 counterpart
+(bg_doomQ3Weapon) with that weapon's ammo, and Doom ammo gives the ammo of
+the Quake 3 weapons that took the place of the Doom ones using it
+=================
+*/
+static void AddQ3Ammo( playerState_t *ps, int weapon, int count ) {
+	ps->ammo[weapon] += count;
+	if ( ps->ammo[weapon] > 200 ) {
+		ps->ammo[weapon] = 200;
+	}
+}
+
+static qboolean GiveQ3( playerState_t *ps, const gitem_t *item ) {
+	int		clips = item->quantity > 0 ? item->quantity : 1, ammo = item->giTag, i;
+
+	if ( item->giType == IT_WEAPON ) {
+		int w = bg_doomQ3Weapon[item->giTag];
+
+		ps->stats[STAT_WEAPONS] |= 1 << w;
+		if ( w == WP_GAUNTLET ) {
+			ps->ammo[w] = -1;
+		} else {
+			AddQ3Ammo( ps, w, BG_FindItemForWeapon( w )->quantity );
+		}
+		return qtrue;
+	}
+	for ( i = 0 ; i < DAM_NUMAMMO ; i++ ) {
+		// a backpack gives a clip of each
+		if ( ammo != DAM_NUMAMMO && ammo != i ) {
+			continue;
+		}
+		switch ( i ) {
+		case DAM_CLIP:
+			AddQ3Ammo( ps, WP_MACHINEGUN, 10 * clips );
+			AddQ3Ammo( ps, WP_LIGHTNING, 20 * clips );
+			break;
+		case DAM_SHELL:
+			AddQ3Ammo( ps, WP_SHOTGUN, 4 * clips );
+			AddQ3Ammo( ps, WP_RAILGUN, 2 * clips );
+			break;
+		case DAM_MISL:
+			AddQ3Ammo( ps, WP_ROCKET_LAUNCHER, clips );
+			break;
+		case DAM_CELL:
+			AddQ3Ammo( ps, WP_PLASMAGUN, 20 * clips );
+			AddQ3Ammo( ps, WP_BFG, clips );
+			break;
+		}
+	}
+	return qtrue;
+}
+
+/*
+=================
 Doom_TouchItem
 
 P_TouchSpecialThing once BG_CanItemBeGrabbed allowed it: gives the item,
@@ -149,6 +205,13 @@ int Doom_TouchItem( gentity_t *ent, gentity_t *other ) {
 	playerState_t	*ps = &other->client->ps;
 	gitem_t			*item = ent->item;
 	int				i;
+
+	if ( DOOM_WEAPONSET( ps ) == DOOM_WEAPONS_Q3 && ( item->giType == IT_WEAPON || item->giType == IT_AMMO ) ) {
+		return GiveQ3( ps, item );
+	}
+	if ( DOOM_WEAPONSET( ps ) == DOOM_WEAPONS_NONE && ( item->giType == IT_WEAPON || item->giType == IT_AMMO ) ) {
+		return qfalse;
+	}
 
 	switch ( item->giType ) {
 	case IT_WEAPON:
@@ -222,24 +285,68 @@ G_PlayerReborn: 100 health, the fist and the pistol with 50 bullets
 */
 void Doom_GivePlayerStart( gclient_t *client ) {
 	playerState_t	*ps = &client->ps;
+	int				set = DOOM_WEAPONS_DOOM, i;
 
-	ps->stats[STAT_WEAPONS] = ( 1 << DOOM_WP( DWP_FIST ) ) | ( 1 << DOOM_WP( DWP_PISTOL ) );
+	// DoomFrag's weapon set and physics, in the player state for the prediction
+	if ( g_doomFrag.integer ) {
+		set = (int)Com_Clamp( DOOM_WEAPONS_DOOM, DOOM_WEAPONS_NONE, g_doomWeapons.integer );
+	}
+	ps->stats[STAT_DOOM_RULES] = set | ( g_doomFrag.integer && g_doomPhysics.integer ? DOOMRULES_CPM : 0 );
+
 	memset( ps->ammo, 0, sizeof( ps->ammo ) );
-	ps->ammo[DAM_CLIP] = 50;
 	ps->stats[STAT_ARMOR] = 0;
 	ps->stats[STAT_DOOM_ARMORTYPE] = 0;
 	ps->stats[STAT_DOOM_KEYS] = 0;
 	ps->stats[STAT_DOOM_BACKPACK] = 0;
 	ps->stats[STAT_HEALTH] = 100;
 	memset( ps->powerups, 0, sizeof( ps->powerups ) );
-
-	ps->weapon = DOOM_WP( DWP_PISTOL );
 	ps->doomPendingWeapon = 0;
 	ps->doomWeaponFlags = 0;
 	ps->doomTicFrac = 0;
-	BG_DoomBringUpWeapon( ps );
-	// the weapon the client asks for now is not a new selection
+	ps->doomWeaponState = S_NULL;
+	ps->doomFlashState = S_NULL;
 	ps->doomCmdWeapon = client->pers.cmd.weapon;
+
+	switch ( set ) {
+	case DOOM_WEAPONS_Q3:
+		// Quake 3's start: the gauntlet and the machinegun, or everything
+		ps->stats[STAT_WEAPONS] = ( 1 << WP_GAUNTLET ) | ( 1 << WP_MACHINEGUN );
+		ps->ammo[WP_MACHINEGUN] = 100;
+		if ( g_doomLoadout.integer ) {
+			for ( i = WP_MACHINEGUN ; i <= WP_BFG ; i++ ) {
+				ps->stats[STAT_WEAPONS] |= 1 << i;
+				ps->ammo[i] = 200;
+			}
+		}
+		ps->ammo[WP_GAUNTLET] = -1;
+		ps->weapon = WP_MACHINEGUN;
+		ps->weaponstate = WEAPON_READY;
+		return;
+
+	case DOOM_WEAPONS_NONE:
+		ps->stats[STAT_WEAPONS] = 0;
+		ps->weapon = WP_NONE;
+		return;
+
+	default:
+		// G_PlayerReborn: 100 health, the fist and the pistol with 50 bullets
+		ps->stats[STAT_WEAPONS] = ( 1 << DOOM_WP( DWP_FIST ) ) | ( 1 << DOOM_WP( DWP_PISTOL ) );
+		ps->ammo[DAM_CLIP] = 50;
+		if ( g_doomFrag.integer && g_doomLoadout.integer ) {
+			for ( i = 0 ; i < DWP_NUMWEAPONS ; i++ ) {
+				if ( i != DWP_SUPERSHOTGUN ) {
+					ps->stats[STAT_WEAPONS] |= 1 << DOOM_WP( i );
+				}
+			}
+			ps->stats[STAT_DOOM_BACKPACK] = 1;
+			for ( i = 0 ; i < DAM_NUMAMMO ; i++ ) {
+				ps->ammo[i] = BG_DoomMaxAmmo( ps, i );
+			}
+		}
+		ps->weapon = DOOM_WP( DWP_PISTOL );
+		BG_DoomBringUpWeapon( ps );
+		return;
+	}
 }
 
 /*
@@ -299,6 +406,11 @@ void Doom_SpawnItems( void ) {
 		}
 		itemNum = BG_DoomItemForThing( t->type );
 		if ( !itemNum ) {
+			continue;
+		}
+		// DoomFrag without weapons: no weapons and ammo to pick up
+		if ( g_doomFrag.integer && g_doomWeapons.integer == DOOM_WEAPONS_NONE
+			&& ( bg_itemlist[itemNum].giType == IT_WEAPON || bg_itemlist[itemNum].giType == IT_AMMO ) ) {
 			continue;
 		}
 		ent = Doom_SpawnItemAt( itemNum, t->x + 0.25f, t->y + 0.25f, qfalse );

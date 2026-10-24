@@ -281,6 +281,15 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 		return;
 	}
 
+	// Q3Doom: a Quake 3 missile (DoomFrag) presses the switch it hits
+	if ( !other->takedamage && !( ent->s.eFlags & ( EF_BOUNCE | EF_BOUNCE_HALF ) ) && ent->parent ) {
+		vec3_t	velocity, start;
+
+		BG_EvaluateTrajectoryDelta( &ent->s.pos, level.time, velocity );
+		VectorMA( trace->endpos, -64.0f / ( VectorLength( velocity ) + 1 ), velocity, start );
+		Doom_ShootSwitch( ent->parent, start, trace->endpos );
+	}
+
 	// check for bounce
 	if ( !other->takedamage &&
 		( ent->s.eFlags & ( EF_BOUNCE | EF_BOUNCE_HALF ) ) ) {

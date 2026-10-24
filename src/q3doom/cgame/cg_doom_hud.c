@@ -374,7 +374,8 @@ The Doom status bar is up: the 3D view stops above it
 =================
 */
 qboolean CG_DoomHudActive( void ) {
-	return hud.active && !cg_hudStyle.integer && cg.snap && cg.snap->ps.pm_type != PM_INTERMISSION
+	// DoomFrag's Quake 3 weapons have no place on Doom's status bar
+	return hud.active && !cg_hudStyle.integer && cgs.doomWeapons != DOOM_WEAPONS_Q3 && cg.snap && cg.snap->ps.pm_type != PM_INTERMISSION
 		&& cg.snap->ps.persistant[PERS_TEAM] != TEAM_SPECTATOR;
 }
 
@@ -866,7 +867,9 @@ void CG_DoomDraw2D( void ) {
 		if ( hud.automap ) {
 			DrawAutomap( ps );
 		} else {
-			CG_DoomDrawWeapon();
+			if ( cgs.doomWeapons == DOOM_WEAPONS_DOOM ) {
+				CG_DoomDrawWeapon();
+			}
 			// invulnerability: Doom's inverse colormap over the view
 			if ( CG_DoomPowerActive( DPW_INVULNERABILITY ) ) {
 				trap_R_DrawStretchPic( cg.refdef.x, cg.refdef.y, cg.refdef.width, cg.refdef.height, 0, 0, 1, 1, hud.invert );

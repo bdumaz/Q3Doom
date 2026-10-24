@@ -599,9 +599,14 @@ static void CG_DrawStatusBar( void ) {
 	//
 	if ( cent->currentState.weapon > 0 && cent->currentState.weapon <= DWP_NUMWEAPONS ) {
 		// Q3Doom: the ammo of the Doom weapon, nothing for the fist and the chainsaw
+		// (DoomFrag's Quake 3 set: the stock ammo of the Quake 3 weapon)
 		int ammo = bg_doomWeapons[DOOM_DWP( cent->currentState.weapon )].ammo;
 
-		value = ammo < DAM_NUMAMMO ? ps->ammo[ammo] : -1;
+		if ( cgs.doomWeapons == DOOM_WEAPONS_Q3 ) {
+			value = ps->ammo[cent->currentState.weapon];
+		} else {
+			value = ammo < DAM_NUMAMMO ? ps->ammo[ammo] : -1;
+		}
 		if ( value > -1 ) {
 			{
 				if ( value >= 0 ) {
@@ -2511,7 +2516,7 @@ static void CG_Draw2D( void ) {
 	}
 
 	// Q3Doom: Doom's intermission or episode finale replace the Quake 3 one
-	if ( CG_DoomDrawIntermission() ) {
+	if ( CG_DoomDrawIntermission() || CG_DoomDrawFragResult() ) {
 		return;
 	}
 	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
@@ -2521,6 +2526,7 @@ static void CG_Draw2D( void ) {
 
 	// Q3Doom: the weapon, the Doom status bar, messages and palette flashes
 	CG_DoomDraw2D();
+	CG_DoomDrawFragTimer();
 
 /*
 	if (cg.cameraMode) {
@@ -2546,7 +2552,7 @@ static void CG_Draw2D( void ) {
 			}
 #endif
 
-			if ( !CG_DoomMap() ) {
+			if ( !CG_DoomMap() || cgs.doomWeapons == DOOM_WEAPONS_Q3 ) {
 				CG_DrawAmmoWarning();
 			}
 
@@ -2555,7 +2561,7 @@ static void CG_Draw2D( void ) {
 #endif
 			CG_DrawCrosshair();
 			CG_DrawCrosshairNames();
-			if ( !CG_DoomMap() ) {
+			if ( !CG_DoomMap() || cgs.doomWeapons == DOOM_WEAPONS_Q3 ) {
 				CG_DrawWeaponSelect();
 			}
 

@@ -564,8 +564,13 @@ void ClientEvents( gentity_t *ent, int oldEventSequence ) {
 			break;
 
 		case EV_FIRE_WEAPON:
-			// Q3Doom: the Doom action that fired
-			Doom_FireWeapon( ent, client->ps.eventParms[ i & (MAX_PS_EVENTS-1) ] );
+			// Q3Doom: the Doom action that fired, or a Quake 3 weapon (DoomFrag)
+			if ( DOOM_WEAPONSET( &client->ps ) == DOOM_WEAPONS_Q3 ) {
+				Doom_NoiseAlert( ent );
+				FireWeapon( ent );
+			} else {
+				Doom_FireWeapon( ent, client->ps.eventParms[ i & (MAX_PS_EVENTS-1) ] );
+			}
 			break;
 
 		case EV_USE_ITEM1:		// teleporter
@@ -812,6 +817,9 @@ void ClientThink_real( gentity_t *ent ) {
 		return;
 	}
 
+	// Q3Doom: the first move starts a DoomFrag run
+	Doom_FragInput( ent, ucmd );
+
 	// spectators don't do much
 	if ( client->sess.sessionTeam == TEAM_SPECTATOR ) {
 		if ( client->sess.spectatorState == SPECTATOR_SCOREBOARD ) {
@@ -860,7 +868,13 @@ void ClientThink_real( gentity_t *ent ) {
 
 	memset (&pm, 0, sizeof(pm));
 
-	// Q3Doom: no gauntlet (ps.weapon holds Doom weapons, the fist is Doom's)
+	// check for the hit-scan gauntlet, don't let the action
+	// go through as an attack unless it actually hits something
+	// (Q3Doom: only with DoomFrag's Quake 3 weapons; the Doom fist is Doom's)
+	if ( DOOM_WEAPONSET( &client->ps ) == DOOM_WEAPONS_Q3 && client->ps.weapon == WP_GAUNTLET
+		&& !( ucmd->buttons & BUTTON_TALK ) && ( ucmd->buttons & BUTTON_ATTACK ) && client->ps.weaponTime <= 0 ) {
+		pm.gauntletHit = CheckGauntletAttack( ent );
+	}
 
 	if ( ent->flags & FL_FORCE_GESTURE ) {
 		ent->flags &= ~FL_FORCE_GESTURE;

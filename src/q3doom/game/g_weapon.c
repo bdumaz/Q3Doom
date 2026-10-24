@@ -189,6 +189,11 @@ void Bullet_Fire (gentity_t *ent, float spread, int damage ) {
 
 		traceEnt = &g_entities[ tr.entityNum ];
 
+		// Q3Doom: a switch on the wall is pressed by the shot
+		if ( !traceEnt->takedamage && tr.fraction < 1 ) {
+			Doom_ShootSwitch( ent, muzzle, tr.endpos );
+		}
+
 		// snap the endpos to integers, but nudged towards the line
 		SnapVectorTowards( tr.endpos, muzzle );
 

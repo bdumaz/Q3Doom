@@ -47,6 +47,16 @@ float	pm_waterfriction = 1.0f;
 float	pm_flightfriction = 3.0f;
 float	pm_spectatorfriction = 5.0f;
 
+// Q3Doom: CPM-style movement (DoomFrag), the values of the CPM physics mods
+#define CPM_FRICTION			8.0f
+#define CPM_ACCELERATE			15.0f
+#define CPM_AIRSTOPACCELERATE	2.5f
+#define CPM_AIRCONTROL			150.0f
+#define CPM_STRAFEACCELERATE	70.0f
+#define CPM_WISHSPEED			30.0f
+#define CPM_JUMP_Z				100.0f
+#define CPM_JUMP_TIME			400
+
 int		c_pmove = 0;
 
 
@@ -199,7 +209,7 @@ static void PM_Friction( void ) {
 			// if getting knocked back, no friction
 			if ( ! (pm->ps->pm_flags & PMF_TIME_KNOCKBACK) ) {
 				control = speed < pm_stopspeed ? pm_stopspeed : speed;
-				drop += control*pm_friction*pml.frametime;
+				drop += control*( DOOM_CPM( pm->ps ) ? CPM_FRICTION : pm_friction )*pml.frametime;
 			}
 		}
 	}
@@ -379,7 +389,20 @@ static qboolean PM_CheckJump( void ) {
 	pm->ps->pm_flags |= PMF_JUMP_HELD;
 
 	pm->ps->groundEntityNum = ENTITYNUM_NONE;
-	pm->ps->velocity[2] = JUMP_VELOCITY;
+	if ( DOOM_CPM( pm->ps ) ) {
+		// Q3Doom: CPM jumps keep the upward speed (ramp jumps), and a jump soon
+		// after the last one goes higher (double jump)
+		if ( pm->ps->velocity[2] < 0 ) {
+			pm->ps->velocity[2] = 0;
+		}
+		pm->ps->velocity[2] += JUMP_VELOCITY;
+		if ( pm->ps->stats[STAT_DOOM_JUMPTIME] > 0 ) {
+			pm->ps->velocity[2] += CPM_JUMP_Z;
+		}
+		pm->ps->stats[STAT_DOOM_JUMPTIME] = CPM_JUMP_TIME;
+	} else {
+		pm->ps->velocity[2] = JUMP_VELOCITY;
+	}
 	PM_AddEvent( EV_JUMP );
 
 	if ( pm->cmd.forwardmove >= 0 ) {
@@ -599,6 +622,39 @@ PM_AirMove
 
 ===================
 */
+/*
+==============
+CPM_AirControl
+
+Q3Doom: CPM air control: holding only forward (or back) in the air turns
+the velocity toward the view without losing speed
+==============
+*/
+static void CPM_AirControl( vec3_t wishdir, float wishspeed ) {
+	float	zspeed, speed, dot, k;
+	int		i;
+
+	if ( ( pm->ps->movementDir && pm->ps->movementDir != 4 ) || wishspeed == 0.0f ) {
+		return;
+	}
+	zspeed = pm->ps->velocity[2];
+	pm->ps->velocity[2] = 0;
+	speed = VectorNormalize( pm->ps->velocity );
+	dot = DotProduct( pm->ps->velocity, wishdir );
+	k = 32 * CPM_AIRCONTROL * dot * dot * pml.frametime;
+	// no turning while slowing down
+	if ( dot > 0 ) {
+		for ( i = 0 ; i < 2 ; i++ ) {
+			pm->ps->velocity[i] = pm->ps->velocity[i] * speed + wishdir[i] * k;
+		}
+		VectorNormalize( pm->ps->velocity );
+	}
+	for ( i = 0 ; i < 2 ; i++ ) {
+		pm->ps->velocity[i] *= speed;
+	}
+	pm->ps->velocity[2] = zspeed;
+}
+
 static void PM_AirMove( void ) {
 	int			i;
 	vec3_t		wishvel;
@@ -635,7 +691,23 @@ static void PM_AirMove( void ) {
 	wishspeed *= scale;
 
 	// not on ground, so little effect on velocity
-	PM_Accelerate (wishdir, wishspeed, pm_airaccelerate);
+	// Q3Doom: CPM-style air movement in DoomFrag (faster strafe acceleration, air control)
+	if ( DOOM_CPM( pm->ps ) ) {
+		float	accel = DotProduct( pm->ps->velocity, wishdir ) < 0 ? CPM_AIRSTOPACCELERATE : pm_airaccelerate;
+		float	wishspeed2 = wishspeed;
+
+		// pure strafing (A or D only)
+		if ( pm->ps->movementDir == 2 || pm->ps->movementDir == 6 ) {
+			if ( wishspeed > CPM_WISHSPEED ) {
+				wishspeed = CPM_WISHSPEED;
+			}
+			accel = CPM_STRAFEACCELERATE;
+		}
+		PM_Accelerate( wishdir, wishspeed, accel );
+		CPM_AirControl( wishdir, wishspeed2 );
+	} else {
+		PM_Accelerate (wishdir, wishspeed, pm_airaccelerate);
+	}
 
 	// we may have a ground plane that is very steep, even
 	// though we don't have a groundentity
@@ -773,7 +845,7 @@ static void PM_WalkMove( void ) {
 	if ( ( pml.groundTrace.surfaceFlags & SURF_SLICK ) || pm->ps->pm_flags & PMF_TIME_KNOCKBACK ) {
 		accelerate = pm_airaccelerate;
 	} else {
-		accelerate = pm_accelerate;
+		accelerate = DOOM_CPM( pm->ps ) ? CPM_ACCELERATE : pm_accelerate;
 	}
 
 	PM_Accelerate (wishdir, wishspeed, accelerate);
@@ -1476,6 +1548,241 @@ static void PM_TorsoAnimation( void ) {
 
 
 /*
+=====================================================================
+
+Q3Doom: Quake 3's weapon timing, for DoomFrag's Quake 3 weapon set (stock
+bg_pmove.c PM_BeginWeaponChange, PM_FinishWeaponChange, PM_Weapon)
+
+=====================================================================
+*/
+
+/*
+===============
+PM_BeginWeaponChange
+===============
+*/
+static void PM_BeginWeaponChange( int weapon ) {
+	if ( weapon <= WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+		return;
+	}
+
+	if ( !( pm->ps->stats[STAT_WEAPONS] & ( 1 << weapon ) ) ) {
+		return;
+	}
+	
+	if ( pm->ps->weaponstate == WEAPON_DROPPING ) {
+		return;
+	}
+
+	PM_AddEvent( EV_CHANGE_WEAPON );
+	pm->ps->weaponstate = WEAPON_DROPPING;
+	pm->ps->weaponTime += 200;
+	PM_StartTorsoAnim( TORSO_DROP );
+}
+
+
+/*
+===============
+PM_FinishWeaponChange
+===============
+*/
+static void PM_FinishWeaponChange( void ) {
+	int		weapon;
+
+	weapon = pm->cmd.weapon;
+	if ( weapon < WP_NONE || weapon >= WP_NUM_WEAPONS ) {
+		weapon = WP_NONE;
+	}
+
+	if ( !( pm->ps->stats[STAT_WEAPONS] & ( 1 << weapon ) ) ) {
+		weapon = WP_NONE;
+	}
+
+	pm->ps->weapon = weapon;
+	pm->ps->weaponstate = WEAPON_RAISING;
+	pm->ps->weaponTime += 250;
+	PM_StartTorsoAnim( TORSO_RAISE );
+}
+
+
+/*
+==============
+PM_Weapon
+
+Generates weapon events and modifes the weapon counter
+==============
+*/
+static void PM_Q3Weapon( void ) {
+	int		addTime;
+
+	// don't allow attack until all buttons are up
+	if ( pm->ps->pm_flags & PMF_RESPAWNED ) {
+		return;
+	}
+
+	// ignore if spectator
+	if ( pm->ps->persistant[PERS_TEAM] == TEAM_SPECTATOR ) {
+		return;
+	}
+
+	// check for dead player
+	if ( pm->ps->stats[STAT_HEALTH] <= 0 ) {
+		pm->ps->weapon = WP_NONE;
+		return;
+	}
+
+	// check for item using
+	if ( pm->cmd.buttons & BUTTON_USE_HOLDABLE ) {
+		if ( ! ( pm->ps->pm_flags & PMF_USE_ITEM_HELD ) ) {
+			if ( bg_itemlist[pm->ps->stats[STAT_HOLDABLE_ITEM]].giTag == HI_MEDKIT
+				&& pm->ps->stats[STAT_HEALTH] >= (pm->ps->stats[STAT_MAX_HEALTH] + 25) ) {
+				// don't use medkit if at max health
+			} else {
+				pm->ps->pm_flags |= PMF_USE_ITEM_HELD;
+				PM_AddEvent( EV_USE_ITEM0 + bg_itemlist[pm->ps->stats[STAT_HOLDABLE_ITEM]].giTag );
+				pm->ps->stats[STAT_HOLDABLE_ITEM] = 0;
+			}
+			return;
+		}
+	} else {
+		pm->ps->pm_flags &= ~PMF_USE_ITEM_HELD;
+	}
+
+
+	// make weapon function
+	if ( pm->ps->weaponTime > 0 ) {
+		pm->ps->weaponTime -= pml.msec;
+	}
+
+	// check for weapon change
+	// can't change if weapon is firing, but can change
+	// again if lowering or raising
+	if ( pm->ps->weaponTime <= 0 || pm->ps->weaponstate != WEAPON_FIRING ) {
+		if ( pm->ps->weapon != pm->cmd.weapon ) {
+			PM_BeginWeaponChange( pm->cmd.weapon );
+		}
+	}
+
+	if ( pm->ps->weaponTime > 0 ) {
+		return;
+	}
+
+	// change weapon if time
+	if ( pm->ps->weaponstate == WEAPON_DROPPING ) {
+		PM_FinishWeaponChange();
+		return;
+	}
+
+	if ( pm->ps->weaponstate == WEAPON_RAISING ) {
+		pm->ps->weaponstate = WEAPON_READY;
+		if ( pm->ps->weapon == WP_GAUNTLET ) {
+			PM_StartTorsoAnim( TORSO_STAND2 );
+		} else {
+			PM_StartTorsoAnim( TORSO_STAND );
+		}
+		return;
+	}
+
+	// check for fire
+	if ( ! (pm->cmd.buttons & BUTTON_ATTACK) ) {
+		pm->ps->weaponTime = 0;
+		pm->ps->weaponstate = WEAPON_READY;
+		return;
+	}
+
+	// start the animation even if out of ammo
+	if ( pm->ps->weapon == WP_GAUNTLET ) {
+		// the guantlet only "fires" when it actually hits something
+		if ( !pm->gauntletHit ) {
+			pm->ps->weaponTime = 0;
+			pm->ps->weaponstate = WEAPON_READY;
+			return;
+		}
+		PM_StartTorsoAnim( TORSO_ATTACK2 );
+	} else {
+		PM_StartTorsoAnim( TORSO_ATTACK );
+	}
+
+	pm->ps->weaponstate = WEAPON_FIRING;
+
+	// check for out of ammo
+	if ( ! pm->ps->ammo[ pm->ps->weapon ] ) {
+		PM_AddEvent( EV_NOAMMO );
+		pm->ps->weaponTime += 500;
+		return;
+	}
+
+	// take an ammo away if not infinite
+	if ( pm->ps->ammo[ pm->ps->weapon ] != -1 ) {
+		pm->ps->ammo[ pm->ps->weapon ]--;
+	}
+
+	// fire weapon
+	PM_AddEvent( EV_FIRE_WEAPON );
+
+	switch( pm->ps->weapon ) {
+	default:
+	case WP_GAUNTLET:
+		addTime = 400;
+		break;
+	case WP_LIGHTNING:
+		addTime = 50;
+		break;
+	case WP_SHOTGUN:
+		addTime = 1000;
+		break;
+	case WP_MACHINEGUN:
+		addTime = 100;
+		break;
+	case WP_GRENADE_LAUNCHER:
+		addTime = 800;
+		break;
+	case WP_ROCKET_LAUNCHER:
+		addTime = 800;
+		break;
+	case WP_PLASMAGUN:
+		addTime = 100;
+		break;
+	case WP_RAILGUN:
+		addTime = 1500;
+		break;
+	case WP_BFG:
+		addTime = 200;
+		break;
+	case WP_GRAPPLING_HOOK:
+		addTime = 400;
+		break;
+#ifdef MISSIONPACK
+	case WP_NAILGUN:
+		addTime = 1000;
+		break;
+	case WP_PROX_LAUNCHER:
+		addTime = 800;
+		break;
+	case WP_CHAINGUN:
+		addTime = 30;
+		break;
+#endif
+	}
+
+#ifdef MISSIONPACK
+	if( bg_itemlist[pm->ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_SCOUT ) {
+		addTime /= 1.5;
+	}
+	else
+	if( bg_itemlist[pm->ps->stats[STAT_PERSISTANT_POWERUP]].giTag == PW_AMMOREGEN ) {
+		addTime /= 1.3;
+  }
+  else
+#endif
+	if ( pm->ps->powerups[PW_HASTE] ) {
+		addTime /= 1.3;
+	}
+
+	pm->ps->weaponTime += addTime;
+}
+
+/*
 ==============
 PM_Weapon
 
@@ -1483,7 +1790,17 @@ Q3Doom: the Doom weapon sprites (bg_doom_weapon.c)
 ==============
 */
 static void PM_Weapon( void ) {
-	PM_DoomWeapon();
+	switch ( DOOM_WEAPONSET( pm->ps ) ) {
+	case DOOM_WEAPONS_Q3:
+		PM_Q3Weapon();
+		break;
+	case DOOM_WEAPONS_NONE:
+		pm->ps->weapon = WP_NONE;
+		break;
+	default:
+		PM_DoomWeapon();
+		break;
+	}
 }
 
 /*
@@ -1548,6 +1865,14 @@ static void PM_DropTimers( void ) {
 			pm->ps->pm_time = 0;
 		} else {
 			pm->ps->pm_time -= pml.msec;
+		}
+	}
+
+	// Q3Doom: the CPM double jump window
+	if ( pm->ps->stats[STAT_DOOM_JUMPTIME] > 0 ) {
+		pm->ps->stats[STAT_DOOM_JUMPTIME] -= pml.msec;
+		if ( pm->ps->stats[STAT_DOOM_JUMPTIME] < 0 ) {
+			pm->ps->stats[STAT_DOOM_JUMPTIME] = 0;
 		}
 	}
 

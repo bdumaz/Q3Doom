@@ -30,6 +30,19 @@ const doomWeaponInfo_t bg_doomWeapons[DWP_NUMWEAPONS] = {
 	{ DAM_SHELL,	S_DSGUNUP,		S_DSGUNDOWN,	S_DSGUN,	S_DSGUN1,	S_DSGUNFLASH1 }
 };
 
+// DoomFrag's Quake 3 weapon set: what each Doom weapon pickup gives
+const int bg_doomQ3Weapon[DWP_NUMWEAPONS] = {
+	WP_GAUNTLET,		// fist
+	WP_MACHINEGUN,		// pistol
+	WP_SHOTGUN,
+	WP_LIGHTNING,		// chaingun
+	WP_ROCKET_LAUNCHER,
+	WP_PLASMAGUN,
+	WP_BFG,
+	WP_RAILGUN,			// chainsaw
+	WP_SHOTGUN			// super shotgun
+};
+
 // maxammo[] and clipammo[] (p_inter.c)
 const int bg_doomMaxAmmo[DAM_NUMAMMO] = { 200, 50, 300, 50 };
 const int bg_doomClipAmmo[DAM_NUMAMMO] = { 10, 4, 20, 1 };

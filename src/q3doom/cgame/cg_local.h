@@ -1002,6 +1002,8 @@ typedef struct {
 	gametype_t		gametype;
 	int				dmflags;
 	float			stepHeight;		// Q3Doom: g_stepHeight from the serverinfo
+	qboolean		doomFrag;		// Q3Doom: a DoomFrag run (g_doomFrag)
+	int				doomWeapons;	// Q3Doom: DOOM_WEAPONS_*, Doom outside DoomFrag
 	int				teamflags;
 	int				fraglimit;
 	int				capturelimit;
@@ -1722,6 +1724,10 @@ void		CG_DoomPatchSize( int lump, int *width, int *height, int *left, int *top )
 int			CG_DoomFontLump( int c );
 void		CG_DoomDrawPatchColumns( int lump, float x, float from, float to );
 void		CG_DoomFillScreen( qhandle_t flat );
+
+// cg_doom_frag.c (Q3Doom)
+void		CG_DoomDrawFragTimer( void );
+qboolean	CG_DoomDrawFragResult( void );
 
 // cg_doom_wi.c (Q3Doom)
 void		CG_DoomIntermissionChanged( void );

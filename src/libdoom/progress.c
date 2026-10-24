@@ -106,6 +106,92 @@ int doom_skill_medal( int skill ) {
 	return DOOM_MEDAL_SKULL;
 }
 
+/*
+=====================================================================
+
+DOOMFRAG RECORDS
+
+=====================================================================
+*/
+
+void doom_frag_options( char *out, size_t size, int physics, int weapons, int loadout, int monsters, int finish ) {
+	snprintf( out, size, "p%dw%dl%dm%df%d", physics, weapons, loadout, monsters, finish );
+}
+
+static doom_record_t *FindRecord( doom_records_t *r, const char *map, const char *options, int create ) {
+	int		i;
+
+	for ( i = 0 ; i < r->count ; i++ ) {
+		if ( NameEquals( r->records[i].map, map ) && !strcmp( r->records[i].options, options ) ) {
+			return &r->records[i];
+		}
+	}
+	if ( !create || r->count >= DOOM_RECORDS_MAX ) {
+		return NULL;
+	}
+	memset( &r->records[r->count], 0, sizeof( r->records[0] ) );
+	for ( i = 0 ; map[i] && i < DOOM_LUMP_NAME_LEN ; i++ ) {
+		r->records[r->count].map[i] = (char)toupper( (unsigned char)map[i] );
+	}
+	strncpy( r->records[r->count].options, options, DOOM_OPTIONS_LEN );
+	return &r->records[r->count++];
+}
+
+void doom_records_parse( const char *text, doom_records_t *r ) {
+	memset( r, 0, sizeof( *r ) );
+	while ( text && *text ) {
+		char	map[16], options[32];
+		int		msec;
+
+		if ( sscanf( text, "record %15s %31s %d", map, options, &msec ) == 3 && msec > 0 ) {
+			doom_record_t *rec = FindRecord( r, map, options, 1 );
+
+			if ( rec && ( !rec->msec || msec < rec->msec ) ) {
+				rec->msec = msec;
+			}
+		}
+		text = strchr( text, '\n' );
+		if ( text ) {
+			text++;
+		}
+	}
+}
+
+int doom_records_write( const doom_records_t *r, char *buf, size_t size ) {
+	size_t	len = 0;
+	int		i;
+
+	if ( !size ) {
+		return 0;
+	}
+	buf[0] = 0;
+	len += snprintf( buf + len, size - len, "// Q3Doom DoomFrag records (msec)\n" );
+	for ( i = 0 ; i < r->count && len < size ; i++ ) {
+		len += snprintf( buf + len, size - len, "record %s %s %d\n", r->records[i].map, r->records[i].options, r->records[i].msec );
+	}
+	if ( len >= size ) {
+		len = size - 1;
+		buf[len] = 0;
+	}
+	return (int)len;
+}
+
+int doom_record_get( const doom_records_t *r, const char *map, const char *options ) {
+	doom_record_t *rec = FindRecord( (doom_records_t *)r, map, options, 0 );
+
+	return rec ? rec->msec : 0;
+}
+
+int doom_record_set( doom_records_t *r, const char *map, const char *options, int msec ) {
+	doom_record_t *rec = FindRecord( r, map, options, 1 );
+
+	if ( !rec || msec <= 0 || ( rec->msec && rec->msec <= msec ) ) {
+		return 0;
+	}
+	rec->msec = msec;
+	return 1;
+}
+
 int doom_par_time( int episode, int map ) {
 	static const int pars[3][9] = {
 		{ 30, 75, 120, 90, 165, 180, 180, 30, 165 },

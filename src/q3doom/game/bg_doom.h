@@ -18,6 +18,17 @@ Licensed under the GNU General Public License version 2 or later.
 #define DOOM_DEFAULT_SKILL	"2"		// "Hurt me plenty"
 #define DOOM_TICRATE		35
 
+// ps->stats[STAT_DOOM_RULES]: DoomFrag's weapon set and physics, set at spawn
+// so the client predicts with them
+enum { DOOM_WEAPONS_DOOM, DOOM_WEAPONS_Q3, DOOM_WEAPONS_NONE };
+#define DOOMRULES_WEAPONMASK	3
+#define DOOMRULES_CPM			4		// CPM-style movement
+#define DOOM_WEAPONSET( ps )	( (ps)->stats[STAT_DOOM_RULES] & DOOMRULES_WEAPONMASK )
+#define DOOM_CPM( ps )			( ( (ps)->stats[STAT_DOOM_RULES] & DOOMRULES_CPM ) != 0 )
+
+// Doom weapons and their Quake 3 counterparts (DOOM_WEAPONS_Q3)
+extern const int	bg_doomQ3Weapon[];		// [DWP_*] -> WP_*
+
 // skills (skill_t)
 enum { DOOM_SK_BABY, DOOM_SK_EASY, DOOM_SK_MEDIUM, DOOM_SK_HARD, DOOM_SK_NIGHTMARE };
 

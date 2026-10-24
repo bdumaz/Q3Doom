@@ -623,12 +623,13 @@ void CG_RegisterWeapon( int weaponNum ) {
 	memset( weaponInfo, 0, sizeof( *weaponInfo ) );
 	weaponInfo->registered = qtrue;
 
-	// Q3Doom: weapons are Doom sprites (cg_doom_weapon.c), no models
-	if ( qtrue ) {
+	// Q3Doom: Doom weapons are sprites (cg_doom_weapon.c), no models; the
+	// Quake 3 set of DoomFrag (bg_q3items) uses the stock models
+	if ( cgs.doomWeapons != DOOM_WEAPONS_Q3 ) {
 		return;
 	}
 
-	for ( item = bg_itemlist + 1 ; item->classname ; item++ ) {
+	for ( item = bg_q3items + 1 ; item->classname ; item++ ) {
 		if ( item->giType == IT_WEAPON && item->giTag == weaponNum ) {
 			weaponInfo->item = item;
 			break;
@@ -637,7 +638,6 @@ void CG_RegisterWeapon( int weaponNum ) {
 	if ( !item->classname ) {
 		CG_Error( "Couldn't find weapon %i", weaponNum );
 	}
-	CG_RegisterItemVisuals( item - bg_itemlist );
 
 	// load cmodel before model so filecache works
 	weaponInfo->weaponModel = trap_R_RegisterModel( item->world_model[0] );
@@ -651,7 +651,7 @@ void CG_RegisterWeapon( int weaponNum ) {
 	weaponInfo->weaponIcon = trap_R_RegisterShader( item->icon );
 	weaponInfo->ammoIcon = trap_R_RegisterShader( item->icon );
 
-	for ( ammo = bg_itemlist + 1 ; ammo->classname ; ammo++ ) {
+	for ( ammo = bg_q3items + 1 ; ammo->classname ; ammo++ ) {
 		if ( ammo->giType == IT_AMMO && ammo->giTag == weaponNum ) {
 			break;
 		}
@@ -1395,7 +1395,7 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 	}
 
 	// Q3Doom: the Doom weapon is drawn in 2D (CG_DoomDrawWeapon)
-	if ( CG_DoomMap() ) {
+	if ( CG_DoomMap() && cgs.doomWeapons != DOOM_WEAPONS_Q3 ) {
 		return;
 	}
 

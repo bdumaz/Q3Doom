@@ -103,8 +103,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // (Doom's intermission, maps 0-based) or "finale <episode>"
 #define CS_DOOM_INTERMISSION	(CS_MAX+1)
 
-#if (CS_DOOM_INTERMISSION) >= MAX_CONFIGSTRINGS
-#error overflow: CS_DOOM_INTERMISSION >= MAX_CONFIGSTRINGS
+// Q3Doom: a DoomFrag run, empty otherwise (g_doom_frag.c):
+// "<state> <start> <end> <best> <par> <kills> <totalkills> <newrecord>"
+#define CS_DOOM_FRAG			(CS_MAX+2)
+
+#if (CS_DOOM_FRAG) >= MAX_CONFIGSTRINGS
+#error overflow: CS_DOOM_FRAG >= MAX_CONFIGSTRINGS
 #endif
 
 typedef enum {
@@ -231,7 +235,9 @@ typedef enum {
 	// Q3Doom
 	STAT_DOOM_ARMORTYPE,			// 0 none, 1 green (saves 1/3), 2 blue (saves 1/2)
 	STAT_DOOM_KEYS,					// 1 << DOOM_IT_* (cards and skulls)
-	STAT_DOOM_BACKPACK				// 1 once a backpack doubled the ammo limits
+	STAT_DOOM_BACKPACK,				// 1 once a backpack doubled the ammo limits
+	STAT_DOOM_RULES,				// the weapon set and the physics (DOOMRULES_*), set at spawn
+	STAT_DOOM_JUMPTIME				// msec since the last jump, for CPM double jumps
 } statIndex_t;
 
 // Q3Doom: Doom powers in ps->powerups[] (above the Quake 3 ones the stock code
@@ -687,6 +693,9 @@ typedef struct gitem_s {
 // included in both the game dll and the client
 extern	gitem_t	bg_itemlist[];
 extern	int		bg_numItems;
+extern	gitem_t	bg_q3items[];		// Q3Doom: Quake 3's weapons and ammo (DoomFrag)
+extern	int		bg_numQ3Items;
+gitem_t	*BG_Q3AmmoItem( weapon_t weapon );
 
 gitem_t	*BG_FindItem( const char *pickupName );
 gitem_t	*BG_FindItemForWeapon( weapon_t weapon );

@@ -403,8 +403,8 @@ qboolean Doom_ActivateLine( gentity_t *activator, int line, int side, doom_trigg
 
 	switch ( sp->kind ) {
 	case DOOM_KIND_EXIT:
-		Doom_ExitLevel( sp->type == 1 );
-		success = qtrue;
+		// a DoomFrag run with monsters left refuses it
+		success = Doom_ExitLevel( activator, sp->type == 1 );
 		break;
 	case DOOM_KIND_TELEPORT:
 		// only from the front, so you can step out of a teleporter
@@ -459,7 +459,7 @@ qboolean Doom_ActivateLine( gentity_t *activator, int line, int side, doom_trigg
 	// walk lines work once whatever happened; switches and gun lines
 	// change texture and, for the once-only ones, stop working when they acted
 	if ( trigger == DOOM_TRIG_WALK ) {
-		if ( !sp->repeatable ) {
+		if ( !sp->repeatable && ( success || sp->kind != DOOM_KIND_EXIT ) ) {
 			doomLevel.lineSpecial[line] = 0;
 		}
 	} else if ( success && ( trigger == DOOM_TRIG_SWITCH || trigger == DOOM_TRIG_GUN ) ) {
@@ -762,7 +762,7 @@ static void PlayerInSpecialSector( gentity_t *ent, int tic ) {
 		// the damage never kills (P_DamageMobj's "end of game hell hack")
 		damage = MIN( 20, ent->health - 1 );
 		if ( ent->health <= 10 ) {
-			Doom_ExitLevel( qfalse );
+			Doom_ExitLevel( ent, qfalse );
 			return;
 		}
 		if ( damage < 1 ) {
@@ -800,7 +800,10 @@ void Doom_RunFrame( void ) {
 	tic = ( level.time - level.startTime ) * DOOM_TICRATE / 1000;
 	while ( doomLevel.lastTic < tic ) {
 		doomLevel.lastTic++;
-		Doom_RunMobjs();
+		// DoomFrag: the monsters wait for the run to start
+		if ( !Doom_FragWaiting() ) {
+			Doom_RunMobjs();
+		}
 		for ( i = 0 ; i < level.maxclients ; i++ ) {
 			gentity_t *ent = &g_entities[i];
 
@@ -941,6 +944,7 @@ void Doom_StartLevel( void ) {
 	SpawnThingBlockers();
 	Doom_SpawnItems();
 	Doom_SpawnMobjs();
+	Doom_InitFrag();
 }
 
 void Doom_ShutdownLevel( void ) {

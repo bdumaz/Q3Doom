@@ -371,6 +371,29 @@ int						doom_skill_medal( int skill );
 // Doom's par time of ExMy in seconds (g_game.c pars[]), 0 if it has none
 int						doom_par_time( int episode, int map );
 
+// DoomFrag records: the best time of a map with a set of options
+// ("record E1M1 p0w0l0m2f0 31250" per line, in msec)
+#define DOOM_RECORDS_MAX	1024
+#define DOOM_OPTIONS_LEN	15
+
+typedef struct {
+	char		map[DOOM_LUMP_NAME_LEN + 1];
+	char		options[DOOM_OPTIONS_LEN + 1];
+	int			msec;
+} doom_record_t;
+
+typedef struct {
+	int				count;
+	doom_record_t	records[DOOM_RECORDS_MAX];
+} doom_records_t;
+
+void					doom_records_parse( const char *text, doom_records_t *r );
+int						doom_records_write( const doom_records_t *r, char *buf, size_t size );
+int						doom_record_get( const doom_records_t *r, const char *map, const char *options );	// 0 none
+int						doom_record_set( doom_records_t *r, const char *map, const char *options, int msec );	// 1: new best
+// the options key: physics 0-1, weapons 0-2, loadout 0-1, monsters (skill 0-4, 5 none), finish 0-1
+void					doom_frag_options( char *out, size_t size, int physics, int weapons, int loadout, int monsters, int finish );
+
 /*
 =====================================================================
 
