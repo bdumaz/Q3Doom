@@ -41,6 +41,7 @@ static struct {
 	int			scores[TEAM_NUM_TEAMS];
 	vec3_t		sides[2];		// 0: the level's start, 1: its exit, on the floor
 	float		sideYaw[2];
+	float		spawns[2][2];	// where each side's players appear: a step ahead of its flag
 	gentity_t	*goals[2];		// the flag on each side
 	qboolean	finished[MAX_CLIENTS];	// reached the goal this round
 } duel;
@@ -169,24 +170,16 @@ gentity_t *Doom_DuelSpawnSpot( gentity_t *ent, vec3_t origin, vec3_t angles ) {
 	int		team = ent->client->sess.sessionTeam, side, i, n = sizeof( offsets ) / sizeof( offsets[0] );
 	trace_t	tr;
 	vec3_t	p, mins = { -15, -15, MINS_Z }, maxs = { 15, 15, 32 };		// g_client.c's player box
-	float	ahead[2];
 
 	if ( !duel.active || ( team != TEAM_RED && team != TEAM_BLUE ) ) {
 		return NULL;
 	}
 	side = TeamSide( team );
 	maxs[2] = g_playerHeight.value > 0 ? g_playerHeight.value + MINS_Z : maxs[2];
-	// a step ahead of the flag, which stands where the other side must get
-	ahead[0] = duel.sides[side][0] + cos( DEG2RAD( duel.sideYaw[side] ) ) * 64;
-	ahead[1] = duel.sides[side][1] + sin( DEG2RAD( duel.sideYaw[side] ) ) * 64;
-	if ( doom_map_sector_at( doomLevel.map, ahead[0], ahead[1] ) < 0 ) {
-		ahead[0] = duel.sides[side][0];
-		ahead[1] = duel.sides[side][1];
-	}
 	for ( i = 0 ; i < n ; i++ ) {
 		int sector;
 
-		VectorSet( p, ahead[0] + offsets[i][0], ahead[1] + offsets[i][1], 0 );
+		VectorSet( p, duel.spawns[side][0] + offsets[i][0], duel.spawns[side][1] + offsets[i][1], 0 );
 		sector = doom_map_sector_at( doomLevel.map, p[0], p[1] );
 		if ( sector < 0 ) {
 			continue;
@@ -388,6 +381,53 @@ static void RoundOver( void ) {
 
 /*
 =================
+Doom_DuelNearSpawn
+
+No monster comes to life within 128 units of a side's start or spawn spot
+(on the map, ignoring height)
+=================
+*/
+#define DUEL_MONSTER_CLEARANCE	128
+
+qboolean Doom_DuelNearSpawn( float x, float y ) {
+	int		side;
+
+	if ( !duel.active ) {
+		return qfalse;
+	}
+	for ( side = 0 ; side < 2 ; side++ ) {
+		float	dx = x - duel.sides[side][0], dy = y - duel.sides[side][1];
+		float	sx = x - duel.spawns[side][0], sy = y - duel.spawns[side][1];
+
+		if ( dx * dx + dy * dy < DUEL_MONSTER_CLEARANCE * DUEL_MONSTER_CLEARANCE
+			|| sx * sx + sy * sy < DUEL_MONSTER_CLEARANCE * DUEL_MONSTER_CLEARANCE ) {
+			return qtrue;
+		}
+	}
+	return qfalse;
+}
+
+// the level's monsters placed near a side are taken out
+static void ClearSpawns( void ) {
+	int		i, n = 0;
+
+	for ( i = MAX_CLIENTS ; i < level.num_entities ; i++ ) {
+		gentity_t	*ent = &g_entities[i];
+
+		if ( ent->inuse && ent->doomMobj && ( ent->doomMobj->flags & MF_COUNTKILL )
+			&& Doom_DuelNearSpawn( ent->doomMobj->spawnX, ent->doomMobj->spawnY ) ) {
+			G_FreeEntity( ent );
+			doomLevel.totalKills--;
+			n++;
+		}
+	}
+	if ( n ) {
+		G_Printf( "Doom Duel: %d monsters left out near the spawn points\n", n );
+	}
+}
+
+/*
+=================
 Doom_InitDuel
 
 After the entities spawned: the sides, the goals, and the round (the next
@@ -415,13 +455,22 @@ void Doom_InitDuel( void ) {
 		return;
 	}
 	for ( team = 0 ; team < 2 ; team++ ) {
-		int sector = doom_map_sector_at( doomLevel.map, duel.sides[team][0], duel.sides[team][1] );
+		int		sector = doom_map_sector_at( doomLevel.map, duel.sides[team][0], duel.sides[team][1] );
+		float	*spawn = duel.spawns[team];
 
 		if ( sector >= 0 ) {
 			duel.sides[team][2] = doomLevel.floor[sector];		// both on the floor
 		}
+		// a step ahead of the flag, which stands where the other side must get
+		spawn[0] = duel.sides[team][0] + cos( DEG2RAD( duel.sideYaw[team] ) ) * 64;
+		spawn[1] = duel.sides[team][1] + sin( DEG2RAD( duel.sideYaw[team] ) ) * 64;
+		if ( doom_map_sector_at( doomLevel.map, spawn[0], spawn[1] ) < 0 ) {
+			spawn[0] = duel.sides[team][0];
+			spawn[1] = duel.sides[team][1];
+		}
 	}
 	duel.active = qtrue;
+	ClearSpawns();
 
 	duel.round = 1;
 	if ( trap_Cvar_VariableIntegerValue( "g_duelContinue" ) ) {

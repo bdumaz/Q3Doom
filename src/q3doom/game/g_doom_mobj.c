@@ -811,7 +811,8 @@ void Doom_RespawnDeadMonsters( void ) {
 	for ( i = MAX_CLIENTS ; i < level.num_entities ; i++ ) {
 		gentity_t	*ent = &g_entities[i];
 
-		if ( ent->inuse && ent->doomMobj && ( ent->doomMobj->flags & MF_COUNTKILL ) && ( ent->doomMobj->flags & MF_CORPSE ) ) {
+		if ( ent->inuse && ent->doomMobj && ( ent->doomMobj->flags & MF_COUNTKILL ) && ( ent->doomMobj->flags & MF_CORPSE )
+			&& !Doom_DuelNearSpawn( ent->doomMobj->spawnX, ent->doomMobj->spawnY ) ) {
 			NightmareRespawn( ent );
 			n++;
 		}
