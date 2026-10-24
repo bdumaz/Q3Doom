@@ -1322,6 +1322,11 @@ Sets mins, maxs, and pm->ps->viewheight
 static void PM_CheckDuck (void)
 {
 	trace_t	trace;
+	// Q3Doom: g_playerHeight; the feet stay at MINS_Z, the eyes at most 4
+	// units under the top, the crouched box no taller than the standing one
+	float	standTop = ( pm->playerHeight > 0 ? pm->playerHeight : 56 ) + MINS_Z;
+	float	crouchTop = standTop < 16 ? standTop : 16;
+	int		standView = standTop - 4 < DEFAULT_VIEWHEIGHT ? (int)( standTop - 4 ) : DEFAULT_VIEWHEIGHT;
 
 	if ( pm->ps->powerups[PW_INVULNERABILITY] ) {
 		if ( pm->ps->pm_flags & PMF_INVULEXPAND ) {
@@ -1363,7 +1368,7 @@ static void PM_CheckDuck (void)
 		if (pm->ps->pm_flags & PMF_DUCKED)
 		{
 			// try to stand up
-			pm->maxs[2] = 32;
+			pm->maxs[2] = standTop;
 			pm->trace (&trace, pm->ps->origin, pm->mins, pm->maxs, pm->ps->origin, pm->ps->clientNum, pm->tracemask );
 			if (!trace.allsolid)
 				pm->ps->pm_flags &= ~PMF_DUCKED;
@@ -1372,13 +1377,13 @@ static void PM_CheckDuck (void)
 
 	if (pm->ps->pm_flags & PMF_DUCKED)
 	{
-		pm->maxs[2] = 16;
+		pm->maxs[2] = crouchTop;
 		pm->ps->viewheight = CROUCH_VIEWHEIGHT;
 	}
 	else
 	{
-		pm->maxs[2] = 32;
-		pm->ps->viewheight = DEFAULT_VIEWHEIGHT;
+		pm->maxs[2] = standTop;
+		pm->ps->viewheight = standView;
 	}
 }
 

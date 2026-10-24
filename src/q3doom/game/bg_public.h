@@ -204,6 +204,9 @@ typedef struct {
 
 	// Q3Doom: g_stepHeight (published in the serverinfo so prediction matches), 0 = STEPSIZE
 	float		stepHeight;
+	// Q3Doom: g_playerHeight, the standing height of the player box (also
+	// in the serverinfo), 0 = Quake 3's 56
+	float		playerHeight;
 
 	// callbacks to test the world
 	// these will be different functions during game and cgame

@@ -1199,6 +1199,9 @@ void ClientSpawn(gentity_t *ent) {
 	
 	VectorCopy (playerMins, ent->r.mins);
 	VectorCopy (playerMaxs, ent->r.maxs);
+	if ( g_playerHeight.value > 0 ) {
+		ent->r.maxs[2] = g_playerHeight.value + MINS_Z;		// Q3Doom: as Pmove will set it
+	}
 
 	client->ps.clientNum = index;
 

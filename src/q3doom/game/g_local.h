@@ -769,6 +769,7 @@ extern	vmCvar_t	g_blueteam;
 extern	vmCvar_t	g_smoothClients;
 extern	vmCvar_t	pmove_fixed;
 extern	vmCvar_t	g_stepHeight;
+extern	vmCvar_t	g_playerHeight;
 extern	vmCvar_t	g_doomSkill;
 extern	vmCvar_t	g_doomAllKeys;
 extern	vmCvar_t	g_fallDamage;

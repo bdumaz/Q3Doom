@@ -1007,6 +1007,7 @@ typedef struct {
 	gametype_t		gametype;
 	int				dmflags;
 	float			stepHeight;		// Q3Doom: g_stepHeight from the serverinfo
+	float			playerHeight;	// Q3Doom: g_playerHeight from the serverinfo
 	qboolean		doomFrag;		// Q3Doom: a DoomFrag run (g_doomFrag)
 	int				doomWeapons;	// Q3Doom: DOOM_WEAPONS_* of the level (g_doomWeaponSet)
 	int				teamflags;
