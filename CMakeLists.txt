@@ -8,7 +8,11 @@ endif()
 
 set(SRC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 set(RUN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/run CACHE PATH "Runtime folder (binaries are copied here)")
-set(ARCH_STRING x86_64)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|ARM64)$")
+  set(ARCH_STRING aarch64)
+else()
+  set(ARCH_STRING x86_64)
+endif()
 
 # --- SDL2 --------------------------------------------------------------------
 # on Windows the VC development package, by default in external/ (-DSDL2_DIR to use another)
@@ -23,6 +27,13 @@ if(MSVC)
   add_compile_definitions(_CRT_SECURE_NO_WARNINGS _WINSOCK_DEPRECATED_NO_WARNINGS)
   # pointer truncation must never compile silently on 64-bit
   add_compile_options(/W3 /wd4996 /wd4244 /wd4267 /wd4305 /we4311 /we4312 /we4302 /we4022 /we4047 /we4013 /MP)
+else()
+  # GCC / Clang (Linux): id's code reinterprets types freely; pointer
+  # truncation and undeclared functions must never compile silently
+  add_compile_options(-fno-strict-aliasing -fwrapv
+    -Werror=int-to-pointer-cast -Werror=pointer-to-int-cast -Werror=implicit-function-declaration)
+  # libdoom and the shared code are linked into the game modules (.so)
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 endif()
 
 function(q3_sources out dir)
@@ -38,8 +49,12 @@ function(q3_deploy target subdir)
   add_custom_command(TARGET ${target} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory ${RUN_DIR}/${subdir}
     COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${target}> ${RUN_DIR}/${subdir}
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_PDB_FILE:${target}> ${RUN_DIR}/${subdir}
     VERBATIM)
+  if(MSVC)
+    add_custom_command(TARGET ${target} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_PDB_FILE:${target}> ${RUN_DIR}/${subdir}
+      VERBATIM)
+  endif()
 endfunction()
 
 # --- libdoom: WAD, Doom asset decoding, map model (no engine dependencies) ---
@@ -99,10 +114,16 @@ q3_sources(SHARED_SRC game q_math.c q_shared.c)
 if(WIN32)
   q3_sources(SYS_SRC win32 win_main.c win_net.c win_shared.c win_syscon.c win_crash.c winquake.rc)
   set(SYS_LIBS winmm ws2_32 wsock32 dbghelp)
+else()
+  q3_sources(SYS_SRC unix unix_main.c unix_net.c unix_shared.c)
+  set(SYS_LIBS ${CMAKE_DL_LIBS} m)
+  # backtrace_symbols names our functions in crash reports
+  set(SYS_LINK_OPTIONS -rdynamic)
 endif()
 
 add_executable(q3doom WIN32 ${CLIENT_SRC} ${QCOMMON_SRC} ${SERVER_SRC} ${SDL_SRC} ${SYS_SRC} ${SHARED_SRC})
 target_link_libraries(q3doom PRIVATE botlib renderer libdoom SDL2::SDL2 ${SYS_LIBS})
+target_link_options(q3doom PRIVATE ${SYS_LINK_OPTIONS})
 q3_deploy(q3doom "")
 if(WIN32)
   add_custom_command(TARGET q3doom POST_BUILD
@@ -112,7 +133,13 @@ endif()
 
 # --- game modules (native DLLs) ---------------------------------------------
 function(q3_module target name gamedir deffile)
-  add_library(${target} SHARED ${ARGN} ${deffile})
+  # the .def files list the exports for MSVC; GCC exports every global symbol
+  if(MSVC)
+    add_library(${target} SHARED ${ARGN} ${deffile})
+  else()
+    add_library(${target} SHARED ${ARGN})
+    target_link_libraries(${target} PRIVATE m)
+  endif()
   # one output folder per game directory: modules share file names
   set_target_properties(${target} PROPERTIES OUTPUT_NAME ${name}${ARCH_STRING} PREFIX ""
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/modules/${gamedir}

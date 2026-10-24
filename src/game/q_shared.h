@@ -251,7 +251,11 @@ static inline float LittleFloat (const float l) { return FloatSwap(&l); }
 #define	MAC_STATIC // bk: FIXME
 #define ID_INLINE inline 
 
-#ifdef __i386__
+#if defined __x86_64__
+#define	CPUSTRING	"linux-x86_64"
+#elif defined __aarch64__
+#define	CPUSTRING	"linux-aarch64"
+#elif defined __i386__
 #define	CPUSTRING	"linux-i386"
 #elif defined __axp__
 #define	CPUSTRING	"linux-alpha"
