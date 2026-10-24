@@ -458,9 +458,16 @@ A Doom sprite billboard: it faces the view direction (around the vertical
 axis only, as in Doom), rotation picked from the angle between the viewer
 and the thing (R_ProjectSprite). 'origin' is the bottom of the thing;
 'light' -1 takes the light of the sector it is in.
+
+A standing thing (monsters, items, decorations) stands on its origin:
+Doom's sprites often reach a few pixels below it, which Doom hid by
+clipping sprites at the floor line; in 3D the floor would hide those
+pixels and the thing would look sunk into the ground, so the sprite is
+lifted to stand on it (as modern ports do). Missiles and effects keep
+Doom's offsets.
 =================
 */
-static void AddSprite( const vec3_t origin, float angle, int state, int light, qboolean fuzz ) {
+static void AddSprite( const vec3_t origin, float angle, int state, int light, qboolean fuzz, qboolean standing ) {
 	const doom_state_t	*st = &doom_states[state];
 	const spriteRot_t	*rot;
 	const uint8_t		*header;
@@ -486,6 +493,9 @@ static void AddSprite( const vec3_t origin, float angle, int state, int light, q
 	height = (short)( header[2] | ( header[3] << 8 ) );
 	left = (short)( header[4] | ( header[5] << 8 ) );
 	top = (short)( header[6] | ( header[7] << 8 ) );
+	if ( standing && top < height ) {
+		top = height;
+	}
 
 	// screen right, flattened
 	right[0] = -cg.refdef.viewaxis[1][0];
@@ -542,7 +552,7 @@ static void AddSprite( const vec3_t origin, float angle, int state, int light, q
 }
 
 void CG_DoomAddSprite( const vec3_t origin, float angle, int state, int light ) {
-	AddSprite( origin, angle, state, light, qfalse );
+	AddSprite( origin, angle, state, light, qfalse, qfalse );
 }
 
 /*
@@ -875,8 +885,8 @@ void CG_DoomItem( centity_t *cent ) {
 	if ( type < 0 ) {
 		return;
 	}
-	CG_DoomAddSprite( cent->lerpOrigin, es->angles[YAW],
-		CG_DoomAnimatedState( doom_mobjinfo[type].spawnstate, cg.time * DOOM_TICRATE / 1000 ), -1 );
+	AddSprite( cent->lerpOrigin, es->angles[YAW],
+		CG_DoomAnimatedState( doom_mobjinfo[type].spawnstate, cg.time * DOOM_TICRATE / 1000 ), -1, qfalse, qtrue );
 }
 
 /*
@@ -918,7 +928,7 @@ void CG_DoomThing( centity_t *cent ) {
 	VectorCopy( cent->lerpOrigin, cent->doomLastOrigin );
 	cent->doomDrawTime = cg.time;
 	VectorAdd( cent->lerpOrigin, cent->doomStepOffset, origin );
-	AddSprite( origin, es->angles[YAW], es->frame, -1, ( doom_mobjinfo[type].flags & MF_SHADOW ) != 0 );
+	AddSprite( origin, es->angles[YAW], es->frame, -1, ( doom_mobjinfo[type].flags & MF_SHADOW ) != 0, qtrue );
 }
 
 /*
@@ -1114,7 +1124,9 @@ void CG_DoomAddToScene( void ) {
 	for ( i = 0 ; i < cgDoom.numThings ; i++ ) {
 		const doomThing_t *th = &cgDoom.things[i];
 
-		CG_DoomAddSprite( th->origin, th->angle, CG_DoomAnimatedState( doom_mobjinfo[th->type].spawnstate, tics ), cgDoom.levels[th->sector] );
+		// things hanging from the ceiling keep their offsets
+		AddSprite( th->origin, th->angle, CG_DoomAnimatedState( doom_mobjinfo[th->type].spawnstate, tics ), cgDoom.levels[th->sector],
+			qfalse, !( doom_mobjinfo[th->type].flags & MF_SPAWNCEILING ) );
 		if ( r_quakeVisuals.integer ) {
 			QV_Corona( th );
 		}
