@@ -820,11 +820,15 @@ void CG_DoomShutdown( void ) {
 CG_DoomUpdateLevelShot
 
 The first frame of a level becomes its picture in the campaign menu
-(levelshots/doom/<map>.tga), taken once, without the HUD
+(levelshots/doom/<map>.tga), taken once, without the HUD. A pure server
+hides loose .tga files from the game, so a marker next to it
+(levelshots/doom/<map>.dat) records that it was taken; without it the
+picture was taken again at every level start, and its frame without the
+HUD flickered.
 =================
 */
 void CG_DoomUpdateLevelShot( void ) {
-	char			name[MAX_QPATH];
+	char			name[MAX_QPATH], marker[MAX_QPATH];
 	fileHandle_t	f;
 
 	if ( levelShotState == 1 ) {
@@ -835,16 +839,18 @@ void CG_DoomUpdateLevelShot( void ) {
 		return;
 	}
 	Com_sprintf( name, sizeof( name ), "levelshots/doom/%s.tga", cgDoom.map->name );
-	if ( trap_FS_FOpenFile( name, &f, FS_READ ) > 0 ) {
+	Com_sprintf( marker, sizeof( marker ), "levelshots/doom/%s.dat", cgDoom.map->name );
+	if ( trap_FS_FOpenFile( marker, &f, FS_READ ) >= 0 && f ) {
 		trap_FS_FCloseFile( f );
 		levelShotState = 2;
 		return;
 	}
-	if ( f ) {
-		trap_FS_FCloseFile( f );
-	}
 	levelShotState = 1;
 	trap_R_DoomLevelShot( name );
+	if ( trap_FS_FOpenFile( marker, &f, FS_WRITE ) >= 0 && f ) {
+		trap_FS_Write( "taken\n", 6, f );
+		trap_FS_FCloseFile( f );
+	}
 }
 
 qboolean CG_DoomLevelShotFrame( void ) {
