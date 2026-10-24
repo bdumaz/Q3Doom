@@ -9,8 +9,9 @@ It has two single player modes:
 
 An optional **Quake Visuals** mode redraws the maps with Quake 3 textures, item models and lighting.
 
+**Multiplayer** plays Quake 3's Deathmatch, Team Deathmatch, Tournament and CTF with Doom's weapons and items, as Doom marines in five colours. It runs on Quake 3's maps and, for Deathmatch and Team Deathmatch, on all 36 Doom levels.
+
 > Runs on 64-bit Windows and Linux.
-> Multiplayer is hidden in the menu for now, but the plan is to get it working with Doom Deathmatch maps, as well as Quake 3 Modes using Doom Weapons.
 
 ## What you need
 
@@ -66,6 +67,30 @@ The engine and its game modules are copied into `run/` (with `SDL2.dll` on Windo
 On Linux, settings and screenshots go to `~/.q3doom`.
 
 The game starts on the main menu. **Single Player** leads to the Campaign and DoomFrag. Resolutions, borderless fullscreen and Quake Visuals are under **Setup → System**.
+
+### Multiplayer
+
+**Multiplayer** lists the games on your network and joins them. **Create** hosts a game: pick a Quake 3 map or a Doom level, the game type and the limits. Your name and marine colour are under **Setup → Player**.
+
+To join a game on another network, open the console and type `connect <address>`. id's master servers are gone, so internet games don't show in the list.
+
+A dedicated server runs without a window:
+
+```
+q3doom +set dedicated 1 +set g_doomDeathmatch 1 +map E1M1
+```
+
+On Doom levels, these settings change the rules:
+
+| Setting | Default | Effect |
+|---|---|---|
+| `g_doomDeathmatch` | 0 (1 when hosted from the menu) | Deathmatch rules on Doom levels: deathmatch starts, all keys, multiplayer-only things |
+| `g_doomMatchMonsters` | 0 | Keep the monsters in a match |
+| `g_doomWeaponsStay` | 1 | Weapons stay where they are, as in Doom's deathmatch |
+| `g_doomExitEndsMatch` | 0 | The exit ends the match instead of fragging whoever takes it |
+| `g_spawnProtection` | 1500 | Milliseconds after a respawn when other players do no damage (until you fire) |
+
+Q3Doom uses its own network protocol (1068). It doesn't see or join Quake 3 servers, and Quake 3 can't join it.
 
 ## Tests
 
