@@ -1288,7 +1288,8 @@ static float CG_DrawPowerups( float y ) {
 	for ( i = 0 ; i < active ; i++ ) {
 		item = BG_FindItemForPowerup( sorted[i] );
 
-    if (item) {
+		// Q3Doom: Quake 3's powerups only (the quad); Doom's powers show on the face and palette
+    if ( item && !item->doomednum ) {
 
 		  color = 1;
 
@@ -1717,9 +1718,10 @@ static void CG_DrawLagometer( void ) {
 	x = 640 - 48;
 	y = 480 - 48;
 #endif
-	// Q3Doom: above the Doom status bar (32 of Doom's 200 lines)
+	// Q3Doom: above the Doom status bar (32 of Doom's 200 lines) and the
+	// scores standing on it
 	if ( CG_DoomHudActive() ) {
-		y -= 32 * 480 / 200;
+		y -= 32 * 480 / 200 + BIGCHAR_HEIGHT + 8;
 	}
 
 	trap_R_SetColor( NULL );
@@ -2607,10 +2609,15 @@ static void CG_Draw2D( void ) {
 #endif
 
 #ifndef MISSIONPACK
-	// Q3Doom: no Quake 3 powerup timers and pickup icons (under the Doom status bar)
+	// Q3Doom: Quake 3's scores, flags and quad timer stand on the Doom status
+	// bar; no Quake 3 pickup icons
 	if ( !CG_DoomGame() ) {
 		CG_DrawLowerRight();
 		CG_DrawLowerLeft();
+	} else if ( CG_DoomHudActive() ) {
+		CG_DrawPowerups( CG_DrawScores( 480 - 32 * 480 / 200 ) );
+	} else {
+		CG_DrawLowerRight();
 	}
 #endif
 

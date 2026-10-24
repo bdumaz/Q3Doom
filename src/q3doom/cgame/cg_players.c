@@ -2227,6 +2227,42 @@ int CG_LightVerts( vec3_t normal, int numVerts, polyVert_t *verts )
 
 /*
 ===============
+CG_DoomPlayerPowerups
+
+Q3Doom: what a marine carries of Quake 3's: the quad's blue glow, and a
+CTF flag on its back (Quake 3's flag model, glowing in its colour)
+===============
+*/
+static void CG_DoomPlayerPowerups( centity_t *cent ) {
+	int			powerups = cent->currentState.powerups;
+	refEntity_t	flag;
+	vec3_t		angles;
+	qboolean	red;
+
+	if ( powerups & ( 1 << PW_QUAD ) ) {
+		trap_R_AddLightToScene( cent->lerpOrigin, 200 + ( rand() & 31 ), 0.2f, 0.2f, 1 );
+	}
+	if ( !( powerups & ( ( 1 << PW_REDFLAG ) | ( 1 << PW_BLUEFLAG ) ) ) ) {
+		return;
+	}
+	red = ( powerups & ( 1 << PW_REDFLAG ) ) != 0;
+	memset( &flag, 0, sizeof( flag ) );
+	flag.hModel = red ? cgs.media.redFlagModel : cgs.media.blueFlagModel;
+	if ( !flag.hModel ) {
+		return;
+	}
+	// leaning back a little, behind the shoulders
+	VectorSet( angles, 0, cent->lerpAngles[YAW], -15 );
+	AnglesToAxis( angles, flag.axis );
+	VectorMA( cent->lerpOrigin, -10, flag.axis[0], flag.origin );
+	VectorCopy( flag.origin, flag.oldorigin );
+	flag.renderfx = RF_MINLIGHT;
+	trap_R_AddRefEntityToScene( &flag );
+	trap_R_AddLightToScene( flag.origin, 150 + ( rand() & 31 ), red ? 1 : 0.2f, 0.2f, red ? 0.2f : 1 );
+}
+
+/*
+===============
 CG_Player
 ===============
 */
@@ -2270,6 +2306,7 @@ void CG_Player( centity_t *cent ) {
 		}
 		CG_PlayerSprites( cent );
 		CG_DoomPlayer( cent, ci->team == TEAM_RED ? 3 : ci->team == TEAM_BLUE ? 4 : ci->doomColor );
+		CG_DoomPlayerPowerups( cent );
 		return;
 	}
 

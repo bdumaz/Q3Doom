@@ -293,6 +293,9 @@ qboolean CG_DoomEntityEvent( centity_t *cent, vec3_t position, int event ) {
 	switch ( event ) {
 	case EV_FIRE_WEAPON:
 		cent->muzzleFlashTime = cg.time;	// the marine's attack frames (CG_DoomPlayer)
+		if ( es->powerups & ( 1 << PW_QUAD ) ) {
+			trap_S_StartSound( NULL, es->number, CHAN_ITEM, cgs.media.quadSound );
+		}
 		// the sounds of the attacks that always make one (punch and saw
 		// sounds depend on the hit: the game sends them)
 		switch ( es->eventParm & ~DOOM_FIRE_ACCURATE ) {
@@ -346,7 +349,10 @@ qboolean CG_DoomEntityEvent( centity_t *cent, vec3_t position, int event ) {
 		}
 		// Doom plays pickup sounds for the player who picked up only
 		if ( local ) {
-			trap_S_StartSound( NULL, es->number, CHAN_AUTO, trap_S_RegisterSound( bg_itemlist[es->eventParm].pickup_sound, qfalse ) );
+			// the CTF flags have none: the global pickup event announces them
+			if ( bg_itemlist[es->eventParm].pickup_sound ) {
+				trap_S_StartSound( NULL, es->number, CHAN_AUTO, trap_S_RegisterSound( bg_itemlist[es->eventParm].pickup_sound, qfalse ) );
+			}
 			CG_DoomMessage( bg_itemlist[es->eventParm].pickup_name );
 			CG_DoomBonus();
 			// the Quake 3 set switches to the matching Quake 3 weapon (the

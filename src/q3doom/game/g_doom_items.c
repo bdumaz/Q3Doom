@@ -13,6 +13,8 @@ Licensed under the GNU General Public License version 2 or later.
 */
 #include "g_local.h"
 
+int Pickup_Powerup( gentity_t *ent, gentity_t *other );		// g_items.c
+
 /*
 =====================================================================
 
@@ -268,6 +270,10 @@ int Doom_TouchItem( gentity_t *ent, gentity_t *other ) {
 		return qtrue;
 
 	case IT_POWERUP:
+		// Quake 3's quad (Quake 3 maps): Quake 3's timer
+		if ( !item->doomednum ) {
+			return Pickup_Powerup( ent, other ) != 0;
+		}
 		if ( !GivePower( other, item->giTag ) ) {
 			return qfalse;
 		}

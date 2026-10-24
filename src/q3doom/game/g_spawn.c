@@ -278,13 +278,64 @@ Finds the spawn function for the entity and calls it,
 returning qfalse if not found
 ===============
 */
+/*
+Q3Doom: Quake 3's items on Quake 3 maps, as the Doom items closest in use
+(NULL: no Doom counterpart, not spawned). The weapons Doom lacks give the
+nearest one: grenades and rockets the launcher, lightning the plasma rifle,
+the railgun the chaingun. The quad and the CTF flags stay Quake 3's.
+*/
+static const char *q3ItemsInDoom[][2] = {
+	{ "weapon_gauntlet",		"doom_chainsaw" },
+	{ "weapon_shotgun",			"doom_shotgun" },
+	{ "weapon_machinegun",		"doom_chaingun" },
+	{ "weapon_grenadelauncher",	"doom_launcher" },
+	{ "weapon_rocketlauncher",	"doom_launcher" },
+	{ "weapon_lightning",		"doom_plasmagun" },
+	{ "weapon_railgun",			"doom_chaingun" },
+	{ "weapon_plasmagun",		"doom_plasmagun" },
+	{ "weapon_bfg",				"doom_bfg9000" },
+	{ "ammo_bullets",			"doom_ammobox" },
+	{ "ammo_shells",			"doom_shellbox" },
+	{ "ammo_grenades",			"doom_rocketbox" },
+	{ "ammo_rockets",			"doom_rocketbox" },
+	{ "ammo_cells",				"doom_cellpack" },
+	{ "ammo_lightning",			"doom_cellpack" },
+	{ "ammo_slugs",				"doom_ammobox" },
+	{ "ammo_bfg",				"doom_cellpack" },
+	{ "item_armor_shard",		"doom_armorbonus" },
+	{ "item_armor_combat",		"doom_greenarmor" },
+	{ "item_armor_body",		"doom_bluearmor" },
+	{ "item_health_small",		"doom_healthbonus" },
+	{ "item_health",			"doom_stimpack" },
+	{ "item_health_large",		"doom_medikit" },
+	{ "item_health_mega",		"doom_soulsphere" },
+	{ "item_invis",				"doom_invisibility" },
+	{ "item_enviro",			NULL },
+	{ "item_haste",				NULL },
+	{ "item_regen",				NULL },
+	{ "item_flight",			NULL },
+	{ "holdable_teleporter",	NULL },
+	{ "holdable_medkit",		NULL }
+};
+
 qboolean G_CallSpawn( gentity_t *ent ) {
 	spawn_t	*s;
 	gitem_t	*item;
+	int		i;
 
 	if ( !ent->classname ) {
 		G_Printf ("G_CallSpawn: NULL classname\n");
 		return qfalse;
+	}
+
+	for ( i = 0 ; i < (int)( sizeof( q3ItemsInDoom ) / sizeof( q3ItemsInDoom[0] ) ) ; i++ ) {
+		if ( !strcmp( ent->classname, q3ItemsInDoom[i][0] ) ) {
+			if ( !q3ItemsInDoom[i][1] ) {
+				return qfalse;		// freed by the caller, quietly
+			}
+			ent->classname = (char *)q3ItemsInDoom[i][1];
+			break;
+		}
 	}
 
 	// check item spawn functions

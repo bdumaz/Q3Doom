@@ -415,7 +415,29 @@ void RespawnItem( gentity_t *ent ) {
 Touch_Item
 ===============
 */
+/*
+Q3Doom: seconds before an item on a Quake 3 map comes back, Quake 3's
+*/
+static int ItemRespawnTime( const gitem_t *item ) {
+	switch ( item->giType ) {
+	case IT_WEAPON:
+		return g_gametype.integer >= GT_TEAM ? g_weaponTeamRespawn.integer : g_weaponRespawn.integer;
+	case IT_AMMO:
+		return RESPAWN_AMMO;
+	case IT_ARMOR:
+		return RESPAWN_ARMOR;
+	case IT_HEALTH:
+		return item->quantity == 100 ? RESPAWN_MEGAHEALTH : RESPAWN_HEALTH;		// the soulsphere
+	case IT_POWERUP:
+		return RESPAWN_POWERUP;
+	default:
+		return 0;
+	}
+}
+
 void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
+	int		respawn;
+
 	if (!other->client)
 		return;
 	if (other->health < 1)
@@ -426,23 +448,78 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 		return;
 	}
 
-	// Q3Doom: Doom's rules (P_TouchSpecialThing); a Doom item is used up
-	if ( !Doom_TouchItem( ent, other ) ) {
+	// Q3Doom: the CTF flags keep Quake 3's rules, the rest Doom's
+	// (P_TouchSpecialThing)
+	if ( ent->item->giType == IT_TEAM ) {
+		respawn = Pickup_Team( ent, other );
+		if ( !respawn ) {
+			return;
+		}
+	} else if ( !Doom_TouchItem( ent, other ) ) {
 		return;
+	} else {
+		respawn = ItemRespawnTime( ent->item );
 	}
 
 	G_LogPrintf( "Item: %i %s\n", other->s.number, ent->item->classname );
-	if ( doom_mobjinfo[doom_mobjtype_for_ednum( ent->item->doomednum )].flags & MF_COUNTITEM ) {
+	if ( ent->item->doomednum && ( doom_mobjinfo[doom_mobjtype_for_ednum( ent->item->doomednum )].flags & MF_COUNTITEM ) ) {
 		doomLevel.items++;
 	}
 
 	// the pickup sound, message and flash, predicted by the client
 	G_AddPredictableEvent( other, EV_ITEM_PICKUP, ent->s.modelindex );
 
+	// everyone hears the powerups and flags being taken
+	if ( !DOOM_LEVEL() && ( ent->item->giType == IT_POWERUP || ent->item->giType == IT_TEAM ) ) {
+		gentity_t *te = G_TempEntity( ent->s.pos.trBase, EV_GLOBAL_ITEM_PICKUP );
+
+		te->s.eventParm = ent->s.modelindex;
+		te->r.svFlags |= SVF_BROADCAST;
+	}
+
 	// fire item targets
 	G_UseTargets (ent, other);
 
-	G_FreeEntity( ent );
+	// a Doom map's items are used up (single player and cooperative rules),
+	// so are dropped ones
+	if ( DOOM_LEVEL() || ( ( ent->flags & FL_DROPPED_ITEM ) && ent->item->giType != IT_TEAM ) ) {
+		G_FreeEntity( ent );
+		return;
+	}
+
+	// Quake 3 maps: the item comes back after a while (CTF flags when
+	// returned); a wait of -1 never
+	if ( ent->wait == -1 ) {
+		ent->r.svFlags |= SVF_NOCLIENT;
+		ent->s.eFlags |= EF_NODRAW;
+		ent->r.contents = 0;
+		ent->unlinkAfterEvent = qtrue;
+		return;
+	}
+	if ( ent->wait ) {
+		respawn = ent->wait;
+	}
+	if ( ent->random ) {
+		respawn += crandom() * ent->random;
+		if ( respawn < 1 ) {
+			respawn = 1;
+		}
+	}
+	if ( ent->flags & FL_DROPPED_ITEM ) {
+		ent->freeAfterEvent = qtrue;
+	}
+	// picked up items stay around without being drawn, so they can ride movers
+	ent->r.svFlags |= SVF_NOCLIENT;
+	ent->s.eFlags |= EF_NODRAW;
+	ent->r.contents = 0;
+	if ( respawn <= 0 ) {
+		ent->nextthink = 0;
+		ent->think = 0;
+	} else {
+		ent->nextthink = level.time + respawn * 1000;
+		ent->think = RespawnItem;
+	}
+	trap_LinkEntity( ent );
 }
 
 
@@ -574,6 +651,10 @@ void FinishSpawningItem( gentity_t *ent ) {
 		// allow to ride movers
 		ent->s.groundEntityNum = tr.entityNum;
 
+		// Q3Doom: a Doom item's origin is on the floor (its sprite stands there)
+		if ( ent->item->doomednum ) {
+			tr.endpos[2] -= ITEM_RADIUS;
+		}
 		G_SetOrigin( ent, tr.endpos );
 	}
 

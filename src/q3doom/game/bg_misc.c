@@ -106,6 +106,18 @@ gitem_t	bg_itemlist[] =
 	{ "doom_computermap",	DOOM_SOUND( "DSGETPOW" ), { NULL }, NULL, "Computer Area Map", 0, IT_POWERUP, DPW_ALLMAP, "", "", 2026 },
 	{ "doom_visor",			DOOM_SOUND( "DSGETPOW" ), { NULL }, NULL, "Light Amplification Visor", 0, IT_POWERUP, DPW_INFRARED, "", "", 2045 },
 
+	// Quake 3 maps: the quad and the CTF flags stay Quake 3's (no doomednum),
+	// the other Quake 3 items become Doom ones (G_CallSpawn)
+	{ "item_quad", "sound/items/quaddamage.wav",
+		{ "models/powerups/instant/quad.md3", "models/powerups/instant/quad_ring.md3", NULL, NULL },
+		"icons/quad", "Quad Damage", 30, IT_POWERUP, PW_QUAD, "", "sound/items/damage2.wav sound/items/damage3.wav", 0 },
+	{ "team_CTF_redflag", NULL,
+		{ "models/flags/r_flag.md3", NULL, NULL, NULL },
+		"icons/iconf_red1", "Red Flag", 0, IT_TEAM, PW_REDFLAG, "", "", 0 },
+	{ "team_CTF_blueflag", NULL,
+		{ "models/flags/b_flag.md3", NULL, NULL, NULL },
+		"icons/iconf_blu1", "Blue Flag", 0, IT_TEAM, PW_BLUEFLAG, "", "", 0 },
+
 	// end of list marker
 	{ NULL }
 };
@@ -601,6 +613,19 @@ qboolean BG_CanItemBeGrabbed( int gametype, const entityState_t *ent, const play
 	case IT_POWERUP:
 		// the computer map only once
 		return item->giTag != DPW_ALLMAP || !ps->powerups[DPW_ALLMAP];
+
+	case IT_TEAM:
+		// Quake 3's CTF: the other team's flag, and your own when dropped
+		// (to return it) or when you bring the other one home
+		if ( gametype == GT_CTF ) {
+			if ( ps->persistant[PERS_TEAM] == TEAM_RED ) {
+				return item->giTag == PW_BLUEFLAG || ( item->giTag == PW_REDFLAG && ( ent->modelindex2 || ps->powerups[PW_BLUEFLAG] ) );
+			}
+			if ( ps->persistant[PERS_TEAM] == TEAM_BLUE ) {
+				return item->giTag == PW_REDFLAG || ( item->giTag == PW_BLUEFLAG && ( ent->modelindex2 || ps->powerups[PW_REDFLAG] ) );
+			}
+		}
+		return qfalse;
 
 	case IT_BAD:
 		Com_Error( ERR_DROP, "BG_CanItemBeGrabbed: IT_BAD" );

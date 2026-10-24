@@ -221,12 +221,14 @@ void Team_SetFlagStatus( int team, flagStatus_t status ) {
 		char st[4];
 
 		if( g_gametype.integer == GT_CTF ) {
-			st[0] = ctfFlagStatusRemap[teamgame.redStatus];
-			st[1] = ctfFlagStatusRemap[teamgame.blueStatus];
+			// Q3Doom: a status still at -1 (Team_InitGame forcing an update)
+			// read outside the table
+			st[0] = (unsigned)teamgame.redStatus < sizeof( ctfFlagStatusRemap ) ? ctfFlagStatusRemap[teamgame.redStatus] : '0';
+			st[1] = (unsigned)teamgame.blueStatus < sizeof( ctfFlagStatusRemap ) ? ctfFlagStatusRemap[teamgame.blueStatus] : '0';
 			st[2] = 0;
 		}
 		else {		// GT_1FCTF
-			st[0] = oneFlagStatusRemap[teamgame.flagStatus];
+			st[0] = (unsigned)teamgame.flagStatus < sizeof( oneFlagStatusRemap ) ? oneFlagStatusRemap[teamgame.flagStatus] : '0';
 			st[1] = 0;
 		}
 

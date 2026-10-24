@@ -904,6 +904,11 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		damage = damage * max / 100;
 	}
 
+	// Q3Doom: the quad on Doom's weapons (Quake 3's are multiplied as they fire)
+	if ( attacker->client && attacker->client->ps.powerups[PW_QUAD] && DOOM_WEAPONSET( &attacker->client->ps ) == DOOM_WEAPONS_DOOM ) {
+		damage *= g_quadfactor.value;
+	}
+
 	client = targ->client;
 
 	if ( client ) {

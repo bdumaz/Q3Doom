@@ -237,8 +237,9 @@ static void CG_Item( centity_t *cent ) {
 		CG_Error( "Bad item index %i on entity", es->modelindex );
 	}
 
-	// Q3Doom: Doom items are Doom sprites
-	if ( CG_DoomGame() ) {
+	// Q3Doom: Doom items are Doom sprites (the quad and the CTF flags are
+	// Quake 3 models)
+	if ( CG_DoomGame() && bg_itemlist[es->modelindex].doomednum ) {
 		CG_DoomItem( cent );
 		return;
 	}
