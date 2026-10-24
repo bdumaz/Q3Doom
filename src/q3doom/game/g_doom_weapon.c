@@ -33,7 +33,7 @@ static float Spread( void ) {
 =================
 Doom_IsTarget
 
-Things Doom shots aim at and bleed: living players (monsters with M6)
+Things Doom shots aim at (MF_SHOOTABLE): living players, monsters, barrels
 =================
 */
 qboolean Doom_IsTarget( gentity_t *ent ) {
@@ -43,7 +43,29 @@ qboolean Doom_IsTarget( gentity_t *ent ) {
 	if ( ent->client ) {
 		return ent->client->sess.sessionTeam != TEAM_SPECTATOR;
 	}
+	if ( ent->doomMobj ) {
+		return ( ent->doomMobj->flags & MF_SHOOTABLE ) != 0;
+	}
 	return qfalse;
+}
+
+// shots draw blood from it rather than a puff
+qboolean Doom_Bleeds( gentity_t *ent ) {
+	return Doom_IsTarget( ent ) && !( ent->doomMobj && ( ent->doomMobj->flags & MF_NOBLOOD ) );
+}
+
+/*
+=================
+Doom_Sound
+
+A Doom sound from an entity; | DOOM_SOUND_FULL plays it at full volume
+everywhere (the bosses)
+=================
+*/
+void Doom_Sound( gentity_t *ent, int sfx ) {
+	if ( sfx > sfx_None ) {
+		G_AddEvent( ent, EV_DOOM_SOUND, sfx );
+	}
 }
 
 static void EyePoint( gentity_t *ent, vec3_t eye ) {
@@ -173,7 +195,7 @@ and blood on things that bleed, a few units short of the hit like Doom.
 Returns the entity damaged, if any.
 =================
 */
-static gentity_t *LineAttack( gentity_t *ent, const vec3_t eye, float yaw, float pitch, float range, int damage, int mod ) {
+gentity_t *Doom_LineAttack( gentity_t *ent, const vec3_t eye, float yaw, float pitch, float range, int damage, int mod ) {
 	vec3_t		angles, forward, end, pos;
 	trace_t		tr;
 	gentity_t	*hit;
@@ -183,7 +205,10 @@ static gentity_t *LineAttack( gentity_t *ent, const vec3_t eye, float yaw, float
 	VectorMA( eye, range, forward, end );
 	trap_Trace( &tr, eye, NULL, NULL, end, ent->s.number, MASK_SHOT );
 
-	Doom_ShotTrace( ent, eye, tr.endpos );
+	// only players shoot gun lines (P_ShootSpecialLine)
+	if ( ent->client ) {
+		Doom_ShotTrace( ent, eye, tr.endpos );
+	}
 
 	// nothing hit, or the sky: no puff
 	if ( tr.fraction == 1 || ( tr.surfaceFlags & SURF_NOIMPACT ) ) {
@@ -191,7 +216,7 @@ static gentity_t *LineAttack( gentity_t *ent, const vec3_t eye, float yaw, float
 	}
 	VectorMA( tr.endpos, -4, forward, pos );
 	hit = &g_entities[tr.entityNum];
-	if ( Doom_IsTarget( hit ) ) {
+	if ( Doom_Bleeds( hit ) ) {
 		SpawnBlood( pos, damage );
 	} else {
 		SpawnPuff( pos, range <= DOOM_MELEERANGE + 1 );
@@ -229,7 +254,7 @@ static void Punch( gentity_t *ent, const vec3_t eye ) {
 		damage *= 10;
 	}
 	target = Doom_AimLineAttack( ent, eye, yaw, DOOM_MELEERANGE, &pitch );
-	LineAttack( ent, eye, yaw, pitch, DOOM_MELEERANGE, damage, MOD_GAUNTLET );
+	Doom_LineAttack( ent, eye, yaw, pitch, DOOM_MELEERANGE, damage, MOD_GAUNTLET );
 	// turn to face the target
 	if ( target ) {
 		G_AddEvent( ent, EV_DOOM_SOUND, sfx_punch );
@@ -246,7 +271,7 @@ static void Saw( gentity_t *ent, const vec3_t eye ) {
 	yaw += Spread();
 	// meleerange + 1 so the puff doesn't skip the flash
 	target = Doom_AimLineAttack( ent, eye, yaw, DOOM_MELEERANGE + 1, &pitch );
-	LineAttack( ent, eye, yaw, pitch, DOOM_MELEERANGE + 1, damage, MOD_CHAINSAW );
+	Doom_LineAttack( ent, eye, yaw, pitch, DOOM_MELEERANGE + 1, damage, MOD_CHAINSAW );
 	if ( !target ) {
 		G_AddEvent( ent, EV_DOOM_SOUND, sfx_sawful );
 		return;
@@ -271,7 +296,7 @@ static void GunShot( gentity_t *ent, const vec3_t eye, float pitch, qboolean acc
 	if ( !accurate ) {
 		yaw += Spread();
 	}
-	LineAttack( ent, eye, yaw, pitch, DOOM_MISSILERANGE, damage, MOD_MACHINEGUN );
+	Doom_LineAttack( ent, eye, yaw, pitch, DOOM_MISSILERANGE, damage, MOD_MACHINEGUN );
 }
 
 /*
@@ -282,16 +307,18 @@ MISSILES (P_SpawnPlayerMissile)
 =====================================================================
 */
 
-static void SpawnPlayerMissile( gentity_t *ent, const vec3_t eye, int type ) {
-	const doom_mobjinfo_t	*info = &doom_mobjinfo[type];
-	float					yaw = ent->client->ps.viewangles[YAW];
-	float					pitch = ShotPitch( ent, eye, yaw, AIMRANGE );
-	vec3_t					angles, dir, start;
-	gentity_t				*bolt;
+/*
+=================
+Doom_LaunchMissile
 
-	VectorSet( angles, pitch, yaw, 0 );
-	AngleVectors( angles, dir, NULL, NULL );
-	VectorCopy( eye, start );
+A Doom missile (rocket, plasma, BFG ball, monster fireballs) flying from
+'start' at 'velocity' (units a second): a Quake 3 missile with the Doom
+damage of its type
+=================
+*/
+gentity_t *Doom_LaunchMissile( gentity_t *owner, const vec3_t start, const vec3_t velocity, int type ) {
+	const doom_mobjinfo_t	*info = &doom_mobjinfo[type];
+	gentity_t				*bolt;
 
 	bolt = G_Spawn();
 	bolt->classname = "doom_missile";
@@ -299,11 +326,11 @@ static void SpawnPlayerMissile( gentity_t *ent, const vec3_t eye, int type ) {
 	bolt->think = G_ExplodeMissile;
 	bolt->s.eType = ET_MISSILE;
 	bolt->r.svFlags = SVF_USE_CURRENT_ORIGIN;
-	bolt->s.weapon = ent->s.weapon;
+	bolt->s.weapon = owner->s.weapon;
 	bolt->s.generic1 = type;
 	bolt->doomMissile = type + 1;
-	bolt->r.ownerNum = ent->s.number;
-	bolt->parent = ent;
+	bolt->r.ownerNum = owner->s.number;
+	bolt->parent = owner;
 	bolt->damage = ( Doom_Random() % 8 + 1 ) * info->damage;
 	bolt->clipmask = MASK_SHOT;
 	bolt->target_ent = NULL;
@@ -317,17 +344,32 @@ static void SpawnPlayerMissile( gentity_t *ent, const vec3_t eye, int type ) {
 	case MT_PLASMA:
 		bolt->methodOfDeath = MOD_PLASMA;
 		break;
-	default:
+	case MT_BFG:
 		bolt->methodOfDeath = MOD_BFG;
+		break;
+	default:
+		bolt->methodOfDeath = MOD_UNKNOWN;
 		break;
 	}
 
 	bolt->s.pos.trType = TR_LINEAR;
 	bolt->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;		// move a bit on the very first frame
 	VectorCopy( start, bolt->s.pos.trBase );
-	VectorScale( dir, (float)info->speed / DOOM_FRACUNIT * DOOM_TICRATE, bolt->s.pos.trDelta );
+	VectorCopy( velocity, bolt->s.pos.trDelta );
 	SnapVector( bolt->s.pos.trDelta );
 	VectorCopy( start, bolt->r.currentOrigin );
+	return bolt;
+}
+
+static void SpawnPlayerMissile( gentity_t *ent, const vec3_t eye, int type ) {
+	float	yaw = ent->client->ps.viewangles[YAW];
+	float	pitch = ShotPitch( ent, eye, yaw, AIMRANGE );
+	vec3_t	angles, dir;
+
+	VectorSet( angles, pitch, yaw, 0 );
+	AngleVectors( angles, dir, NULL, NULL );
+	VectorScale( dir, (float)doom_mobjinfo[type].speed / DOOM_FRACUNIT * DOOM_TICRATE, dir );
+	Doom_LaunchMissile( ent, eye, dir, type );
 }
 
 /*
@@ -391,12 +433,19 @@ Doom's A_Explode.
 */
 void Doom_MissileImpact( gentity_t *ent, trace_t *trace ) {
 	gentity_t	*other = &g_entities[trace->entityNum];
+	gentity_t	*owner = &g_entities[ent->r.ownerNum];
 	int			type = ent->doomMissile - 1;
 	vec3_t		velocity;
 
 	BG_EvaluateTrajectoryDelta( &ent->s.pos, level.time, velocity );
+	// a monster's missiles explode on its own kind without hurting it (PIT_CheckThing)
+	if ( owner->doomMobj && other->doomMobj && ( owner->doomMobj->type == other->doomMobj->type
+		|| ( owner->doomMobj->type == MT_KNIGHT && other->doomMobj->type == MT_BRUISER )
+		|| ( owner->doomMobj->type == MT_BRUISER && other->doomMobj->type == MT_KNIGHT ) ) ) {
+		other = &g_entities[ENTITYNUM_WORLD];
+	}
 	if ( other->takedamage && ent->damage ) {
-		G_Damage( other, ent, &g_entities[ent->r.ownerNum], velocity, ent->s.origin, ent->damage, 0, ent->methodOfDeath );
+		G_Damage( other, ent, owner, velocity, ent->s.origin, ent->damage, 0, ent->methodOfDeath );
 	}
 
 	G_AddEvent( ent, Doom_IsTarget( other ) ? EV_MISSILE_HIT : EV_MISSILE_MISS, DirToByte( trace->plane.normal ) );
@@ -443,6 +492,9 @@ void Doom_FireWeapon( gentity_t *ent, int parm ) {
 		return;
 	}
 	EyePoint( ent, eye );
+
+	// the shot wakes up the monsters that hear it (P_FireWeapon)
+	Doom_NoiseAlert( ent );
 
 	switch ( action ) {
 	case ACT_Punch:

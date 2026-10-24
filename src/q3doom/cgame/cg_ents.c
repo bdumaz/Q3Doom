@@ -971,6 +971,9 @@ static void CG_AddCEntity( centity_t *cent ) {
 	case ET_ITEM:
 		CG_Item( cent );
 		break;
+	case ET_DOOM_THING:
+		CG_DoomThing( cent );		// Q3Doom: monsters and barrels
+		break;
 	case ET_MISSILE:
 		CG_Missile( cent );
 		break;

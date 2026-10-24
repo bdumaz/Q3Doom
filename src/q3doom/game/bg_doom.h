@@ -83,6 +83,10 @@ extern const int				bg_doomClipAmmo[DAM_NUMAMMO];
 // EV_FIRE_WEAPON eventParm: the Doom action (ACT_*) | DOOM_FIRE_ACCURATE
 #define DOOM_FIRE_ACCURATE	0x80
 
+// EV_DOOM_SOUND eventParm: the sound (sfx_*) | DOOM_SOUND_FULL for full
+// volume everywhere (the bosses' sight and death sounds)
+#define DOOM_SOUND_FULL		0x80
+
 int			BG_DoomMaxAmmo( const playerState_t *ps, int ammo );
 // the weapon P_CheckAmmo switches to when the current one is empty
 int			BG_DoomBestWeapon( const playerState_t *ps );

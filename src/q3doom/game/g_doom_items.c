@@ -291,9 +291,8 @@ void Doom_SpawnItems( void ) {
 
 	for ( i = 0 ; i < map->num_things ; i++ ) {
 		const doom_thing_t	*t = &map->things[i];
-		int					itemNum, sector;
+		int					itemNum;
 		gentity_t			*ent;
-		vec3_t				origin;
 
 		if ( !BG_DoomThingOnSkill( t, g_doomSkill.integer ) ) {
 			continue;
@@ -302,31 +301,53 @@ void Doom_SpawnItems( void ) {
 		if ( !itemNum ) {
 			continue;
 		}
-		sector = doom_map_sector_at( map, t->x + 0.25, t->y + 0.25 );
-		if ( sector < 0 ) {
+		ent = Doom_SpawnItemAt( itemNum, t->x + 0.25f, t->y + 0.25f, qfalse );
+		if ( !ent ) {
 			continue;
 		}
-
-		ent = G_Spawn();
-		ent->classname = bg_itemlist[itemNum].classname;
-		ent->item = &bg_itemlist[itemNum];
-		RegisterItem( ent->item );
-		ent->s.eType = ET_ITEM;
-		ent->s.modelindex = itemNum;
-		ent->s.modelindex2 = 0;
 		ent->s.angles[YAW] = t->angle;
-		ent->doomSector = sector;
-		// only for finding it: BG_PlayerTouchesItem decides
-		VectorSet( ent->r.mins, -21, -21, 0 );
-		VectorSet( ent->r.maxs, 21, 21, 8 );
-		ent->r.contents = CONTENTS_TRIGGER;
-		ent->touch = Touch_Item;
-		VectorSet( origin, t->x, t->y, doomLevel.floor[sector] );
-		G_SetOrigin( ent, origin );
-		trap_LinkEntity( ent );
+		if ( doom_mobjinfo[doom_mobjtype_for_ednum( t->type )].flags & MF_COUNTITEM ) {
+			doomLevel.totalItems++;
+		}
 		count++;
 	}
 	G_Printf( "Doom items: %d\n", count );
+}
+
+/*
+=================
+Doom_SpawnItemAt
+
+An item standing on the floor at x, y; 'dropped' by a monster (MF_DROPPED:
+half a clip, one clip with a weapon)
+=================
+*/
+gentity_t *Doom_SpawnItemAt( int itemNum, float x, float y, qboolean dropped ) {
+	int			sector = doom_map_sector_at( doomLevel.map, x, y );
+	gentity_t	*ent;
+	vec3_t		origin;
+
+	if ( itemNum <= 0 || itemNum >= bg_numItems || sector < 0 ) {
+		return NULL;
+	}
+	ent = G_Spawn();
+	ent->classname = bg_itemlist[itemNum].classname;
+	ent->item = &bg_itemlist[itemNum];
+	RegisterItem( ent->item );
+	ent->s.eType = ET_ITEM;
+	ent->s.modelindex = itemNum;
+	ent->s.modelindex2 = dropped;
+	ent->doomDropped = dropped;
+	ent->doomSector = sector;
+	// only for finding it: BG_PlayerTouchesItem decides
+	VectorSet( ent->r.mins, -21, -21, 0 );
+	VectorSet( ent->r.maxs, 21, 21, 8 );
+	ent->r.contents = CONTENTS_TRIGGER;
+	ent->touch = Touch_Item;
+	VectorSet( origin, x, y, doomLevel.floor[sector] );
+	G_SetOrigin( ent, origin );
+	trap_LinkEntity( ent );
+	return ent;
 }
 
 /*

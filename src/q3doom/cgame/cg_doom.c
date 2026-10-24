@@ -65,6 +65,7 @@ static struct {
 	// sprites: lump and mirroring per sprite, frame and rotation
 	spriteRot_t			(*frames)[MAX_SPRITE_FRAMES][8];
 	qhandle_t			*lumpShader;		// per WAD lump, registered on first use
+	qhandle_t			*fuzzShader;
 
 	int					numThings;
 	doomThing_t			things[MAX_DOOM_THINGS];
@@ -385,6 +386,15 @@ static void BuildSpriteFrames( void ) {
 	}
 
 	cgDoom.lumpShader = calloc( doom_wad_num_lumps( cgDoom.wad ), sizeof( qhandle_t ) );
+	cgDoom.fuzzShader = calloc( doom_wad_num_lumps( cgDoom.wad ), sizeof( qhandle_t ) );
+}
+
+// the dark see-through look of spectres (Doom's fuzz)
+static qhandle_t FuzzShader( int lump ) {
+	if ( !cgDoom.fuzzShader[lump] ) {
+		cgDoom.fuzzShader[lump] = trap_R_RegisterShader( va( "doom/fuzz/%s", doom_wad_lump( cgDoom.wad, lump )->name ) );
+	}
+	return cgDoom.fuzzShader[lump];
 }
 
 static qhandle_t LumpShader( int lump ) {
@@ -448,7 +458,7 @@ and the thing (R_ProjectSprite). 'origin' is the bottom of the thing;
 'light' -1 takes the light of the sector it is in.
 =================
 */
-void CG_DoomAddSprite( const vec3_t origin, float angle, int state, int light ) {
+static void AddSprite( const vec3_t origin, float angle, int state, int light, qboolean fuzz ) {
 	const doom_state_t	*st = &doom_states[state];
 	const spriteRot_t	*rot;
 	const uint8_t		*header;
@@ -499,9 +509,13 @@ void CG_DoomAddSprite( const vec3_t origin, float angle, int state, int light ) 
 		verts[i].st[0] = rot->flip ? 1.0f - s : s;
 		verts[i].st[1] = ( i < 2 ) ? 0.0f : 1.0f;
 		verts[i].modulate[0] = verts[i].modulate[1] = verts[i].modulate[2] = color;
-		verts[i].modulate[3] = 255;
+		verts[i].modulate[3] = fuzz ? 160 : 255;
 	}
-	trap_R_AddPolyToScene( LumpShader( rot->lump ), 4, verts );
+	trap_R_AddPolyToScene( fuzz ? FuzzShader( rot->lump ) : LumpShader( rot->lump ), 4, verts );
+}
+
+void CG_DoomAddSprite( const vec3_t origin, float angle, int state, int light ) {
+	AddSprite( origin, angle, state, light, qfalse );
 }
 
 /*
@@ -618,6 +632,24 @@ void CG_DoomItem( centity_t *cent ) {
 	}
 	CG_DoomAddSprite( cent->lerpOrigin, es->angles[YAW],
 		CG_DoomAnimatedState( doom_mobjinfo[type].spawnstate, cg.time * DOOM_TICRATE / 1000 ), -1 );
+}
+
+/*
+=================
+CG_DoomThing
+
+A monster or barrel (ET_DOOM_THING): the state the game sent, facing its
+way; spectres are a dark fuzz
+=================
+*/
+void CG_DoomThing( centity_t *cent ) {
+	const entityState_t	*es = &cent->currentState;
+	int					type = es->generic1;
+
+	if ( !DOOM_MAP() || type <= 0 || type >= NUMMOBJTYPES || es->frame <= S_NULL || es->frame >= NUMSTATES ) {
+		return;
+	}
+	AddSprite( cent->lerpOrigin, es->angles[YAW], es->frame, -1, ( doom_mobjinfo[type].flags & MF_SHADOW ) != 0 );
 }
 
 /*
@@ -739,6 +771,7 @@ void CG_DoomShutdown( void ) {
 	CG_DoomHudShutdown();
 	free( cgDoom.frames );
 	free( cgDoom.lumpShader );
+	free( cgDoom.fuzzShader );
 	free( cgDoom.baseLight );
 	free( cgDoom.lights );
 	free( cgDoom.levels );

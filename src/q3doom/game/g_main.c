@@ -83,6 +83,7 @@ vmCvar_t	g_doomSkill;
 vmCvar_t	g_doomAllKeys;
 vmCvar_t	g_fallDamage;
 vmCvar_t	g_autoaim;
+vmCvar_t	g_doomMonsters;
 vmCvar_t	pmove_msec;
 vmCvar_t	g_rankings;
 vmCvar_t	g_listEntity;
@@ -191,6 +192,8 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_fallDamage, "g_fallDamage", "1", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},
 	// Q3Doom: Doom's vertical autoaim on hitscan shots and missiles (off: free aim)
 	{ &g_autoaim, "g_autoaim", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},
+	// Q3Doom: 0 spawns no monsters (Doom's -nomonsters)
+	{ &g_doomMonsters, "g_doomMonsters", "1", CVAR_SERVERINFO | CVAR_LATCH, 0, qfalse},
 	{ &pmove_msec, "pmove_msec", "8", CVAR_SYSTEMINFO, 0, qfalse},
 
 	{ &g_rankings, "g_rankings", "0", 0, 0, qfalse}
@@ -1789,6 +1792,11 @@ int start, end;
 		}
 
 		if ( !ent->r.linked && ent->neverFree ) {
+			continue;
+		}
+
+		// Q3Doom: monsters and barrels run at 35 tics a second (Doom_RunFrame)
+		if ( ent->doomMobj ) {
 			continue;
 		}
 

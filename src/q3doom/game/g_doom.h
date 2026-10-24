@@ -17,6 +17,11 @@ Licensed under the GNU General Public License version 2 or later.
 #include "bg_doom.h"
 
 #define DOOM_TICRATE		35
+
+#ifndef MIN
+#define MIN( a, b )			( (a) < (b) ? (a) : (b) )
+#define MAX( a, b )			( (a) > (b) ? (a) : (b) )
+#endif
 #define DOOM_TICS_MSEC( t )	( (t) * 1000 / DOOM_TICRATE )
 #define DOOM_TICSPEED( u )	( (u) * DOOM_TICRATE )		// units per tic -> units per second
 
@@ -49,6 +54,28 @@ typedef struct doomPlane_s {
 	qboolean	reachPending;	// a move of zero distance: finish it on the next think
 } doomPlane_t;
 
+// a Doom thing that acts (mobj_t): monsters and barrels. Its position is the
+// entity's r.currentOrigin, at its feet; its health is the entity's.
+typedef struct doomMobj_s {
+	int					type;			// mobjtype_t
+	const doom_mobjinfo_t	*info;
+	int					flags;			// MF_*
+	int					state;
+	int					tics;
+	float				angle;			// degrees
+	vec3_t				mom;			// units per tic
+	float				radius, height;
+	float				floorz, ceilingz;
+	gentity_t			*target;		// what it attacks or chases
+	int					threshold;		// tics before it may change target
+	int					movedir;		// 0-7 (east, counter-clockwise), 8 none
+	int					movecount;		// steps before a new direction
+	int					reactiontime;	// tics before it may attack
+	int					lastlook;
+	float				spawnX, spawnY, spawnAngle;	// nightmare respawn
+	int					spawnFlags;		// map thing flags
+} doomMobj_t;
+
 typedef struct {
 	const doom_map_t	*map;
 	const doom_wad_t	*wad;
@@ -73,6 +100,9 @@ typedef struct {
 	int					exitTime;		// level.time to change map, 0 none
 	char				nextMap[16];
 	int					secretsFound;
+	int					kills, totalKills;
+	int					items, totalItems;
+	int					totalSecrets;
 } doomLevel_t;
 
 extern doomLevel_t	doomLevel;
@@ -97,16 +127,35 @@ void		Doom_PlaySectorSound( int sector, const char *sound );
 
 void		Doom_Message( gentity_t *ent, const char *message );
 
+void		Doom_ExitLevel( qboolean secret );
+qboolean	Doom_TeleportMobj( gentity_t *ent, int tag );
+
 // g_doom_weapon.c
 int			Doom_Random( void );
 qboolean	Doom_IsTarget( gentity_t *ent );
+qboolean	Doom_Bleeds( gentity_t *ent );
 gentity_t	*Doom_AimLineAttack( gentity_t *shooter, const vec3_t eye, float yaw, float range, float *pitch );
+gentity_t	*Doom_LineAttack( gentity_t *ent, const vec3_t eye, float yaw, float pitch, float range, int damage, int mod );
+gentity_t	*Doom_LaunchMissile( gentity_t *owner, const vec3_t start, const vec3_t velocity, int type );
 void		Doom_SpawnFx( const vec3_t origin, int state, int flags );
+void		Doom_Sound( gentity_t *ent, int sfx );
+
+// g_doom_mobj.c
+void		Doom_InitMobjs( void );
+void		Doom_SpawnMobjs( void );
+void		Doom_RunMobjs( void );		// one Doom tic
+gentity_t	*Doom_SpawnMobj( int type, float x, float y, float angle );
+void		Doom_DamageMobj( gentity_t *target, gentity_t *inflictor, gentity_t *source, vec3_t dir, int damage, int dflags );
+void		Doom_NoiseAlert( gentity_t *emitter );
+float		Doom_ThingZ( gentity_t *ent );
+float		Doom_ThingHeight( gentity_t *ent );
+void		Doom_SpawnCommand( gentity_t *ent );
 void		Doom_FireWeapon( gentity_t *ent, int parm );
 void		Doom_MissileImpact( gentity_t *ent, trace_t *trace );
 
 // g_doom_items.c
 void		Doom_SpawnItems( void );
+gentity_t	*Doom_SpawnItemAt( int itemNum, float x, float y, qboolean dropped );
 void		Doom_UpdateItems( void );
 int			Doom_TouchItem( gentity_t *ent, gentity_t *other );
 void		Doom_GivePlayerStart( gclient_t *client );

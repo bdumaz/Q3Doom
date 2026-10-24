@@ -864,6 +864,12 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		attacker = &g_entities[ENTITYNUM_WORLD];
 	}
 
+	// Q3Doom: monsters and barrels take Doom damage (P_DamageMobj)
+	if ( targ->doomMobj ) {
+		Doom_DamageMobj( targ, inflictor, attacker, dir, damage, dflags );
+		return;
+	}
+
 	// shootable doors / buttons don't actually have any health
 	if ( targ->s.eType == ET_MOVER ) {
 		if ( targ->use && targ->moverState == MOVER_POS1 ) {

@@ -306,7 +306,7 @@ static void NextMapName( const char *map, qboolean secret, char *out, int outSiz
 	Q_strncpyz( out, map, outSize );
 }
 
-static void ExitLevel( qboolean secret ) {
+void Doom_ExitLevel( qboolean secret ) {
 	char	mapname[MAX_QPATH];
 
 	if ( doomLevel.exitTime ) {
@@ -333,7 +333,7 @@ static qboolean Teleport( gentity_t *ent, int tag ) {
 	vec3_t				origin, angles;
 
 	if ( !ent->client ) {
-		return qfalse;
+		return Doom_TeleportMobj( ent, tag );
 	}
 	for ( i = 0 ; i < map->num_things ; i++ ) {
 		const doom_thing_t *t = &map->things[i];
@@ -442,7 +442,7 @@ qboolean Doom_ActivateLine( gentity_t *activator, int line, int side, doom_trigg
 	if ( trigger == DOOM_TRIG_SWITCH && sp->trigger == DOOM_TRIG_MANUAL ) {
 		trigger = DOOM_TRIG_MANUAL;
 	}
-	if ( sp->trigger != trigger || ( isPlayer && sp->monsters == 2 ) ) {
+	if ( sp->trigger != trigger || ( isPlayer && sp->monsters == 2 ) || ( !isPlayer && !sp->monsters ) ) {
 		return qfalse;
 	}
 	// lines are used from their front side only (P_UseSpecialLine)
@@ -463,7 +463,7 @@ qboolean Doom_ActivateLine( gentity_t *activator, int line, int side, doom_trigg
 
 	switch ( sp->kind ) {
 	case DOOM_KIND_EXIT:
-		ExitLevel( sp->type == 1 );
+		Doom_ExitLevel( sp->type == 1 );
 		success = qtrue;
 		break;
 	case DOOM_KIND_TELEPORT:
@@ -709,7 +709,7 @@ static void PlayerInSpecialSector( gentity_t *ent, int tic ) {
 	case 11:	// exit when almost dead (E1M8)
 		damage = 20;
 		if ( ent->health <= 10 ) {
-			ExitLevel( qfalse );
+			Doom_ExitLevel( qfalse );
 		}
 		break;
 	case 9:		// secret
@@ -737,6 +737,7 @@ void Doom_RunFrame( void ) {
 	tic = ( level.time - level.startTime ) * DOOM_TICRATE / 1000;
 	while ( doomLevel.lastTic < tic ) {
 		doomLevel.lastTic++;
+		Doom_RunMobjs();
 		for ( i = 0 ; i < level.maxclients ; i++ ) {
 			gentity_t *ent = &g_entities[i];
 
@@ -853,6 +854,13 @@ void Doom_InitLevel( void ) {
 		doomLevel.switchUntil[i] = 0;
 	}
 	trap_SetConfigstring( CS_DOOM_LIGHTS, "" );
+
+	for ( i = 0 ; i < doomLevel.numSectors ; i++ ) {
+		if ( doomLevel.special[i] == 9 ) {
+			doomLevel.totalSecrets++;
+		}
+	}
+	Doom_InitMobjs();
 }
 
 /*
@@ -870,6 +878,7 @@ void Doom_StartLevel( void ) {
 	Doom_SpawnDoorTriggers();
 	SpawnThingBlockers();
 	Doom_SpawnItems();
+	Doom_SpawnMobjs();
 }
 
 void Doom_ShutdownLevel( void ) {
@@ -908,7 +917,18 @@ void Doom_StatusCommand( void ) {
 				ent->doomLine >= 0 ? va( " door line %d", ent->doomLine ) : "" );
 		}
 	}
-	G_Printf( "secrets found: %d\n", doomLevel.secretsFound );
+	G_Printf( "secrets found: %d of %d, kills %d of %d\n", doomLevel.secretsFound, doomLevel.totalSecrets, doomLevel.kills, doomLevel.totalKills );
+
+	for ( i = MAX_CLIENTS ; i < level.num_entities ; i++ ) {
+		gentity_t	*ent = &g_entities[i];
+
+		if ( !ent->inuse || !ent->doomMobj ) {
+			continue;
+		}
+		G_Printf( "thing %d: type %d at %.0f %.0f %.0f health %d state %d target %d flags 0x%x\n", i, ent->doomMobj->type,
+			ent->r.currentOrigin[0], ent->r.currentOrigin[1], ent->r.currentOrigin[2], ent->health, ent->doomMobj->state,
+			ent->doomMobj->target ? ent->doomMobj->target->s.number : -1, ent->doomMobj->flags );
+	}
 
 	for ( i = 0 ; i < level.maxclients ; i++ ) {
 		gclient_t	*cl = &level.clients[i];

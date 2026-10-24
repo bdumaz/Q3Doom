@@ -113,7 +113,9 @@ static shader_t *R_DoomShader( const char *name ) {
 	Q_strncpyz( fileName, name, sizeof( fileName ) );
 	COM_DefaultExtension( fileName, sizeof( fileName ), ".tga" );
 
-	if ( !Q_stricmp( kind, "thing" ) ) {
+	if ( !Q_stricmp( kind, "thing" ) || !Q_stricmp( kind, "fuzz" ) ) {
+		Com_sprintf( fileName, sizeof( fileName ), "doom/thing/%s", slash + 1 );
+		COM_DefaultExtension( fileName, sizeof( fileName ), ".tga" );
 		image = R_FindImageFile( fileName, qtrue, qtrue, GL_CLAMP );
 		if ( !image ) {
 			shader.defaultShader = qtrue;
@@ -121,9 +123,16 @@ static shader_t *R_DoomShader( const char *name ) {
 		}
 		stages[0].bundle[0].image[0] = image;
 		stages[0].active = qtrue;
-		stages[0].rgbGen = CGEN_VERTEX;
-		stages[0].alphaGen = AGEN_SKIP;
-		stages[0].stateBits = GLS_DEFAULT | GLS_ATEST_GE_80;
+		if ( !Q_stricmp( kind, "fuzz" ) ) {
+			// spectres: darken what is behind the shape (vertex alpha)
+			stages[0].rgbGen = CGEN_IDENTITY;
+			stages[0].alphaGen = AGEN_VERTEX;
+			stages[0].stateBits = GLS_SRCBLEND_ZERO | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_ATEST_GE_80;
+		} else {
+			stages[0].rgbGen = CGEN_VERTEX;
+			stages[0].alphaGen = AGEN_SKIP;
+			stages[0].stateBits = GLS_DEFAULT | GLS_ATEST_GE_80;
+		}
 		shader.cullType = CT_TWO_SIDED;		// lightmapIndex stays as requested: it is part of the shader's identity
 		return FinishShader();
 	}
@@ -2598,7 +2607,7 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 
 
 	// Q3Doom: Doom world surfaces and sprites
-	if ( !Q_stricmpn( name, "doom/thing/", 11 ) || !Q_stricmp( name, "doom/invert" ) || !Q_stricmp( name, "doom/amline" )
+	if ( !Q_stricmpn( name, "doom/thing/", 11 ) || !Q_stricmpn( name, "doom/fuzz/", 10 ) || !Q_stricmp( name, "doom/invert" ) || !Q_stricmp( name, "doom/amline" )
 		|| ( !Q_stricmpn( name, "doom/", 5 ) && lightmapIndex != LIGHTMAP_2D ) ) {
 		return R_DoomShader( name );
 	}

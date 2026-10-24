@@ -45,6 +45,30 @@ void SP_info_player_deathmatch( gentity_t *ent ) {
 	if ( i ) {
 		ent->flags |= FL_NO_HUMANS;
 	}
+	// Q3Doom: the Doom thing number (1-4 player starts, 11 deathmatch)
+	G_SpawnInt( "doom_type", "0", &ent->count );
+}
+
+/*
+===========
+Doom_SelectSpawnPoint
+
+Q3Doom: player N starts at Doom's player N start (single player and
+cooperative); NULL if the map has none
+===========
+*/
+static gentity_t *Doom_SelectSpawnPoint( int clientNum, vec3_t origin, vec3_t angles ) {
+	gentity_t	*spot = NULL;
+
+	while ( ( spot = G_Find( spot, FOFS( classname ), "info_player_deathmatch" ) ) != NULL ) {
+		if ( spot->count == 1 + clientNum % 4 ) {
+			VectorCopy( spot->s.origin, origin );
+			origin[2] += 9;
+			VectorCopy( spot->s.angles, angles );
+			return spot;
+		}
+	}
+	return NULL;
 }
 
 /*QUAKED info_player_start (1 0 0) (-16 -16 -24) (16 16 32)
@@ -1079,6 +1103,8 @@ void ClientSpawn(gentity_t *ent) {
 						client->sess.sessionTeam, 
 						client->pers.teamState.state, 
 						spawn_origin, spawn_angles);
+	} else if ( DOOM_LEVEL() && ( spawnPoint = Doom_SelectSpawnPoint( index, spawn_origin, spawn_angles ) ) != NULL ) {
+		// Q3Doom: Doom's player starts
 	} else {
 		do {
 			// the first spawn should be at a good looking spot

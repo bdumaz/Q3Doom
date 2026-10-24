@@ -1692,6 +1692,7 @@ int			CG_DoomAnimatedState( int state, int tics );
 void		CG_DoomAddSprite( const vec3_t origin, float angle, int state, int light );
 void		CG_DoomSpawnFx( const vec3_t origin, int state, int flags );
 void		CG_DoomItem( centity_t *cent );
+void		CG_DoomThing( centity_t *cent );
 void		CG_DoomMissile( centity_t *cent );
 sfxHandle_t	CG_DoomSound( int sfx );
 

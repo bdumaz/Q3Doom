@@ -432,6 +432,9 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 	}
 
 	G_LogPrintf( "Item: %i %s\n", other->s.number, ent->item->classname );
+	if ( doom_mobjinfo[doom_mobjtype_for_ednum( ent->item->doomednum )].flags & MF_COUNTITEM ) {
+		doomLevel.items++;
+	}
 
 	// the pickup sound, message and flash, predicted by the client
 	G_AddPredictableEvent( other, EV_ITEM_PICKUP, ent->s.modelindex );

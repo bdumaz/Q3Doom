@@ -183,6 +183,7 @@ struct gentity_s {
 	int			doomLine;		// door trigger or shootable door: its manual door line, -1 none
 	int			doomMessageTime;	// door trigger: last "you need a key" message
 	int			doomMissile;	// Doom missile: its mobj type + 1, 0 if not one
+	struct doomMobj_s	*doomMobj;	// monster or barrel: its Doom thing state (g_doom_mobj.c)
 	qboolean	doomDropped;	// item dropped (by a monster): half a clip (MF_DROPPED)
 };
 
@@ -772,6 +773,7 @@ extern	vmCvar_t	g_doomSkill;
 extern	vmCvar_t	g_doomAllKeys;
 extern	vmCvar_t	g_fallDamage;
 extern	vmCvar_t	g_autoaim;
+extern	vmCvar_t	g_doomMonsters;
 extern	vmCvar_t	pmove_msec;
 extern	vmCvar_t	g_rankings;
 extern	vmCvar_t	g_enableDust;

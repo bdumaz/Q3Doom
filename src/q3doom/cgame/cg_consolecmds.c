@@ -564,6 +564,7 @@ void CG_InitConsoleCommands( void ) {
 	trap_AddCommand ("idkfa");		// Q3Doom: Doom cheats (g_cmds.c)
 	trap_AddCommand ("idfa");
 	trap_AddCommand ("iddqd");
+	trap_AddCommand ("doom_spawn");
 	trap_AddCommand ("god");
 	trap_AddCommand ("notarget");
 	trap_AddCommand ("noclip");

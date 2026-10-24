@@ -724,6 +724,7 @@ typedef enum {
 	ET_INVISIBLE,
 	ET_GRAPPLE,				// grapple hooked on wall
 	ET_TEAM,
+	ET_DOOM_THING,			// Q3Doom: a monster or barrel: s.generic1 mobj type, s.frame Doom state
 
 	ET_EVENTS				// any of the EV_* events can be added freestanding
 							// by setting eType to ET_EVENTS + eventNum

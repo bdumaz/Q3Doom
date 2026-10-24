@@ -271,6 +271,15 @@ qboolean CG_DoomEntityEvent( centity_t *cent, vec3_t position, int event ) {
 		return qtrue;
 
 	case EV_DOOM_SOUND:
+		// the bosses are heard at full volume everywhere
+		if ( es->eventParm & DOOM_SOUND_FULL ) {
+			sfxHandle_t h = CG_DoomSound( es->eventParm & ~DOOM_SOUND_FULL );
+
+			if ( h ) {
+				trap_S_StartLocalSound( h, CHAN_ANNOUNCER );
+			}
+			return qtrue;
+		}
 		StartDoomSound( es->number, CHAN_AUTO, es->eventParm );
 		return qtrue;
 
