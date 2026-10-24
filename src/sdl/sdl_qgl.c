@@ -9,11 +9,7 @@ Licensed under the GNU General Public License version 2 or later.
 #include "../renderer/tr_local.h"
 #include "sdl_local.h"
 
-void ( APIENTRY * qglMultiTexCoord2fARB )( GLenum texture, GLfloat s, GLfloat t );
-void ( APIENTRY * qglActiveTextureARB )( GLenum texture );
-void ( APIENTRY * qglClientActiveTextureARB )( GLenum texture );
-void ( APIENTRY * qglLockArraysEXT) (GLint, GLint);
-void ( APIENTRY * qglUnlockArraysEXT) (void);
+// the multitexture and compiled-vertex-array pointers are defined in tr_init.c
 void ( APIENTRY * qglAccum )(GLenum op, GLfloat value);
 void ( APIENTRY * qglAlphaFunc )(GLenum func, GLclampf ref);
 GLboolean ( APIENTRY * qglAreTexturesResident )(GLsizei n, const GLuint *textures, GLboolean *residences);

@@ -9,10 +9,12 @@ It has two single player modes:
 
 An optional **Quake Visuals** mode redraws the maps with Quake 3 textures, item models and lighting.
 
-> Windows 64-bit only for now. A Linux build is planned.
+> Runs on 64-bit Windows and Linux.
 > Multiplayer is hidden in the menu for now, but the plan is to get it working with Doom Deathmatch maps, as well as Quake 3 Modes using Doom Weapons.
 
 ## What you need
+
+### Windows
 
 - **Windows 10 or 11**, 64-bit.
 - **Visual Studio 2022** with the "Desktop development with C++" workload.
@@ -23,6 +25,14 @@ An optional **Quake Visuals** mode redraws the maps with Quake 3 textures, item 
   ```
   To use another location, configure with `-DSDL2_DIR=<path to SDL2>/cmake`.
 
+### Linux
+
+- A 64-bit distribution (x86_64; aarch64 should work but is untested).
+- GCC, CMake 3.20 or later, and the SDL2 and OpenGL development packages. On Debian or Ubuntu:
+  ```
+  sudo apt install build-essential cmake libsdl2-dev libgl-dev
+  ```
+
 ### Game data (not included)
 
 This repository contains no game data. You need your own copies of:
@@ -32,19 +42,28 @@ This repository contains no game data. You need your own copies of:
 
 ## Build
 
-From the repository root:
+From the repository root, on Windows:
 
 ```
 cmake -S . -B build/x64 -A x64
 cmake --build build/x64 --config RelWithDebInfo
 ```
 
-The engine, its game modules and `SDL2.dll` are copied into `run/`.
+On Linux:
+
+```
+cmake -S . -B build/linux -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake --build build/linux -j
+```
+
+The engine and its game modules are copied into `run/` (with `SDL2.dll` on Windows).
 
 ## Run
 
 1. Copy `DOOM.WAD` and `pak0.pk3` … `pak8.pk3` into `run/baseq3/`.
-2. Start `run/q3doom.exe`.
+2. Start `run/q3doom.exe` on Windows, or `run/q3doom.x86_64` on Linux.
+
+On Linux, settings and screenshots go to `~/.q3doom`.
 
 The game starts on the main menu. **Single Player** leads to the Campaign and DoomFrag. Resolutions, borderless fullscreen and Quake Visuals are under **Setup → System**.
 
@@ -53,12 +72,13 @@ The game starts on the main menu. **Single Player** leads to the Campaign and Do
 The libdoom tests read the IWAD from `GameData/DOOM.WAD` (or `-DDOOM_IWAD=<path>`). They are skipped when it is missing.
 
 ```
-ctest --test-dir build/x64 -C RelWithDebInfo
+ctest --test-dir build/x64 -C RelWithDebInfo     # Windows
+ctest --test-dir build/linux                      # Linux
 ```
 
 ## Tools
 
-`doomtool` (built in `build/x64/RelWithDebInfo/`) inspects a WAD: map statistics, texture and sound export, BSP building, and music rendering. Run it without arguments for its commands.
+`doomtool` (built in `build/x64/RelWithDebInfo/`, or `build/linux/`) inspects a WAD: map statistics, texture and sound export, BSP building, and music rendering. Run it without arguments for its commands.
 
 ## License
 

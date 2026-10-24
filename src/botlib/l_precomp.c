@@ -1008,7 +1008,7 @@ int PC_Directive_include(source_t *source)
 				break;
 			} //end if
 			if (token.type == TT_PUNCTUATION && *token.string == '>') break;
-			strncat(path, token.string, MAX_PATH);
+			strncat(path, token.string, MAX_PATH - 1 - strlen(path));
 		} //end while
 		if (*token.string != '>')
 		{

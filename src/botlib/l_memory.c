@@ -39,6 +39,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define MEM_ID		0x12345678l
 #define HUNK_ID		0x87654321l
+// room for the id in front of each block, keeping the 16 byte alignment
+// of the engine allocators (GCC uses aligned SSE stores on 64-bit)
+#define MEM_HEADER	16
 
 int allocatedmemory;
 int totalmemorysize;
@@ -345,11 +348,11 @@ void *GetMemory(unsigned long size)
 	void *ptr;
 	unsigned long int *memid;
 
-	ptr = botimport.GetMemory(size + sizeof(unsigned long int));
+	ptr = botimport.GetMemory(size + MEM_HEADER);
 	if (!ptr) return NULL;
 	memid = (unsigned long int *) ptr;
 	*memid = MEM_ID;
-	return (unsigned long int *) ((char *) ptr + sizeof(unsigned long int));
+	return (unsigned long int *) ((char *) ptr + MEM_HEADER);
 } //end of the function GetMemory
 //===========================================================================
 //
@@ -387,11 +390,11 @@ void *GetHunkMemory(unsigned long size)
 	void *ptr;
 	unsigned long int *memid;
 
-	ptr = botimport.HunkAlloc(size + sizeof(unsigned long int));
+	ptr = botimport.HunkAlloc(size + MEM_HEADER);
 	if (!ptr) return NULL;
 	memid = (unsigned long int *) ptr;
 	*memid = HUNK_ID;
-	return (unsigned long int *) ((char *) ptr + sizeof(unsigned long int));
+	return (unsigned long int *) ((char *) ptr + MEM_HEADER);
 } //end of the function GetHunkMemory
 //===========================================================================
 //
@@ -424,7 +427,7 @@ void FreeMemory(void *ptr)
 {
 	unsigned long int *memid;
 
-	memid = (unsigned long int *) ((char *) ptr - sizeof(unsigned long int));
+	memid = (unsigned long int *) ((char *) ptr - MEM_HEADER);
 
 	if (*memid == MEM_ID)
 	{

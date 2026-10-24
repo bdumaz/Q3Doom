@@ -950,7 +950,7 @@ void *Z_TagMalloc( int size, int tag ) {
 	//
 	size += sizeof(memblock_t);	// account for size of block header
 	size += 4;					// space for memory trash tester
-	size = (size + 3) & ~3;		// align to 32 bit boundary
+	size = (size + 15) & ~15;	// 16 byte alignment, like malloc: GCC uses aligned SSE stores
 	
 	base = rover = zone->rover;
 	start = base->prev;
@@ -2836,7 +2836,6 @@ void Com_Shutdown (void) {
 }
 
 #if !( defined __VECTORC )
-#if !( defined __linux__ || defined __FreeBSD__ )  // r010123 - include FreeBSD 
 #if ((!id386) && (!defined __i386__)) // rcg010212 - for PPC
 
 void Com_Memcpy (void* dest, const void* src, const size_t count)
@@ -3148,7 +3147,6 @@ skipClamp:
 	}
 }
 #endif
-#endif 
 #endif // bk001208 - memset/memcpy assembly, Q_acos needed (RC4)
 //------------------------------------------------------------------------
 

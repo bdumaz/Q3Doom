@@ -61,6 +61,9 @@ endfunction()
 q3_sources(LIBDOOM_SRC libdoom wad.c graphics.c sound.c map.c builder.c specials.c doom_info.c progress.c music.c)
 add_library(libdoom STATIC ${LIBDOOM_SRC})
 target_include_directories(libdoom PUBLIC ${SRC}/libdoom)
+if(NOT MSVC)
+  target_link_libraries(libdoom PUBLIC m)
+endif()
 set_target_properties(libdoom PROPERTIES OUTPUT_NAME doom)
 
 add_executable(doomtool ${CMAKE_CURRENT_SOURCE_DIR}/tools/doomtool/doomtool.c)
@@ -117,13 +120,17 @@ if(WIN32)
 else()
   q3_sources(SYS_SRC unix unix_main.c unix_net.c unix_shared.c)
   set(SYS_LIBS ${CMAKE_DL_LIBS} m)
-  # backtrace_symbols names our functions in crash reports
-  set(SYS_LINK_OPTIONS -rdynamic)
+  # no -rdynamic: exported engine globals would replace the game modules'
+  # own variables of the same name (bot_developer, Com_Printf...). Crash
+  # backtraces print exe+offset instead; addr2line turns them into lines.
 endif()
 
 add_executable(q3doom WIN32 ${CLIENT_SRC} ${QCOMMON_SRC} ${SERVER_SRC} ${SDL_SRC} ${SYS_SRC} ${SHARED_SRC})
 target_link_libraries(q3doom PRIVATE botlib renderer libdoom SDL2::SDL2 ${SYS_LIBS})
-target_link_options(q3doom PRIVATE ${SYS_LINK_OPTIONS})
+if(NOT WIN32)
+  # "q3doom" alone would clash with the q3doom/ game folder next to it
+  set_target_properties(q3doom PROPERTIES SUFFIX .${ARCH_STRING})
+endif()
 q3_deploy(q3doom "")
 if(WIN32)
   add_custom_command(TARGET q3doom POST_BUILD
@@ -139,6 +146,8 @@ function(q3_module target name gamedir deffile)
   else()
     add_library(${target} SHARED ${ARGN})
     target_link_libraries(${target} PRIVATE m)
+    # a module always uses its own definitions, never same-named host symbols
+    target_link_options(${target} PRIVATE -Wl,-Bsymbolic)
   endif()
   # one output folder per game directory: modules share file names
   set_target_properties(${target} PROPERTIES OUTPUT_NAME ${name}${ARCH_STRING} PREFIX ""

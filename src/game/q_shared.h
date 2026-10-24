@@ -457,13 +457,8 @@ void *Hunk_AllocDebug( int size, ha_pref preference, char *label, char *file, in
 void *Hunk_Alloc( int size, ha_pref preference );
 #endif
 
-#ifdef __linux__
-// https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=371
-// custom Snd_Memset implementation for glibc memset bug workaround
-void Snd_Memset (void* dest, const int val, const size_t count);
-#else
+// the old Linux build had its own Snd_Memset for a long-fixed glibc bug
 #define Snd_Memset Com_Memset
-#endif
 
 #if !( defined __VECTORC )
 void Com_Memset (void* dest, const int val, const size_t count);
