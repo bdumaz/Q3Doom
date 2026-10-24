@@ -677,13 +677,14 @@ void Doom_SpawnMobjs( void ) {
 		int					type = doom_mobjtype_for_ednum( t->type );
 		gentity_t			*ent;
 
-		if ( type < 0 || type == MT_PLAYER || !BG_DoomThingOnSkill( t, g_doomSkill.integer ) ) {
+		if ( type < 0 || type == MT_PLAYER || !BG_DoomThingOnSkill( t, g_doomSkill.integer, doomLevel.deathmatch ) ) {
 			continue;
 		}
 		if ( !( doom_mobjinfo[type].flags & ( MF_COUNTKILL | MF_SHOOTABLE ) ) ) {
 			continue;
 		}
-		if ( ( doom_mobjinfo[type].flags & MF_COUNTKILL ) && !g_doomMonsters.integer ) {
+		// no monsters in a deathmatch, unless asked for
+		if ( ( doom_mobjinfo[type].flags & MF_COUNTKILL ) && ( !g_doomMonsters.integer || ( doomLevel.deathmatch && !g_doomMatchMonsters.integer ) ) ) {
 			continue;
 		}
 		ent = Doom_SpawnMobj( type, t->x, t->y, t->angle );

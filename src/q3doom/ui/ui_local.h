@@ -594,6 +594,8 @@ extern uiStatic_t	uis;
 void UI_DoomSinglePlayerMenu( void );
 void UI_DoomCampaignMenu( void );
 void UI_DoomFragMenu( void );
+const char *UI_DoomLevelName( int episode, int map );
+const char *UI_LevelShotName( const char *map );
 
 // ui_spLevel.c
 //

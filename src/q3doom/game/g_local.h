@@ -780,10 +780,16 @@ extern	vmCvar_t	g_doomMonsters;
 extern	vmCvar_t	g_doomFrag;
 extern	vmCvar_t	g_doomPhysics;
 extern	vmCvar_t	g_doomWeapons;
+void LogExit( const char *string );		// g_main.c
+extern	vmCvar_t	g_doomCampaign;
 extern	vmCvar_t	g_doomCampaignWeapons;
 extern	vmCvar_t	g_doomWeaponSet;
 extern	vmCvar_t	g_doomLoadout;
 extern	vmCvar_t	g_doomFinish;
+extern	vmCvar_t	g_doomDeathmatch;
+extern	vmCvar_t	g_doomMatchMonsters;
+extern	vmCvar_t	g_doomWeaponsStay;
+extern	vmCvar_t	g_doomExitEndsMatch;
 extern	vmCvar_t	pmove_msec;
 extern	vmCvar_t	g_rankings;
 extern	vmCvar_t	g_enableDust;

@@ -75,48 +75,19 @@ Toss the weapon and powerups for the killed player
 */
 void TossClientItems( gentity_t *self ) {
 	gitem_t		*item;
-	int			weapon;
 	float		angle;
 	int			i;
 	gentity_t	*drop;
 
-	// Q3Doom: Doom players drop nothing
-	if ( qtrue ) {
-		return;
-	}
-
-	// drop the weapon if not a gauntlet or machinegun
-	weapon = self->s.weapon;
-
-	// make a special check to see if they are changing to a new
-	// weapon that isn't the mg or gauntlet.  Without this, a client
-	// can pick up a weapon, be killed, and not drop the weapon because
-	// their weapon change hasn't completed yet and they are still holding the MG.
-	if ( weapon == WP_MACHINEGUN || weapon == WP_GRAPPLING_HOOK ) {
-		if ( self->client->ps.weaponstate == WEAPON_DROPPING ) {
-			weapon = self->client->pers.cmd.weapon;
-		}
-		if ( !( self->client->ps.stats[STAT_WEAPONS] & ( 1 << weapon ) ) ) {
-			weapon = WP_NONE;
-		}
-	}
-
-	if ( weapon > WP_MACHINEGUN && weapon != WP_GRAPPLING_HOOK && 
-		self->client->ps.ammo[ weapon ] ) {
-		// find the item type for this weapon
-		item = BG_FindItemForWeapon( weapon );
-
-		// spawn the item
-		Drop_Item( self, item, 0 );
-	}
-
+	// Q3Doom: Doom players drop no weapon; the CTF flags and the quad fall
+	// as in Quake 3 (Doom's own powers go with the player)
 	// drop all the powerups if not in teamplay
 	if ( g_gametype.integer != GT_TEAM ) {
 		angle = 45;
 		for ( i = 1 ; i < PW_NUM_POWERUPS ; i++ ) {
 			if ( self->client->ps.powerups[ i ] > level.time ) {
 				item = BG_FindItemForPowerup( i );
-				if ( !item ) {
+				if ( !item || item->doomednum ) {
 					continue;
 				}
 				drop = Drop_Item( self, item, angle );
@@ -326,7 +297,8 @@ char	*modNames[] = {
 	"MOD_GRAPPLE",
 	"MOD_CHAINSAW",
 	"MOD_PISTOL",
-	"MOD_DOOM_CHAINGUN"
+	"MOD_DOOM_CHAINGUN",
+	"MOD_DOOM_EXIT"
 };
 
 #ifdef MISSIONPACK

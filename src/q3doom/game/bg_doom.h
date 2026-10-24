@@ -23,6 +23,8 @@ Licensed under the GNU General Public License version 2 or later.
 enum { DOOM_WEAPONS_DOOM, DOOM_WEAPONS_Q3, DOOM_WEAPONS_NONE };
 #define DOOMRULES_WEAPONMASK	3
 #define DOOMRULES_CPM			4		// CPM-style movement
+#define DOOMRULES_WEAPONSTAY	8		// deathmatch on a Doom map: weapons stay, owned ones are not taken
+#define DOOM_WEAPONSTAY( ps )	( ( (ps)->stats[STAT_DOOM_RULES] & DOOMRULES_WEAPONSTAY ) != 0 )
 #define DOOM_WEAPONSET( ps )	( (ps)->stats[STAT_DOOM_RULES] & DOOMRULES_WEAPONMASK )
 #define DOOM_CPM( ps )			( ( (ps)->stats[STAT_DOOM_RULES] & DOOMRULES_CPM ) != 0 )
 
@@ -135,9 +137,9 @@ MAP THINGS
 // a map thing that is a static decoration in this milestone: its mobj
 // type, or -1 if it is not spawned that way (wrong skill, multiplayer only,
 // player starts, monsters, items, invisible markers)
-int			BG_DoomStaticThing( const doom_thing_t *t, int skill );
-// is the thing on this skill in single player
-qboolean	BG_DoomThingOnSkill( const doom_thing_t *t, int skill );
+int			BG_DoomStaticThing( const doom_thing_t *t, int skill, qboolean deathmatch );
+// is the thing on this skill, in single player or deathmatch
+qboolean	BG_DoomThingOnSkill( const doom_thing_t *t, int skill, qboolean deathmatch );
 
 // a static thing that blocks movement: fills its box and returns qtrue
 qboolean	BG_DoomThingBlocks( const doom_map_t *map, const doom_thing_t *t, int type, vec3_t mins, vec3_t maxs );

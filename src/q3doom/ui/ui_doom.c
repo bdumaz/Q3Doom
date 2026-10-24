@@ -69,6 +69,23 @@ static const char *levelNames[NUM_EPISODES][NUM_MAPS] = {
 	  "Against Thee Wickedly", "And Hell Followed", "Unto the Cruel", "Fear" }
 };
 
+// the name of E<episode>M<map> (1-based), NULL out of range
+const char *UI_DoomLevelName( int episode, int map ) {
+	if ( episode < 1 || episode > NUM_EPISODES || map < 1 || map > NUM_MAPS ) {
+		return NULL;
+	}
+	return levelNames[episode - 1][map - 1];
+}
+
+// a map's picture: Doom levels have theirs in levelshots/doom (taken the
+// first time they are played)
+const char *UI_LevelShotName( const char *map ) {
+	if ( strlen( map ) == 4 && toupper( map[0] ) == 'E' && toupper( map[2] ) == 'M' ) {
+		return va( "levelshots/doom/%s", map );
+	}
+	return va( "levelshots/%s", map );
+}
+
 static const char *skillNames[] = {
 	"I'm too young to die.", "Hey, not too rough.", "Hurt me plenty.", "Ultra-Violence.", "Nightmare!", NULL
 };

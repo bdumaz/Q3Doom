@@ -112,6 +112,7 @@ typedef struct {
 	qboolean			restarting;		// the player died, the level reloads
 
 	int					weaponSet;		// DOOM_WEAPONS_*: DoomFrag's or the campaign's option
+	qboolean			deathmatch;		// g_doomDeathmatch, outside the campaign and DoomFrag
 } doomLevel_t;
 
 extern doomLevel_t	doomLevel;

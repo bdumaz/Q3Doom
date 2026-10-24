@@ -220,6 +220,7 @@ static void CL_DoomCampaign_f( void ) {
 	Cvar_Set( "g_doomSkill", va( "%d", skill ) );
 	Cvar_Set( "g_doomCampaign", "1" );
 	Cvar_Set( "g_doomFrag", "0" );
+	Cvar_Set( "g_doomDeathmatch", "0" );
 	Cvar_Set( "g_doomMonsters", "1" );
 	Cvar_Set( "g_doomDidSecret", "0" );
 	for ( i = 0 ; i < MAX_CLIENTS ; i++ ) {
@@ -243,6 +244,7 @@ static void CL_DoomFrag_f( void ) {
 	}
 	Cvar_Set( "g_doomFrag", "1" );
 	Cvar_Set( "g_doomCampaign", "0" );
+	Cvar_Set( "g_doomDeathmatch", "0" );
 	Cbuf_AddText( va( "map %s\n", Cmd_Argv( 1 ) ) );
 }
 

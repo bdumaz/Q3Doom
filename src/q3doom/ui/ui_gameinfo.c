@@ -196,6 +196,14 @@ static void UI_LoadArenas( void ) {
 		strcat(filename, dirptr);
 		UI_LoadArenasFromFile(filename);
 	}
+	// Q3Doom: The Ultimate Doom's levels, for deathmatch and team deathmatch
+	for ( n = 0 ; n < 4 * 9 && ui_numArenas < MAX_ARENAS ; n++ ) {
+		char	info[256];
+
+		Com_sprintf( info, sizeof( info ), "{ map \"E%dM%d\" longname \"%s\" type \"ffa team tourney\" }",
+			n / 9 + 1, n % 9 + 1, UI_DoomLevelName( n / 9 + 1, n % 9 + 1 ) );
+		ui_numArenas += UI_ParseInfos( info, MAX_ARENAS - ui_numArenas, &ui_arenaInfos[ui_numArenas] );
+	}
 	trap_Print( va( "%i arenas parsed\n", ui_numArenas ) );
 	if (outOfMemory) trap_Print(S_COLOR_YELLOW"WARNING: not anough memory in pool to load all arenas\n");
 

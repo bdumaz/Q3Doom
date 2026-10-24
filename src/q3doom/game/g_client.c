@@ -125,6 +125,66 @@ qboolean SpotWouldTelefrag( gentity_t *spot ) {
 }
 
 /*
+===========
+Doom_SelectDeathmatchSpot
+
+Q3Doom: deathmatch on a Doom map (G_DeathMatchSpawnPlayer): a random free
+deathmatch start (thing 11). In Team Deathmatch each team has the half of
+the starts on its side, along the longer side of the area they cover.
+NULL if the map has none.
+===========
+*/
+#define MAX_DOOM_DM_STARTS	64
+
+static gentity_t *Doom_SelectDeathmatchSpot( gclient_t *client, vec3_t origin, vec3_t angles ) {
+	gentity_t	*spots[MAX_DOOM_DM_STARTS], *spot = NULL;
+	int			count = 0, first = 0, i, j, axis;
+	float		mins[2] = { 99999, 99999 }, maxs[2] = { -99999, -99999 };
+
+	while ( ( spot = G_Find( spot, FOFS( classname ), "info_player_deathmatch" ) ) != NULL && count < MAX_DOOM_DM_STARTS ) {
+		if ( spot->count == 11 ) {
+			spots[count++] = spot;
+			for ( i = 0 ; i < 2 ; i++ ) {
+				mins[i] = spot->s.origin[i] < mins[i] ? spot->s.origin[i] : mins[i];
+				maxs[i] = spot->s.origin[i] > maxs[i] ? spot->s.origin[i] : maxs[i];
+			}
+		}
+	}
+	if ( !count ) {
+		return NULL;
+	}
+
+	if ( g_gametype.integer == GT_TEAM && count >= 2
+		&& ( client->sess.sessionTeam == TEAM_RED || client->sess.sessionTeam == TEAM_BLUE ) ) {
+		axis = maxs[0] - mins[0] >= maxs[1] - mins[1] ? 0 : 1;
+		for ( i = 1 ; i < count ; i++ ) {
+			for ( j = i ; j > 0 && spots[j]->s.origin[axis] < spots[j - 1]->s.origin[axis] ; j-- ) {
+				spot = spots[j];
+				spots[j] = spots[j - 1];
+				spots[j - 1] = spot;
+			}
+		}
+		if ( client->sess.sessionTeam == TEAM_RED ) {
+			count /= 2;
+		} else {
+			first = count / 2;
+			count -= first;
+		}
+	}
+
+	for ( i = 0 ; i < 20 ; i++ ) {
+		spot = spots[first + rand() % count];
+		if ( !SpotWouldTelefrag( spot ) ) {
+			break;
+		}
+	}
+	VectorCopy( spot->s.origin, origin );
+	origin[2] += 9;
+	VectorCopy( spot->s.angles, angles );
+	return spot;
+}
+
+/*
 ================
 SelectNearestDeathmatchSpawnPoint
 
@@ -1112,7 +1172,9 @@ void ClientSpawn(gentity_t *ent) {
 						client->sess.sessionTeam, 
 						client->pers.teamState.state, 
 						spawn_origin, spawn_angles);
-	} else if ( DOOM_LEVEL() && ( spawnPoint = Doom_SelectSpawnPoint( index, spawn_origin, spawn_angles ) ) != NULL ) {
+	} else if ( DOOM_LEVEL() && doomLevel.deathmatch && ( spawnPoint = Doom_SelectDeathmatchSpot( client, spawn_origin, spawn_angles ) ) != NULL ) {
+		// Q3Doom: Doom's deathmatch starts
+	} else if ( DOOM_LEVEL() && !doomLevel.deathmatch && ( spawnPoint = Doom_SelectSpawnPoint( index, spawn_origin, spawn_angles ) ) != NULL ) {
 		// Q3Doom: Doom's player starts
 	} else {
 		do {

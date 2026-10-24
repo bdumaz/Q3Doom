@@ -284,6 +284,22 @@ qboolean Doom_ExitLevel( gentity_t *activator, qboolean secret ) {
 	if ( doomLevel.intermission ) {
 		return qtrue;
 	}
+	// deathmatch: the exit frags whoever takes it, or ends the match
+	// (Quake 3's intermission, then the next map of the rotation)
+	if ( doomLevel.deathmatch ) {
+		if ( g_doomExitEndsMatch.integer ) {
+			if ( !level.intermissionQueued && !level.intermissiontime ) {
+				trap_SendServerCommand( -1, va( "print \"%s" S_COLOR_WHITE " took the exit.\n\"",
+					activator && activator->client ? activator->client->pers.netname : "Someone" ) );
+				LogExit( "Exit taken." );
+			}
+			return qtrue;
+		}
+		if ( activator && activator->client && activator->health > 0 ) {
+			G_Damage( activator, NULL, NULL, NULL, NULL, 100000, DAMAGE_NO_PROTECTION, MOD_DOOM_EXIT );
+		}
+		return qfalse;		// the switch stays for the next one
+	}
 	// a DoomFrag run ends here (or not yet, with monsters left)
 	if ( Doom_FragActive() ) {
 		return Doom_FragExit( activator );

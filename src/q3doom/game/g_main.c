@@ -92,6 +92,10 @@ vmCvar_t	g_doomPhysics;
 vmCvar_t	g_doomWeapons;
 vmCvar_t	g_doomLoadout;
 vmCvar_t	g_doomFinish;
+vmCvar_t	g_doomDeathmatch;
+vmCvar_t	g_doomMatchMonsters;
+vmCvar_t	g_doomWeaponsStay;
+vmCvar_t	g_doomExitEndsMatch;
 vmCvar_t	g_doomCampaignWeapons;
 vmCvar_t	g_doomWeaponSet;
 vmCvar_t	pmove_msec;
@@ -217,6 +221,14 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_doomWeapons, "g_doomWeapons", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},		// 0 Doom, 1 Quake 3, 2 none
 	{ &g_doomLoadout, "g_doomLoadout", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},		// 0 pick up, 1 all from the start
 	{ &g_doomFinish, "g_doomFinish", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},		// 0 exit, 1 all monsters dead first
+	// Q3Doom: deathmatch on Doom levels (set by the Multiplayer menu): deathmatch
+	// starts and things, all keys, monsters only with g_doomMatchMonsters,
+	// weapons that stay (g_doomWeaponsStay), exits that frag the user or end
+	// the match (g_doomExitEndsMatch)
+	{ &g_doomDeathmatch, "g_doomDeathmatch", "0", CVAR_SERVERINFO | CVAR_LATCH, 0, qfalse},
+	{ &g_doomMatchMonsters, "g_doomMatchMonsters", "0", CVAR_ARCHIVE, 0, qfalse},
+	{ &g_doomWeaponsStay, "g_doomWeaponsStay", "1", CVAR_ARCHIVE, 0, qfalse},
+	{ &g_doomExitEndsMatch, "g_doomExitEndsMatch", "0", CVAR_ARCHIVE, 0, qfalse},
 	// Q3Doom: the campaign's weapons (0 Doom, 1 Quake 3), and the set of this level for the clients (Doom_InitLevel)
 	{ &g_doomCampaignWeapons, "g_doomCampaignWeapons", "0", CVAR_ARCHIVE, 0, qfalse},
 	{ &g_doomWeaponSet, "g_doomWeaponSet", "0", CVAR_SERVERINFO, 0, qfalse},

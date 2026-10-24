@@ -143,6 +143,9 @@ static void CG_Obituary( entityState_t *ent ) {
 	case MOD_TRIGGER_HURT:
 		message = "was in the wrong place";
 		break;
+	case MOD_DOOM_EXIT:
+		message = "tried to leave";
+		break;
 	default:
 		message = NULL;
 		break;

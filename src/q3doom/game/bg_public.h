@@ -652,7 +652,8 @@ typedef enum {
 	MOD_GRAPPLE,
 	MOD_CHAINSAW,			// Q3Doom
 	MOD_PISTOL,				// Q3Doom
-	MOD_DOOM_CHAINGUN		// Q3Doom (MOD_CHAINGUN is Team Arena's)
+	MOD_DOOM_CHAINGUN,		// Q3Doom (MOD_CHAINGUN is Team Arena's)
+	MOD_DOOM_EXIT			// Q3Doom: took the exit in a deathmatch
 } meansOfDeath_t;
 
 

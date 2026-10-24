@@ -480,9 +480,15 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 	// fire item targets
 	G_UseTargets (ent, other);
 
-	// a Doom map's items are used up (single player and cooperative rules),
-	// so are dropped ones
-	if ( DOOM_LEVEL() || ( ( ent->flags & FL_DROPPED_ITEM ) && ent->item->giType != IT_TEAM ) ) {
+	// a deathmatch where weapons stay: the weapon stays for the others
+	if ( ent->item->giType == IT_WEAPON && DOOM_WEAPONSTAY( &other->client->ps ) && !ent->s.modelindex2 ) {
+		return;
+	}
+
+	// a Doom map's items are used up out of deathmatch (single player and
+	// cooperative rules), so are dropped ones (by players or monsters)
+	if ( ( DOOM_LEVEL() && ( !doomLevel.deathmatch || ent->doomDropped ) )
+		|| ( ( ent->flags & FL_DROPPED_ITEM ) && ent->item->giType != IT_TEAM ) ) {
 		G_FreeEntity( ent );
 		return;
 	}

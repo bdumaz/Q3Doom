@@ -586,9 +586,13 @@ qboolean BG_CanItemBeGrabbed( int gametype, const entityState_t *ent, const play
 
 	switch( item->giType ) {
 	case IT_WEAPON:
-		// a weapon owned already only gives its ammo
+		// a weapon owned already only gives its ammo; in a deathmatch where
+		// weapons stay, a placed one is not taken again at all
 		if ( !DOOM_OWNS( ps, item->giTag ) ) {
 			return qtrue;
+		}
+		if ( DOOM_WEAPONSTAY( ps ) && !ent->modelindex2 ) {
+			return qfalse;
 		}
 		ammo = bg_doomWeapons[item->giTag].ammo;
 		return ammo < DAM_NUMAMMO && ps->ammo[ammo] < BG_DoomMaxAmmo( ps, ammo );

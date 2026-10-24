@@ -1011,6 +1011,7 @@ typedef struct {
 	float			playerHeight;	// Q3Doom: g_playerHeight from the serverinfo
 	qboolean		doomFrag;		// Q3Doom: a DoomFrag run (g_doomFrag)
 	qboolean		doomDeathmatch;	// Q3Doom: neither the campaign nor DoomFrag
+	qboolean		doomLevelDeathmatch;	// Q3Doom: and g_doomDeathmatch (Doom levels)
 	int				doomWeapons;	// Q3Doom: DOOM_WEAPONS_* of the level (g_doomWeaponSet)
 	int				teamflags;
 	int				fraglimit;

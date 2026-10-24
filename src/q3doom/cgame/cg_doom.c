@@ -1155,7 +1155,7 @@ void CG_DoomInit( void ) {
 	// things
 	for ( i = 0 ; i < cgDoom.map->num_things && cgDoom.numThings < MAX_DOOM_THINGS ; i++ ) {
 		const doom_thing_t		*t = &cgDoom.map->things[i];
-		int						type = BG_DoomStaticThing( t, cgDoom.skill );
+		int						type = BG_DoomStaticThing( t, cgDoom.skill, cgs.doomLevelDeathmatch );
 		doomThing_t				*th;
 		int						sector;
 		float					height;

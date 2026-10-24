@@ -175,7 +175,7 @@ static void StartServer_Update( void ) {
 		if (top+i >= s_startserver.nummaps)
 			break;
 
-		Com_sprintf( picname[i], sizeof(picname[i]), "levelshots/%s", s_startserver.maplist[top+i] );
+		Q_strncpyz( picname[i], UI_LevelShotName( s_startserver.maplist[top+i] ), sizeof(picname[i]) );
 
 		s_startserver.mappics[i].generic.flags &= ~QMF_HIGHLIGHT;
 		s_startserver.mappics[i].generic.name   = picname[i];
@@ -582,7 +582,7 @@ void StartServer_Cache( void )
 		s_startserver.mapGamebits[i] = GametypeBits( Info_ValueForKey( info, "type") );
 
 		if( precache ) {
-			Com_sprintf( picname, sizeof(picname), "levelshots/%s", s_startserver.maplist[i] );
+			Q_strncpyz( picname, UI_LevelShotName( s_startserver.maplist[i] ), sizeof(picname) );
 			trap_R_RegisterShaderNoMip(picname);
 		}
 	}
@@ -789,9 +789,11 @@ static void ServerOptions_Start( void ) {
 	
 	trap_Cvar_SetValue( "sv_punkbuster", s_serveroptions.punkbuster.curvalue );
 
-	// Q3Doom: a match, not the campaign or a DoomFrag run
+	// Q3Doom: a match, not the campaign or a DoomFrag run (deathmatch rules
+	// on the Doom levels)
 	trap_Cvar_Set( "g_doomCampaign", "0" );
 	trap_Cvar_Set( "g_doomFrag", "0" );
+	trap_Cvar_Set( "g_doomDeathmatch", "1" );
 
 	// the wait commands will allow the dedicated to take effect
 	trap_Cmd_ExecuteText( EXEC_APPEND, va( "wait ; wait ; map %s\n", s_startserver.maplist[s_startserver.currentmap] ) );
@@ -1159,7 +1161,7 @@ static void ServerOptions_SetMenuItems( void ) {
 	s_serveroptions.pure.curvalue = Com_Clamp( 0, 1, trap_Cvar_VariableValue( "sv_pure" ) );
 
 	// set the map pic
-	Com_sprintf( picname, 64, "levelshots/%s", s_startserver.maplist[s_startserver.currentmap] );
+	Q_strncpyz( picname, UI_LevelShotName( s_startserver.maplist[s_startserver.currentmap] ), 64 );
 	s_serveroptions.mappic.generic.name = picname;
 
 	// set the map name

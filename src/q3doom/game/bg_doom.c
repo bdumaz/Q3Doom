@@ -116,8 +116,8 @@ MAP THINGS
 =====================================================================
 */
 
-qboolean BG_DoomThingOnSkill( const doom_thing_t *t, int skill ) {
-	int		flags;
+qboolean BG_DoomThingOnSkill( const doom_thing_t *t, int skill, qboolean deathmatch ) {
+	int		flags, type;
 
 	// skill levels (P_SpawnMapThing): baby and easy, medium, hard and nightmare
 	if ( skill <= DOOM_SK_EASY ) {
@@ -127,13 +127,22 @@ qboolean BG_DoomThingOnSkill( const doom_thing_t *t, int skill ) {
 	} else {
 		flags = DOOM_MTF_HARD;
 	}
-	return ( t->flags & flags ) && !( t->flags & DOOM_MTF_NOTSINGLE );
+	if ( !( t->flags & flags ) ) {
+		return qfalse;
+	}
+	// multiplayer things only in deathmatch, and not the ones Doom keeps out
+	// of it (the keys: everyone has them)
+	if ( !deathmatch ) {
+		return !( t->flags & DOOM_MTF_NOTSINGLE );
+	}
+	type = doom_mobjtype_for_ednum( t->type );
+	return type < 0 || !( doom_mobjinfo[type].flags & MF_NOTDMATCH );
 }
 
-int BG_DoomStaticThing( const doom_thing_t *t, int skill ) {
+int BG_DoomStaticThing( const doom_thing_t *t, int skill, qboolean deathmatch ) {
 	int		type;
 
-	if ( !BG_DoomThingOnSkill( t, skill ) ) {
+	if ( !BG_DoomThingOnSkill( t, skill, deathmatch ) ) {
 		return -1;
 	}
 	type = doom_mobjtype_for_ednum( t->type );

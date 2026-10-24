@@ -847,7 +847,7 @@ static void SpawnThingBlockers( void ) {
 
 	for ( i = 0 ; i < map->num_things ; i++ ) {
 		const doom_thing_t	*t = &map->things[i];
-		int					type = BG_DoomStaticThing( t, g_doomSkill.integer );
+		int					type = BG_DoomStaticThing( t, g_doomSkill.integer, doomLevel.deathmatch );
 		vec3_t				mins, maxs;
 		gentity_t			*ent;
 
@@ -947,6 +947,7 @@ void Doom_InitLevel( void ) {
 	Doom_InitMobjs();
 	Doom_InitCampaign();
 	SetWeaponSet();
+	doomLevel.deathmatch = g_doomDeathmatch.integer && !g_doomCampaign.integer && !g_doomFrag.integer;
 }
 
 /*

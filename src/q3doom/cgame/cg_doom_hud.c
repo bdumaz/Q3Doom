@@ -673,7 +673,7 @@ static void DrawStatusBar( const playerState_t *ps ) {
 	DrawNum( 221, 171, ps->stats[STAT_ARMOR], 3, hud.tallNum );
 	DrawPatch( 221, 171, hud.tallPercent );
 
-	if ( cgs.doomDeathmatch ) {
+	if ( CG_DoomMap() ? cgs.doomLevelDeathmatch : cgs.doomDeathmatch ) {
 		// deathmatch: the frags over the bar's FRAG label, and the face on
 		// the player's colour
 		DrawNum( 138, 171, ps->persistant[PERS_SCORE], 2, hud.tallNum );

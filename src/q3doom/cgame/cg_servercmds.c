@@ -159,6 +159,8 @@ void CG_ParseServerinfo( void ) {
 	cgs.doomFrag = atoi( Info_ValueForKey( info, "g_doomFrag" ) ) != 0;
 	// a deathmatch: not the campaign or a DoomFrag run (the status bar shows the frags)
 	cgs.doomDeathmatch = !cgs.doomFrag && !atoi( Info_ValueForKey( info, "g_doomCampaign" ) );
+	// and on a Doom level, only when the server plays deathmatch there
+	cgs.doomLevelDeathmatch = cgs.doomDeathmatch && atoi( Info_ValueForKey( info, "g_doomDeathmatch" ) );
 	cgs.doomWeapons = Com_Clamp( 0, 2, atoi( Info_ValueForKey( info, "g_doomWeaponSet" ) ) );
 	mapname = Info_ValueForKey( info, "mapname" );
 	Com_sprintf( cgs.mapname, sizeof( cgs.mapname ), "maps/%s.bsp", mapname );

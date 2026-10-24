@@ -80,13 +80,14 @@ static qboolean GiveAmmo( playerState_t *ps, int ammo, int num ) {
 	return qtrue;
 }
 
-// a dropped weapon has one clip, a placed one two; a new weapon is selected
+// a dropped weapon has one clip, a placed one two (five in a deathmatch
+// where weapons stay); a new weapon is selected
 static qboolean GiveWeapon( playerState_t *ps, int weapon, qboolean dropped ) {
 	int			ammo = bg_doomWeapons[weapon].ammo;
 	qboolean	gaveAmmo = qfalse, gaveWeapon = qfalse;
 
 	if ( ammo != DAM_NOAMMO ) {
-		gaveAmmo = GiveAmmo( ps, ammo, dropped ? 1 : 2 );
+		gaveAmmo = GiveAmmo( ps, ammo, dropped ? 1 : DOOM_WEAPONSTAY( ps ) ? 5 : 2 );
 	}
 	if ( !DOOM_OWNS( ps, weapon ) ) {
 		gaveWeapon = qtrue;
@@ -299,12 +300,13 @@ void Doom_GivePlayerStart( gclient_t *client ) {
 	int				set = doomLevel.weaponSet, i;
 
 	// the weapon set and DoomFrag's physics, in the player state for the prediction
-	ps->stats[STAT_DOOM_RULES] = set | ( g_doomFrag.integer && g_doomPhysics.integer ? DOOMRULES_CPM : 0 );
+	ps->stats[STAT_DOOM_RULES] = set | ( g_doomFrag.integer && g_doomPhysics.integer ? DOOMRULES_CPM : 0 )
+		| ( doomLevel.deathmatch && g_doomWeaponsStay.integer ? DOOMRULES_WEAPONSTAY : 0 );
 
 	memset( ps->ammo, 0, sizeof( ps->ammo ) );
 	ps->stats[STAT_ARMOR] = 0;
 	ps->stats[STAT_DOOM_ARMORTYPE] = 0;
-	ps->stats[STAT_DOOM_KEYS] = 0;
+	ps->stats[STAT_DOOM_KEYS] = doomLevel.deathmatch ? 63 : 0;		// P_SpawnPlayer: all keys in deathmatch
 	ps->stats[STAT_DOOM_BACKPACK] = 0;
 	ps->stats[STAT_HEALTH] = 100;
 	memset( ps->powerups, 0, sizeof( ps->powerups ) );
@@ -409,7 +411,7 @@ void Doom_SpawnItems( void ) {
 		int					itemNum;
 		gentity_t			*ent;
 
-		if ( !BG_DoomThingOnSkill( t, g_doomSkill.integer ) ) {
+		if ( !BG_DoomThingOnSkill( t, g_doomSkill.integer, doomLevel.deathmatch ) ) {
 			continue;
 		}
 		itemNum = BG_DoomItemForThing( t->type );
