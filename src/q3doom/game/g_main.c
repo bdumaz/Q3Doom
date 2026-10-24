@@ -96,6 +96,14 @@ vmCvar_t	g_doomDeathmatch;
 vmCvar_t	g_doomMatchMonsters;
 vmCvar_t	g_doomWeaponsStay;
 vmCvar_t	g_doomExitEndsMatch;
+vmCvar_t	g_doomDuel;
+vmCvar_t	g_duelRounds;
+vmCvar_t	g_duelWeapons;
+vmCvar_t	g_duelWeaponPickups;
+vmCvar_t	g_duelHealthPickups;
+vmCvar_t	g_duelMonsters;
+vmCvar_t	g_duelGoalPlayers;
+vmCvar_t	g_duelRound;
 vmCvar_t	g_doomCampaignWeapons;
 vmCvar_t	g_doomWeaponSet;
 vmCvar_t	pmove_msec;
@@ -229,6 +237,17 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_doomMatchMonsters, "g_doomMatchMonsters", "0", CVAR_ARCHIVE, 0, qfalse},
 	{ &g_doomWeaponsStay, "g_doomWeaponsStay", "1", CVAR_ARCHIVE, 0, qfalse},
 	{ &g_doomExitEndsMatch, "g_doomExitEndsMatch", "0", CVAR_ARCHIVE, 0, qfalse},
+	// Q3Doom: Doom Duel (Team Deathmatch on a Doom level, g_doom_duel.c): rounds
+	// to win; Doom or Quake weapons; weapon and ammo, health and armor pickups;
+	// monsters (at nightmare: g_doomSkill 4); players of a team to reach the goal
+	{ &g_doomDuel, "g_doomDuel", "0", CVAR_SERVERINFO | CVAR_LATCH, 0, qfalse},
+	{ &g_duelRounds, "g_duelRounds", "3", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},
+	{ &g_duelWeapons, "g_duelWeapons", "0", CVAR_ARCHIVE, 0, qfalse},
+	{ &g_duelWeaponPickups, "g_duelWeaponPickups", "1", CVAR_ARCHIVE, 0, qfalse},
+	{ &g_duelHealthPickups, "g_duelHealthPickups", "1", CVAR_ARCHIVE, 0, qfalse},
+	{ &g_duelMonsters, "g_duelMonsters", "0", CVAR_ARCHIVE, 0, qfalse},
+	{ &g_duelGoalPlayers, "g_duelGoalPlayers", "1", CVAR_ARCHIVE, 0, qfalse},
+	{ &g_duelRound, "g_duelRound", "1", CVAR_SERVERINFO, 0, qfalse},
 	// Q3Doom: the campaign's weapons (0 Doom, 1 Quake 3), and the set of this level for the clients (Doom_InitLevel)
 	{ &g_doomCampaignWeapons, "g_doomCampaignWeapons", "0", CVAR_ARCHIVE, 0, qfalse},
 	{ &g_doomWeaponSet, "g_doomWeaponSet", "0", CVAR_SERVERINFO, 0, qfalse},
@@ -1375,6 +1394,11 @@ void CheckExitRules( void ) {
 			BeginIntermission();
 		}
 #endif
+		return;
+	}
+
+	// Q3Doom: Doom Duel ends on rounds (g_doom_duel.c), not on frags or time
+	if ( Doom_DuelActive() ) {
 		return;
 	}
 

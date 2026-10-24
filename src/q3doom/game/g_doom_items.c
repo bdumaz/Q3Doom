@@ -306,7 +306,7 @@ void Doom_GivePlayerStart( gclient_t *client ) {
 	memset( ps->ammo, 0, sizeof( ps->ammo ) );
 	ps->stats[STAT_ARMOR] = 0;
 	ps->stats[STAT_DOOM_ARMORTYPE] = 0;
-	ps->stats[STAT_DOOM_KEYS] = doomLevel.deathmatch ? 63 : 0;		// P_SpawnPlayer: all keys in deathmatch
+	ps->stats[STAT_DOOM_KEYS] = doomLevel.deathmatch || Doom_DuelActive() ? 63 : 0;		// P_SpawnPlayer: all keys in deathmatch (and Doom Duel)
 	ps->stats[STAT_DOOM_BACKPACK] = 0;
 	ps->stats[STAT_HEALTH] = 100;
 	memset( ps->powerups, 0, sizeof( ps->powerups ) );
@@ -420,6 +420,11 @@ void Doom_SpawnItems( void ) {
 		}
 		// DoomFrag without weapons: no weapons and ammo to pick up
 		if ( doomLevel.weaponSet == DOOM_WEAPONS_NONE && ( bg_itemlist[itemNum].giType == IT_WEAPON || bg_itemlist[itemNum].giType == IT_AMMO ) ) {
+			continue;
+		}
+		// Doom Duel's options: no weapons and ammo, no health and armor
+		if ( Doom_DuelActive() && ( ( !g_duelWeaponPickups.integer && ( bg_itemlist[itemNum].giType == IT_WEAPON || bg_itemlist[itemNum].giType == IT_AMMO ) )
+			|| ( !g_duelHealthPickups.integer && ( bg_itemlist[itemNum].giType == IT_HEALTH || bg_itemlist[itemNum].giType == IT_ARMOR ) ) ) ) {
 			continue;
 		}
 		ent = Doom_SpawnItemAt( itemNum, t->x + 0.25f, t->y + 0.25f, qfalse );

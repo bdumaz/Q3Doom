@@ -790,6 +790,7 @@ void Doom_RunFrame( void ) {
 	}
 	Doom_UpdateHeights();
 	Doom_UpdateItems();
+	Doom_DuelFrame();
 
 	// the world stops at the end of the level (Doom's intermission)
 	if ( doomLevel.intermission ) {
@@ -875,6 +876,8 @@ Doom's; the clients read it from the serverinfo
 static void SetWeaponSet( void ) {
 	if ( g_doomFrag.integer ) {
 		doomLevel.weaponSet = (int)Com_Clamp( DOOM_WEAPONS_DOOM, DOOM_WEAPONS_NONE, g_doomWeapons.integer );
+	} else if ( Doom_DuelActive() ) {
+		doomLevel.weaponSet = g_duelWeapons.integer ? DOOM_WEAPONS_Q3 : DOOM_WEAPONS_DOOM;
 	} else if ( doomLevel.campaign && g_doomCampaignWeapons.integer ) {
 		doomLevel.weaponSet = DOOM_WEAPONS_Q3;
 	} else {
@@ -947,7 +950,7 @@ void Doom_InitLevel( void ) {
 	Doom_InitMobjs();
 	Doom_InitCampaign();
 	SetWeaponSet();
-	doomLevel.deathmatch = g_doomDeathmatch.integer && !g_doomCampaign.integer && !g_doomFrag.integer;
+	doomLevel.deathmatch = g_doomDeathmatch.integer && !g_doomCampaign.integer && !g_doomFrag.integer && !Doom_DuelActive();
 }
 
 /*
@@ -967,6 +970,7 @@ void Doom_StartLevel( void ) {
 	Doom_SpawnItems();
 	Doom_SpawnMobjs();
 	Doom_InitFrag();
+	Doom_InitDuel();
 	trap_SetConfigstring( CS_MUSIC, Doom_LevelMusic() );
 }
 

@@ -846,6 +846,7 @@ void ClientThink_real( gentity_t *ent ) {
 	} else {
 		client->ps.pm_type = PM_NORMAL;
 	}
+	Doom_DuelThink( ent );		// Q3Doom: frozen in the countdown, watching once at the goal
 
 	client->ps.gravity = g_gravity.value;
 
@@ -1016,6 +1017,13 @@ void ClientThink_real( gentity_t *ent ) {
 
 	// check for respawning
 	if ( client->ps.stats[STAT_HEALTH] <= 0 ) {
+		// Q3Doom: Doom Duel brings everyone back after 3 seconds
+		if ( Doom_DuelActive() ) {
+			if ( level.time > client->respawnTime ) {
+				respawn( ent );
+			}
+			return;
+		}
 		// wait for the attack button to be pressed
 		if ( level.time > client->respawnTime ) {
 			// forcerespawn is to prevent users from waiting out powerups

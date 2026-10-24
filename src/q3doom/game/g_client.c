@@ -1172,6 +1172,8 @@ void ClientSpawn(gentity_t *ent) {
 						client->sess.sessionTeam, 
 						client->pers.teamState.state, 
 						spawn_origin, spawn_angles);
+	} else if ( Doom_DuelActive() && ( spawnPoint = Doom_DuelSpawnSpot( ent, spawn_origin, spawn_angles ) ) != NULL ) {
+		// Q3Doom: Doom Duel, at the team's side
 	} else if ( DOOM_LEVEL() && doomLevel.deathmatch && ( spawnPoint = Doom_SelectDeathmatchSpot( client, spawn_origin, spawn_angles ) ) != NULL ) {
 		// Q3Doom: Doom's deathmatch starts
 	} else if ( DOOM_LEVEL() && !doomLevel.deathmatch && ( spawnPoint = Doom_SelectSpawnPoint( index, spawn_origin, spawn_angles ) ) != NULL ) {

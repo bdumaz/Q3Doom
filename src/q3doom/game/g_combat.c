@@ -61,7 +61,7 @@ void AddScore( gentity_t *ent, vec3_t origin, int score ) {
 	ScorePlum(ent, origin, score);
 	//
 	ent->client->ps.persistant[PERS_SCORE] += score;
-	if ( g_gametype.integer == GT_TEAM )
+	if ( g_gametype.integer == GT_TEAM && !Doom_DuelActive() )		// Q3Doom: a duel scores rounds
 		level.teamScores[ ent->client->ps.persistant[PERS_TEAM] ] += score;
 	CalculateRanks();
 }
@@ -612,6 +612,7 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 	// don't allow respawn until the death anim is done
 	// g_forcerespawn may force spawning at some later time
 	self->client->respawnTime = level.time + 1700;
+	Doom_DuelPlayerDied( self );		// Q3Doom: back in 3 seconds
 
 	// remove powerups
 	memset( self->client->ps.powerups, 0, sizeof(self->client->ps.powerups) );

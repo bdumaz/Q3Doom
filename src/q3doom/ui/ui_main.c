@@ -234,6 +234,13 @@ void UI_RegisterCvars( void ) {
 	}
 	// Q3Doom: the marine colour, sent to the server (Player Settings)
 	trap_Cvar_Register( NULL, "doomcolor", "0", CVAR_USERINFO | CVAR_ARCHIVE );
+	// Doom Duel's options, with the game's defaults (g_main.c), for the host menu
+	trap_Cvar_Register( NULL, "g_duelRounds", "3", CVAR_SERVERINFO | CVAR_ARCHIVE );
+	trap_Cvar_Register( NULL, "g_duelWeapons", "0", CVAR_ARCHIVE );
+	trap_Cvar_Register( NULL, "g_duelWeaponPickups", "1", CVAR_ARCHIVE );
+	trap_Cvar_Register( NULL, "g_duelHealthPickups", "1", CVAR_ARCHIVE );
+	trap_Cvar_Register( NULL, "g_duelMonsters", "0", CVAR_ARCHIVE );
+	trap_Cvar_Register( NULL, "g_duelGoalPlayers", "1", CVAR_ARCHIVE );
 }
 
 /*

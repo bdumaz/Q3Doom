@@ -284,6 +284,10 @@ qboolean Doom_ExitLevel( gentity_t *activator, qboolean secret ) {
 	if ( doomLevel.intermission ) {
 		return qtrue;
 	}
+	// Doom Duel: the goals are the flags
+	if ( Doom_DuelActive() ) {
+		return qfalse;
+	}
 	// deathmatch: the exit frags whoever takes it, or ends the match
 	// (Quake 3's intermission, then the next map of the rotation)
 	if ( doomLevel.deathmatch ) {

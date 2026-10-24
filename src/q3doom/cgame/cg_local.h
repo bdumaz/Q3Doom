@@ -1012,6 +1012,8 @@ typedef struct {
 	qboolean		doomFrag;		// Q3Doom: a DoomFrag run (g_doomFrag)
 	qboolean		doomDeathmatch;	// Q3Doom: neither the campaign nor DoomFrag
 	qboolean		doomLevelDeathmatch;	// Q3Doom: and g_doomDeathmatch (Doom levels)
+	qboolean		doomDuel;		// Q3Doom: Doom Duel (g_doomDuel, Team Deathmatch)
+	int				doomDuelRound, doomDuelRounds;	// the round, and the rounds to win
 	int				doomWeapons;	// Q3Doom: DOOM_WEAPONS_* of the level (g_doomWeaponSet)
 	int				teamflags;
 	int				fraglimit;

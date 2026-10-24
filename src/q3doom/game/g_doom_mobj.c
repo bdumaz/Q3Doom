@@ -684,7 +684,8 @@ void Doom_SpawnMobjs( void ) {
 			continue;
 		}
 		// no monsters in a deathmatch, unless asked for
-		if ( ( doom_mobjinfo[type].flags & MF_COUNTKILL ) && ( !g_doomMonsters.integer || ( doomLevel.deathmatch && !g_doomMatchMonsters.integer ) ) ) {
+		if ( ( doom_mobjinfo[type].flags & MF_COUNTKILL ) && ( !g_doomMonsters.integer || ( doomLevel.deathmatch && !g_doomMatchMonsters.integer )
+			|| ( Doom_DuelActive() && !g_duelMonsters.integer ) ) ) {
 			continue;
 		}
 		ent = Doom_SpawnMobj( type, t->x, t->y, t->angle );
@@ -786,13 +787,37 @@ static void MobjThinker( gentity_t *ent ) {
 		}
 		return;
 	}
-	// nightmare: dead monsters come back
-	if ( g_doomSkill.integer == DOOM_SK_NIGHTMARE && ( mo->flags & MF_COUNTKILL ) && ( mo->flags & MF_CORPSE ) ) {
+	// nightmare: dead monsters come back (in Doom Duel, when a player dies)
+	if ( g_doomSkill.integer == DOOM_SK_NIGHTMARE && ( mo->flags & MF_COUNTKILL ) && ( mo->flags & MF_CORPSE ) && !Doom_DuelActive() ) {
 		mo->movecount++;
 		if ( mo->movecount < 12 * DOOM_TICRATE || ( level.time / 1000 * DOOM_TICRATE & 31 ) || Doom_Random() > 4 ) {
 			return;
 		}
 		NightmareRespawn( ent );
+	}
+}
+
+/*
+=================
+Doom_RespawnDeadMonsters
+
+Doom Duel: when a player dies, the dead monsters come back where they
+started (those whose spot is taken stay dead)
+=================
+*/
+void Doom_RespawnDeadMonsters( void ) {
+	int		i, n = 0;
+
+	for ( i = MAX_CLIENTS ; i < level.num_entities ; i++ ) {
+		gentity_t	*ent = &g_entities[i];
+
+		if ( ent->inuse && ent->doomMobj && ( ent->doomMobj->flags & MF_COUNTKILL ) && ( ent->doomMobj->flags & MF_CORPSE ) ) {
+			NightmareRespawn( ent );
+			n++;
+		}
+	}
+	if ( n ) {
+		G_Printf( "Doom Duel: %d dead monsters come back\n", n );
 	}
 }
 

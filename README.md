@@ -90,6 +90,12 @@ On Doom levels, these settings change the rules:
 | `g_doomExitEndsMatch` | 0 | The exit ends the match instead of fragging whoever takes it |
 | `g_spawnProtection` | 1500 | Milliseconds after a respawn when other players do no damage (until you fire) |
 
+**Doom Duel** is a race through a Doom level, in rounds:
+- One side starts at the level's start, the other at its exit. Each must reach the other's starting point, marked by a Quake 3 CTF flag.
+- A round starts with a 3, 2, 1 countdown. The dead come back after 3 seconds at their own start, and the sides swap every round.
+- The host chooses the rounds to win, Doom or Quake weapons, weapon and health pickups, and nightmare enemies. Dead enemies come back whenever a player dies.
+- In teams, **To the Goal** sets how many players of a team must get there. Those who arrive watch the rest of the round.
+
 Q3Doom uses its own network protocol (1068). It doesn't see or join Quake 3 servers, and Quake 3 can't join it.
 
 ## Tests

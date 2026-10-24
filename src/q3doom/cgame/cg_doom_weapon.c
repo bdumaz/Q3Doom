@@ -101,7 +101,7 @@ void CG_DoomDrawWeapon( void ) {
 	float				sx, sy;
 
 	if ( !CG_DoomGame() || !cg_drawGun.integer || cg.renderingThirdPerson || ps->persistant[PERS_TEAM] == TEAM_SPECTATOR
-		|| ps->pm_type == PM_INTERMISSION || ps->doomWeaponState == S_NULL ) {
+		|| ps->pm_type == PM_INTERMISSION || ps->pm_type == PM_SPECTATOR || ps->doomWeaponState == S_NULL ) {
 		return;
 	}
 

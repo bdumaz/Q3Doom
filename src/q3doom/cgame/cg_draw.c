@@ -2365,7 +2365,7 @@ static void CG_DrawWarmup( void ) {
 	}
 
 	if ( sec < 0 ) {
-		s = "Waiting for players";		
+		s = cgs.doomDuel ? "Waiting for an opponent" : "Waiting for players";
 		w = CG_DrawStrlen( s ) * BIGCHAR_WIDTH;
 		CG_DrawBigString(320 - w / 2, 24, s, 1.0F);
 		cg.warmupCount = 0;
@@ -2405,6 +2405,9 @@ static void CG_DrawWarmup( void ) {
 	} else {
 		if ( cgs.gametype == GT_FFA ) {
 			s = "Free For All";
+		} else if ( cgs.gametype == GT_TEAM && cgs.doomDuel ) {
+			// Q3Doom: the round, and the score in rounds
+			s = va( "Round %d   %d - %d", cgs.doomDuelRound, cgs.scores1, cgs.scores2 );
 		} else if ( cgs.gametype == GT_TEAM ) {
 			s = "Team Deathmatch";
 		} else if ( cgs.gametype == GT_CTF ) {

@@ -151,6 +151,14 @@ void		Doom_FragUpdate( void );
 qboolean	Doom_FragExit( gentity_t *activator );
 qboolean	Doom_FragCommand( gentity_t *ent, const char *cmd );
 
+// g_doom_duel.c
+qboolean	Doom_DuelActive( void );
+void		Doom_InitDuel( void );		// after the entities spawned
+void		Doom_DuelFrame( void );
+void		Doom_DuelThink( gentity_t *ent );
+void		Doom_DuelPlayerDied( gentity_t *ent );
+gentity_t	*Doom_DuelSpawnSpot( gentity_t *ent, vec3_t origin, vec3_t angles );
+
 // g_doom_campaign.c
 void		Doom_InitCampaign( void );
 qboolean	Doom_ExitLevel( gentity_t *activator, qboolean secret );
@@ -173,6 +181,7 @@ void		Doom_Sound( gentity_t *ent, int sfx );
 void		Doom_InitMobjs( void );
 void		Doom_SpawnMobjs( void );
 void		Doom_RunMobjs( void );		// one Doom tic
+void		Doom_RespawnDeadMonsters( void );
 gentity_t	*Doom_SpawnMobj( int type, float x, float y, float angle );
 void		Doom_DamageMobj( gentity_t *target, gentity_t *inflictor, gentity_t *source, vec3_t dir, int damage, int dflags );
 void		Doom_NoiseAlert( gentity_t *emitter );

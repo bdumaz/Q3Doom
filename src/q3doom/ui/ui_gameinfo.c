@@ -200,7 +200,7 @@ static void UI_LoadArenas( void ) {
 	for ( n = 0 ; n < 4 * 9 && ui_numArenas < MAX_ARENAS ; n++ ) {
 		char	info[256];
 
-		Com_sprintf( info, sizeof( info ), "{ map \"E%dM%d\" longname \"%s\" type \"ffa team tourney\" }",
+		Com_sprintf( info, sizeof( info ), "{ map \"E%dM%d\" longname \"%s\" type \"ffa team tourney duel\" }",
 			n / 9 + 1, n % 9 + 1, UI_DoomLevelName( n / 9 + 1, n % 9 + 1 ) );
 		ui_numArenas += UI_ParseInfos( info, MAX_ARENAS - ui_numArenas, &ui_arenaInfos[ui_numArenas] );
 	}

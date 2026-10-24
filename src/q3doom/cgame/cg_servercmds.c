@@ -160,7 +160,10 @@ void CG_ParseServerinfo( void ) {
 	// a deathmatch: not the campaign or a DoomFrag run (the status bar shows the frags)
 	cgs.doomDeathmatch = !cgs.doomFrag && !atoi( Info_ValueForKey( info, "g_doomCampaign" ) );
 	// and on a Doom level, only when the server plays deathmatch there
-	cgs.doomLevelDeathmatch = cgs.doomDeathmatch && atoi( Info_ValueForKey( info, "g_doomDeathmatch" ) );
+	cgs.doomDuel = cgs.gametype == GT_TEAM && atoi( Info_ValueForKey( info, "g_doomDuel" ) );
+	cgs.doomDuelRound = atoi( Info_ValueForKey( info, "g_duelRound" ) );
+	cgs.doomDuelRounds = atoi( Info_ValueForKey( info, "g_duelRounds" ) );
+	cgs.doomLevelDeathmatch = cgs.doomDeathmatch && atoi( Info_ValueForKey( info, "g_doomDeathmatch" ) ) && !cgs.doomDuel;
 	cgs.doomWeapons = Com_Clamp( 0, 2, atoi( Info_ValueForKey( info, "g_doomWeaponSet" ) ) );
 	mapname = Info_ValueForKey( info, "mapname" );
 	Com_sprintf( cgs.mapname, sizeof( cgs.mapname ), "maps/%s.bsp", mapname );
@@ -185,7 +188,11 @@ static void CG_ParseWarmup( void ) {
 	cg.warmupCount = -1;
 
 	if ( warmup == 0 && cg.warmup ) {
-
+		// Q3Doom: a Doom Duel round starts when its countdown ends
+		if ( cgs.doomDuel && cg.warmup > 0 ) {
+			trap_S_StartLocalSound( cgs.media.countFightSound, CHAN_ANNOUNCER );
+			CG_CenterPrint( "GO!", 120, GIANTCHAR_WIDTH*2 );
+		}
 	} else if ( warmup > 0 && cg.warmup <= 0 ) {
 #ifdef MISSIONPACK
 		if (cgs.gametype >= GT_CTF && cgs.gametype <= GT_HARVESTER) {
@@ -472,7 +479,7 @@ static void CG_MapRestart( void ) {
 	// we really should clear more parts of cg here and stop sounds
 
 	// play the "fight" sound if this is a restart without warmup
-	if ( cg.warmup == 0 /* && cgs.gametype == GT_TOURNAMENT */) {
+	if ( cg.warmup == 0 && !cgs.doomDuel /* && cgs.gametype == GT_TOURNAMENT */) {
 		trap_S_StartLocalSound( cgs.media.countFightSound, CHAN_ANNOUNCER );
 		CG_CenterPrint( "FIGHT!", 120, GIANTCHAR_WIDTH*2 );
 	}
