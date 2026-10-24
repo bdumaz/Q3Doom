@@ -575,6 +575,47 @@ static int CmdLine( const doom_wad_t *wad, const char *name, int index ) {
 	return 0;
 }
 
+/*
+=================
+CmdNear
+
+near <map> <x> <y> [radius]: every linedef within 'radius' (64) units of a
+point, with its sides (finding the lines of a place seen in the game)
+=================
+*/
+static int CmdNear( const doom_wad_t *wad, const char *name, double x, double y, double radius ) {
+	doom_map_t	map;
+	char		err[256];
+	int			i;
+
+	if ( doom_map_load( wad, name, &map, err, sizeof( err ) ) ) {
+		fprintf( stderr, "%s\n", err );
+		return 1;
+	}
+	for ( i = 0 ; i < map.num_linedefs ; i++ ) {
+		const doom_linedef_t	*ld = &map.linedefs[i];
+		const doom_vertex_t		*a = &map.vertexes[ld->v1], *c = &map.vertexes[ld->v2];
+		double					dx = c->x - a->x, dy = c->y - a->y, t, px, py, d;
+
+		t = ( dx || dy ) ? ( ( x - a->x ) * dx + ( y - a->y ) * dy ) / ( dx * dx + dy * dy ) : 0;
+		t = t < 0 ? 0 : t > 1 ? 1 : t;
+		px = a->x + t * dx - x;
+		py = a->y + t * dy - y;
+		d = sqrt( px * px + py * py );
+		if ( d > radius ) {
+			continue;
+		}
+		printf( "linedef %d at %.1f: (%d %d) -> (%d %d) flags 0x%x special %d jumpable window %d\n", i, d, a->x, a->y, c->x, c->y,
+			ld->flags, ld->special, doom_linedef_is_jumpable_window( &map, ld ) );
+		PrintSide( &map, ld->side[0] );
+		if ( ld->side[1] != DOOM_NO_SIDE ) {
+			PrintSide( &map, ld->side[1] );
+		}
+	}
+	doom_map_free( &map );
+	return 0;
+}
+
 static void PutU32( FILE *f, uint32_t v ) {
 	fputc( v & 255, f ); fputc( ( v >> 8 ) & 255, f ); fputc( ( v >> 16 ) & 255, f ); fputc( v >> 24, f );
 }
@@ -684,6 +725,7 @@ int main( int argc, char **argv ) {
 			"       doomtool <wad> map <name> <out.svg>\n"
 			"       doomtool <wad> build <name|all> [outdir]\n"
 			"       doomtool <wad> line <map> <linedef>\n"
+			"       doomtool <wad> near <map> <x> <y> [radius]\n"
 			"       doomtool <wad> music <lump> <out.wav> [seconds]\n" );
 		return 1;
 	}
@@ -706,6 +748,8 @@ int main( int argc, char **argv ) {
 		ret = CmdLine( wad, argv[3], atoi( argv[4] ) );
 	} else if ( !strcmp( argv[2], "build" ) && argc >= 4 ) {
 		ret = CmdBuild( wad, argv[3], argc >= 5 ? argv[4] : NULL );
+	} else if ( !strcmp( argv[2], "near" ) && argc >= 6 ) {
+		ret = CmdNear( wad, argv[3], atof( argv[4] ), atof( argv[5] ), argc >= 7 ? atof( argv[6] ) : 64 );
 	} else if ( !strcmp( argv[2], "music" ) && argc >= 5 ) {
 		ret = CmdMusic( wad, argv[3], argv[4], argc >= 6 ? atoi( argv[5] ) : 30 );
 	} else {

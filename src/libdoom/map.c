@@ -249,7 +249,11 @@ int doom_linedef_is_jumpable_window( const doom_map_t *map, const doom_linedef_t
 	}
 	f0 = map->sectors[s0->sector].floor_height;
 	f1 = map->sectors[s1->sector].floor_height;
-	return abs( f0 - f1 ) > DOOM_MAX_STEP;
+	if ( abs( f0 - f1 ) > DOOM_MAX_STEP ) {
+		return 1;
+	}
+	// a sill: a step up from the room, but a sector only reachable by jumping
+	return SectorIsEnclosed( map, s0->sector ) || SectorIsEnclosed( map, s1->sector );
 }
 
 int doom_map_validate( const doom_map_t *map, char *err, size_t errlen ) {

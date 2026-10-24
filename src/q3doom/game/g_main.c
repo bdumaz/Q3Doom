@@ -193,8 +193,9 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &pmove_fixed, "pmove_fixed", "0", CVAR_SYSTEMINFO, 0, qfalse},
 	// Q3Doom: highest step walked up without jumping (Quake 3: 18, Doom: 24)
 	{ &g_stepHeight, "g_stepHeight", "18", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},
-	// Q3Doom: the standing height of the player box (Quake 3 and Doom: 56)
-	{ &g_playerHeight, "g_playerHeight", "56", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},
+	// Q3Doom: the standing height of the player box (Quake 3 and Doom: 56;
+	// lower so the player fits the openings Doom's exact-fit rule allows)
+	{ &g_playerHeight, "g_playerHeight", "45", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},
 	// Q3Doom: Doom skill 0-4 (things spawned), latched like the gametype; the
 	// cgame reads it from the serverinfo
 	{ &g_doomSkill, "g_doomSkill", DOOM_DEFAULT_SKILL, CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_LATCH, 0, qfalse},
