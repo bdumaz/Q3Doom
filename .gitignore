@@ -15,3 +15,7 @@ run/
 # IDE
 .vs/
 .vscode/
+
+# Personal files
+
+personal/
