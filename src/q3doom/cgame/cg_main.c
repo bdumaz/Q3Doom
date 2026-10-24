@@ -1896,8 +1896,14 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 
 	// get the rendering configuration from the client system
 	trap_GetGlconfig( &cgs.glconfig );
-	cgs.screenXScale = cgs.glconfig.vidWidth / 640.0;
+	// Q3Doom: on wide screens one scale for both axes, the 640x480 screen
+	// centered; narrower ones (5:4) stretch as before
 	cgs.screenYScale = cgs.glconfig.vidHeight / 480.0;
+	cgs.screenXScale = cgs.screenYScale;
+	if ( cgs.glconfig.vidWidth * 480 < cgs.glconfig.vidHeight * 640 ) {
+		cgs.screenXScale = cgs.glconfig.vidWidth / 640.0;
+	}
+	cgs.screenXBias = 0.5 * ( cgs.glconfig.vidWidth - 640 * cgs.screenXScale );
 
 	// get the gamestate from the client system
 	trap_GetGameState( &cgs.gameState );

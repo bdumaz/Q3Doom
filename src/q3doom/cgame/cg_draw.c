@@ -1959,6 +1959,7 @@ static void CG_DrawCrosshair(void) {
 	x = cg_crosshairX.integer;
 	y = cg_crosshairY.integer;
 	CG_AdjustFrom640( &x, &y, &w, &h );
+	x -= cgs.screenXBias;		// Q3Doom: an offset from the view center, not a screen position
 
 	ca = cg_drawCrosshair.integer;
 	if (ca < 0) {

@@ -303,7 +303,22 @@ vidmode_t r_vidModes[] =
     { "Mode  8: 1280x1024",		1280,	1024,	1 },
     { "Mode  9: 1600x1200",		1600,	1200,	1 },
     { "Mode 10: 2048x1536",		2048,	1536,	1 },
-    { "Mode 11: 856x480 (wide)",856,	480,	1 }
+    { "Mode 11: 856x480 (wide)",856,	480,	1 },
+	// Q3Doom: modern wide screen modes, after the classic ones so existing
+	// r_mode values keep their meaning
+    { "Mode 12: 1280x720 (16:9)",	1280,	720,	1 },
+    { "Mode 13: 1366x768 (16:9)",	1366,	768,	1 },
+    { "Mode 14: 1600x900 (16:9)",	1600,	900,	1 },
+    { "Mode 15: 1920x1080 (16:9)",	1920,	1080,	1 },
+    { "Mode 16: 2560x1440 (16:9)",	2560,	1440,	1 },
+    { "Mode 17: 3840x2160 (16:9)",	3840,	2160,	1 },
+    { "Mode 18: 1280x800 (16:10)",	1280,	800,	1 },
+    { "Mode 19: 1440x900 (16:10)",	1440,	900,	1 },
+    { "Mode 20: 1680x1050 (16:10)",	1680,	1050,	1 },
+    { "Mode 21: 1920x1200 (16:10)",	1920,	1200,	1 },
+    { "Mode 22: 2560x1600 (16:10)",	2560,	1600,	1 },
+    { "Mode 23: 2560x1080 (21:9)",	2560,	1080,	1 },
+    { "Mode 24: 3440x1440 (21:9)",	3440,	1440,	1 }
 };
 static int	s_numVidModes = ( sizeof( r_vidModes ) / sizeof( r_vidModes[0] ) );
 
@@ -345,6 +360,9 @@ static void R_ModeList_f( void )
 	{
 		ri.Printf( PRINT_ALL, "%s\n", r_vidModes[i].description );
 	}
+	ri.Printf( PRINT_ALL, "Mode -1: r_customwidth x r_customheight\n" );
+	ri.Printf( PRINT_ALL, "Mode -2: the desktop resolution\n" );
+	ri.Printf( PRINT_ALL, "r_fullscreen 0: window, 1: fullscreen, 2: borderless window at the desktop resolution\n" );
 	ri.Printf( PRINT_ALL, "\n" );
 }
 
@@ -970,7 +988,7 @@ void R_Register( void )
 	r_mode = ri.Cvar_Get( "r_mode", "-2", CVAR_ARCHIVE | CVAR_LATCH );	// -2: desktop resolution
 	r_doomTextureFilter = ri.Cvar_Get( "r_doomTextureFilter", "0", CVAR_ARCHIVE );
 	r_doomLightFade = ri.Cvar_Get( "r_doomLightFade", "0", CVAR_ARCHIVE );
-	r_fullscreen = ri.Cvar_Get( "r_fullscreen", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	r_fullscreen = ri.Cvar_Get( "r_fullscreen", "2", CVAR_ARCHIVE | CVAR_LATCH );	// Q3Doom: 2 borderless window (GLimp_SetMode)
 	r_customwidth = ri.Cvar_Get( "r_customwidth", "1600", CVAR_ARCHIVE | CVAR_LATCH );
 	r_customheight = ri.Cvar_Get( "r_customheight", "1024", CVAR_ARCHIVE | CVAR_LATCH );
 	r_customaspect = ri.Cvar_Get( "r_customaspect", "1", CVAR_ARCHIVE | CVAR_LATCH );

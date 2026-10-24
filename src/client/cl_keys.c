@@ -1050,8 +1050,9 @@ void CL_KeyEvent (int key, qboolean down, unsigned time) {
         Key_ClearStates();
         if (Cvar_VariableValue("r_fullscreen") == 0)
         {
-          Com_Printf("Switching to fullscreen rendering\n");
-          Cvar_Set("r_fullscreen", "1");
+          // Q3Doom: to the borderless window at the desktop resolution
+          Com_Printf("Switching to borderless fullscreen rendering\n");
+          Cvar_Set("r_fullscreen", "2");
         }
         else
         {

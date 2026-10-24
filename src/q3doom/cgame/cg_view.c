@@ -530,7 +530,18 @@ static int CG_CalcFov( void ) {
 		}
 	}
 
-	x = cg.refdef.width / tan( fov_x / 360 * M_PI );
+	// Q3Doom: the fov is the one of a 4:3 screen; wider screens see more on
+	// the sides ("Hor+"). The 4:3 width is taken from the whole screen
+	// height, so the Doom status bar takes height off the view, as in Doom.
+	{
+		float	refWidth = cgs.glconfig.vidHeight * 4.0f / 3.0f;
+
+		if ( refWidth > cg.refdef.width ) {
+			refWidth = cg.refdef.width;
+		}
+		x = refWidth / tan( fov_x / 360 * M_PI );
+		fov_x = atan2( cg.refdef.width, x ) * 360 / M_PI;
+	}
 	// Q3Doom: cg_doomAspect, Doom's 320x200 shown on a 4:3 screen: pixels
 	// 1.2 times taller, so the same width sees less height
 	if ( cg_doomAspect.integer && CG_DoomMap() ) {

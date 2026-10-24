@@ -1114,9 +1114,16 @@ Adjusted for resolution and screen aspect ratio
 */
 void UI_AdjustFrom640( float *x, float *y, float *w, float *h ) {
 	// expect valid pointers
-	*x = *x * uis.scale + uis.bias;
+	// Q3Doom: a rectangle across the whole width (backgrounds, fades) covers
+	// a wide screen too; the rest stays centered at 4:3
+	if ( *x <= 0 && *x + *w >= 640 ) {
+		*x = 0;
+		*w = uis.glconfig.vidWidth;
+	} else {
+		*x = *x * uis.scale + uis.bias;
+		*w *= uis.scale;
+	}
 	*y *= uis.scale;
-	*w *= uis.scale;
 	*h *= uis.scale;
 }
 

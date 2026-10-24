@@ -33,8 +33,39 @@ DRIVER INFORMATION MENU
 */
 
 
-// index of the "Desktop" entry in the resolution list (r_mode -2)
-#define UI_DESKTOP_MODE		12
+// Q3Doom: the resolution list and the r_mode of each entry (tr_init.c
+// r_vidModes): the desktop resolution first, then the wide screen modes,
+// then the classic 4:3 ones
+static const char *s_resolutionNames[] = {
+	"Desktop",
+	"1280x720 (16:9)", "1366x768 (16:9)", "1600x900 (16:9)", "1920x1080 (16:9)", "2560x1440 (16:9)", "3840x2160 (16:9)",
+	"1280x800 (16:10)", "1440x900 (16:10)", "1680x1050 (16:10)", "1920x1200 (16:10)", "2560x1600 (16:10)",
+	"2560x1080 (21:9)", "3440x1440 (21:9)",
+	"640x480 (4:3)", "800x600 (4:3)", "1024x768 (4:3)", "1152x864 (4:3)", "1280x1024 (5:4)", "1600x1200 (4:3)", "2048x1536 (4:3)",
+	0
+};
+static const int s_resolutionModes[] = {
+	-2,
+	12, 13, 14, 15, 16, 17,
+	18, 19, 20, 21, 22,
+	23, 24,
+	3, 4, 6, 7, 8, 9, 10
+};
+#define NUM_RESOLUTIONS		( sizeof( s_resolutionModes ) / sizeof( s_resolutionModes[0] ) )
+
+static int ResolutionForMode( int mode ) {
+	int		i;
+
+	for ( i = 0 ; i < NUM_RESOLUTIONS ; i++ ) {
+		if ( s_resolutionModes[i] == mode ) {
+			return i;
+		}
+	}
+	return 0;		// r_mode -1 or a mode not listed: shown as the desktop
+}
+
+// r_fullscreen 0, 1, 2
+#define DISPLAY_BORDERLESS	2
 
 #define DRIVERINFO_FRAMEL	"menu/art/frame2_l"
 #define DRIVERINFO_FRAMER	"menu/art/frame1_r"
@@ -359,10 +390,7 @@ static void GraphicsOptions_CheckConfig( void )
 			continue;
 		if ( s_ivo_templates[i].driver != s_graphicsoptions.driver.curvalue )
 			continue;
-		if ( s_ivo_templates[i].mode != s_graphicsoptions.mode.curvalue )
-			continue;
-		if ( s_ivo_templates[i].fullscreen != s_graphicsoptions.fs.curvalue )
-			continue;
+		// Q3Doom: the presets leave the resolution and the display alone
 		if ( s_ivo_templates[i].tq != s_graphicsoptions.tq.curvalue )
 			continue;
 		if ( s_ivo_templates[i].lighting != s_graphicsoptions.lighting.curvalue )
@@ -397,7 +425,18 @@ static void GraphicsOptions_UpdateMenuItems( void )
 		s_graphicsoptions.fs.generic.flags &= ~QMF_GRAYED;
 	}
 
-	if ( s_graphicsoptions.fs.curvalue == 0 || s_graphicsoptions.driver.curvalue == 1 )
+	// the borderless window always has the desktop resolution
+	if ( s_graphicsoptions.fs.curvalue == DISPLAY_BORDERLESS )
+	{
+		s_graphicsoptions.mode.curvalue = 0;
+		s_graphicsoptions.mode.generic.flags |= QMF_GRAYED;
+	}
+	else
+	{
+		s_graphicsoptions.mode.generic.flags &= ~QMF_GRAYED;
+	}
+
+	if ( s_graphicsoptions.fs.curvalue != 1 || s_graphicsoptions.driver.curvalue == 1 )
 	{
 		s_graphicsoptions.colordepth.curvalue = 0;
 		s_graphicsoptions.colordepth.generic.flags |= QMF_GRAYED;
@@ -485,11 +524,7 @@ static void GraphicsOptions_ApplyChanges( void *unused, int notification )
 	}
 	trap_Cvar_SetValue( "r_picmip", 3 - s_graphicsoptions.tq.curvalue );
 	trap_Cvar_SetValue( "r_allowExtensions", s_graphicsoptions.allow_extensions.curvalue );
-	if ( s_graphicsoptions.mode.curvalue == UI_DESKTOP_MODE ) {
-		trap_Cvar_SetValue( "r_mode", -2 );
-	} else {
-		trap_Cvar_SetValue( "r_mode", s_graphicsoptions.mode.curvalue );
-	}
+	trap_Cvar_SetValue( "r_mode", s_resolutionModes[s_graphicsoptions.mode.curvalue] );
 	trap_Cvar_SetValue( "r_fullscreen", s_graphicsoptions.fs.curvalue );
 	trap_Cvar_Set( "r_glDriver", ( char * ) s_drivers[s_graphicsoptions.driver.curvalue] );
 	switch ( s_graphicsoptions.colordepth.curvalue )
@@ -553,27 +588,17 @@ static void GraphicsOptions_Event( void* ptr, int event ) {
 
 	switch( ((menucommon_s*)ptr)->id ) {
 	case ID_MODE:
-		// clamp 3dfx video modes
-		if ( s_graphicsoptions.driver.curvalue == 1 )
-		{
-			if ( s_graphicsoptions.mode.curvalue < 2 )
-				s_graphicsoptions.mode.curvalue = 2;
-			else if ( s_graphicsoptions.mode.curvalue > 6 )
-				s_graphicsoptions.mode.curvalue = 6;
-		}
 		break;
 
 	case ID_LIST:
 		ivo = &s_ivo_templates[s_graphicsoptions.list.curvalue];
 
-		s_graphicsoptions.mode.curvalue        = ivo->mode;
-		s_graphicsoptions.tq.curvalue          = ivo->tq;
+		s_graphicsoptions.tq.curvalue         = ivo->tq;
 		s_graphicsoptions.lighting.curvalue    = ivo->lighting;
 		s_graphicsoptions.colordepth.curvalue  = ivo->colordepth;
 		s_graphicsoptions.texturebits.curvalue = ivo->texturebits;
 		s_graphicsoptions.geometry.curvalue    = ivo->geometry;
 		s_graphicsoptions.filter.curvalue      = ivo->filter;
-		s_graphicsoptions.fs.curvalue          = ivo->fullscreen;
 		break;
 
 	case ID_DRIVERINFO:
@@ -638,16 +663,11 @@ GraphicsOptions_SetMenuItems
 */
 static void GraphicsOptions_SetMenuItems( void )
 {
-	s_graphicsoptions.mode.curvalue = trap_Cvar_VariableValue( "r_mode" );
-	if ( s_graphicsoptions.mode.curvalue == -2 )
-	{
-		s_graphicsoptions.mode.curvalue = UI_DESKTOP_MODE;
+	s_graphicsoptions.mode.curvalue = ResolutionForMode( (int)trap_Cvar_VariableValue( "r_mode" ) );
+	s_graphicsoptions.fs.curvalue = (int)Com_Clamp( 0, 2, trap_Cvar_VariableValue( "r_fullscreen" ) );
+	if ( s_graphicsoptions.fs.curvalue == DISPLAY_BORDERLESS ) {
+		s_graphicsoptions.mode.curvalue = 0;	// what it shows: the desktop resolution
 	}
-	else if ( s_graphicsoptions.mode.curvalue < 0 )
-	{
-		s_graphicsoptions.mode.curvalue = 3;
-	}
-	s_graphicsoptions.fs.curvalue = trap_Cvar_VariableValue("r_fullscreen");
 	s_graphicsoptions.allow_extensions.curvalue = trap_Cvar_VariableValue("r_allowExtensions");
 	s_graphicsoptions.tq.curvalue = 3-trap_Cvar_VariableValue( "r_picmip");
 	if ( s_graphicsoptions.tq.curvalue < 0 )
@@ -713,7 +733,7 @@ static void GraphicsOptions_SetMenuItems( void )
 		break;
 	}
 
-	if ( s_graphicsoptions.fs.curvalue == 0 )
+	if ( s_graphicsoptions.fs.curvalue != 1 )
 	{
 		s_graphicsoptions.colordepth.curvalue = 0;
 	}
@@ -770,21 +790,11 @@ void GraphicsOptions_MenuInit( void )
 		0
 	};
 
-	static const char *resolutions[] = 
+	static const char *display_names[] =
 	{
-		"320x240",
-		"400x300",
-		"512x384",
-		"640x480",
-		"800x600",
-		"960x720",
-		"1024x768",
-		"1152x864",
-		"1280x1024",
-		"1600x1200",
-		"2048x1536",
-		"856x480 wide screen",
-		"Desktop",			// Q3Doom: r_mode -2, see UI_DESKTOP_MODE
+		"Window",
+		"Fullscreen",
+		"Borderless",
 		0
 	};
 	static const char *filter_names[] =
@@ -916,7 +926,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.mode.generic.flags    = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
 	s_graphicsoptions.mode.generic.x        = 400;
 	s_graphicsoptions.mode.generic.y        = y;
-	s_graphicsoptions.mode.itemnames        = resolutions;
+	s_graphicsoptions.mode.itemnames        = s_resolutionNames;
 	s_graphicsoptions.mode.generic.callback = GraphicsOptions_Event;
 	s_graphicsoptions.mode.generic.id       = ID_MODE;
 	y += BIGCHAR_HEIGHT+2;
@@ -932,11 +942,11 @@ void GraphicsOptions_MenuInit( void )
 
 	// references/modifies "r_fullscreen"
 	s_graphicsoptions.fs.generic.type     = MTYPE_SPINCONTROL;
-	s_graphicsoptions.fs.generic.name	  = "Fullscreen:";
+	s_graphicsoptions.fs.generic.name	  = "Display:";
 	s_graphicsoptions.fs.generic.flags	  = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
 	s_graphicsoptions.fs.generic.x	      = 400;
 	s_graphicsoptions.fs.generic.y	      = y;
-	s_graphicsoptions.fs.itemnames	      = enabled_names;
+	s_graphicsoptions.fs.itemnames	      = display_names;
 	y += BIGCHAR_HEIGHT+2;
 
 	// references/modifies "r_vertexLight"

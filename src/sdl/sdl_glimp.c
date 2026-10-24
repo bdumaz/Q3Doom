@@ -158,7 +158,8 @@ static qboolean GLimp_SetMode( void )
 		desktop.refresh_rate = 60;
 	}
 
-	if ( r_mode->integer == -2 ) {
+	// the borderless window and r_mode -2 take the desktop resolution
+	if ( r_mode->integer == -2 || r_fullscreen->integer == 2 ) {
 		glConfig.vidWidth = desktop.w;
 		glConfig.vidHeight = desktop.h;
 		glConfig.windowAspect = (float)desktop.w / desktop.h;
@@ -168,7 +169,7 @@ static qboolean GLimp_SetMode( void )
 	}
 
 	ri.Printf( PRINT_ALL, "...setting mode %d: %d x %d %s\n", r_mode->integer,
-		glConfig.vidWidth, glConfig.vidHeight, r_fullscreen->integer ? "FS" : "W" );
+		glConfig.vidWidth, glConfig.vidHeight, r_fullscreen->integer == 2 ? "borderless" : r_fullscreen->integer ? "FS" : "W" );
 
 	SDL_GL_SetAttribute( SDL_GL_RED_SIZE, 8 );
 	SDL_GL_SetAttribute( SDL_GL_GREEN_SIZE, 8 );
@@ -177,8 +178,14 @@ static qboolean GLimp_SetMode( void )
 	SDL_GL_SetAttribute( SDL_GL_STENCIL_SIZE, r_stencilbits->integer );
 	SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1 );
 
+	// r_fullscreen 0: a window; 1: fullscreen (the display switches to the
+	// mode, or keeps the desktop's for r_mode -2); 2: a borderless window
+	// over the whole display ("windowed fullscreen": instant alt-tab, other
+	// windows can show over it)
 	flags = SDL_WINDOW_OPENGL;
-	if ( r_fullscreen->integer ) {
+	if ( r_fullscreen->integer == 2 ) {
+		flags |= SDL_WINDOW_BORDERLESS;
+	} else if ( r_fullscreen->integer ) {
 		if ( r_mode->integer == -2 ) {
 			flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
 		} else {
@@ -186,8 +193,17 @@ static qboolean GLimp_SetMode( void )
 		}
 	}
 
-	SDL_window = SDL_CreateWindow( "Q3Doom", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-		glConfig.vidWidth, glConfig.vidHeight, flags );
+	if ( r_fullscreen->integer == 2 ) {
+		SDL_Rect	bounds;
+
+		if ( SDL_GetDisplayBounds( 0, &bounds ) != 0 ) {
+			bounds.x = bounds.y = 0;
+		}
+		SDL_window = SDL_CreateWindow( "Q3Doom", bounds.x, bounds.y, glConfig.vidWidth, glConfig.vidHeight, flags );
+	} else {
+		SDL_window = SDL_CreateWindow( "Q3Doom", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+			glConfig.vidWidth, glConfig.vidHeight, flags );
+	}
 	if ( !SDL_window ) {
 		ri.Printf( PRINT_ALL, "SDL_CreateWindow failed: %s\n", SDL_GetError() );
 		return qfalse;

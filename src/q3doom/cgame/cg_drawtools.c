@@ -31,16 +31,17 @@ Adjusted for resolution and screen aspect ratio
 ================
 */
 void CG_AdjustFrom640( float *x, float *y, float *w, float *h ) {
-#if 0
-	// adjust for wide screens
-	if ( cgs.glconfig.vidWidth * 480 > cgs.glconfig.vidHeight * 640 ) {
-		*x += 0.5 * ( cgs.glconfig.vidWidth - ( cgs.glconfig.vidHeight * 640 / 480 ) );
+	// Q3Doom: wide screens keep the 640x480 layout undistorted, centered
+	// (cgs.screenXBias); a rectangle across the whole width still covers
+	// the whole screen (fades and backgrounds)
+	if ( *x <= 0 && *x + *w >= SCREEN_WIDTH ) {
+		*x = 0;
+		*w = cgs.glconfig.vidWidth;
+	} else {
+		*x = *x * cgs.screenXScale + cgs.screenXBias;
+		*w *= cgs.screenXScale;
 	}
-#endif
-	// scale for screen sizes
-	*x *= cgs.screenXScale;
 	*y *= cgs.screenYScale;
-	*w *= cgs.screenXScale;
 	*h *= cgs.screenYScale;
 }
 
