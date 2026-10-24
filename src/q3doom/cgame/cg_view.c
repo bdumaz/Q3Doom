@@ -531,6 +531,11 @@ static int CG_CalcFov( void ) {
 	}
 
 	x = cg.refdef.width / tan( fov_x / 360 * M_PI );
+	// Q3Doom: cg_doomAspect, Doom's 320x200 shown on a 4:3 screen: pixels
+	// 1.2 times taller, so the same width sees less height
+	if ( cg_doomAspect.integer && CG_DoomMap() ) {
+		x *= 1.2f;
+	}
 	fov_y = atan2( cg.refdef.height, x );
 	fov_y = fov_y * 360 / M_PI;
 

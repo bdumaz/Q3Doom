@@ -657,11 +657,33 @@ RB_CalcDoomSectorColors
 Doom map surfaces carry their sector index and fake contrast offset in the
 lightmap coordinates. The light is shifted down by the overbright bits the
 hardware gamma adds back, like the vertex colors of Quake 3 maps.
+
+With r_doomLightFade, the light fades with the distance like Doom's
+colormaps (r_main.c zlight / scalelight): colormap (15 - light / 16) * 4 -
+1280 / distance, from 0 (full bright) to 31 (dark).
 ===============
 */
+static int DoomFadedLight( int level, const vec3_t xyz )
+{
+	vec3_t	d;
+	float	dist;
+	int		map;
+
+	VectorSubtract( xyz, backEnd.or.viewOrigin, d );
+	dist = VectorLength( d );
+	map = ( 15 - ( level >> 4 ) ) * 4 - (int)( 1280.0f / ( dist > 1.0f ? dist : 1.0f ) );
+	if ( map < 0 ) {
+		map = 0;
+	} else if ( map > 31 ) {
+		map = 31;
+	}
+	return ( 32 - map ) * 255 / 32;
+}
+
 static void RB_CalcDoomSectorColors( unsigned char *colors )
 {
 	int		i, sector, level;
+	qboolean	fade = r_doomLightFade->integer != 0;
 
 	if ( !tr.numDoomSectorLights ) {
 		Com_Memcpy( colors, tess.vertexColors, tess.numVertexes * sizeof( tess.vertexColors[0] ) );
@@ -675,6 +697,9 @@ static void RB_CalcDoomSectorColors( unsigned char *colors )
 			level = 0;
 		} else if ( level > 255 ) {
 			level = 255;
+		}
+		if ( fade ) {
+			level = DoomFadedLight( level, tess.xyz[i] );
 		}
 		colors[0] = colors[1] = colors[2] = level >> tr.overbrightBits;
 		colors[3] = 255;

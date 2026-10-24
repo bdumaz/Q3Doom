@@ -807,7 +807,7 @@ lighting), and the unused lightmap coordinates carry the sector index and
 the fake contrast offset so the renderer can light it live.
 =================
 */
-static void SurfacePolygon( builder_t *b, surfbuilder_t *sb, int n, const float (*xyz)[3], const float (*st)[2],
+static void EmitPolygon( builder_t *b, surfbuilder_t *sb, int n, const float (*xyz)[3], const float (*st)[2],
 	const float normal[3], int lightSector, int lightDelta ) {
 	int			light = b->map->sectors[lightSector].light + lightDelta;
 	osurface_t	*surf;
@@ -860,6 +860,109 @@ static void SurfacePolygon( builder_t *b, surfbuilder_t *sb, int n, const float 
 	}
 	surf->numVerts = verts->count;
 	surf->numIndexes = indexes->count;
+}
+
+/*
+=================
+SurfacePolygon
+
+EmitPolygon after cutting the polygon on a grid of SUBDIVIDE_SIZE units
+along the two axes of its plane: the renderer lights vertexes, and Doom's
+light fading with distance (r_doomLightFade) needs them close together.
+=================
+*/
+#define SUBDIVIDE_SIZE		64
+#define SUBDIVIDE_VERTS		64
+
+// cuts off the part below the first grid line inside the polygon along an
+// axis into back[]; the polygon keeps the rest. qfalse if there is no cut.
+static int CutPolygon( int *n, float (*xyz)[3], float (*st)[2], int axis, int *nb, float (*back)[3], float (*backSt)[2] ) {
+	float	front[SUBDIVIDE_VERTS][3], frontSt[SUBDIVIDE_VERTS][2], mins = xyz[0][axis], maxs = xyz[0][axis], cut;
+	int		i, k, nf = 0;
+
+	for ( i = 1 ; i < *n ; i++ ) {
+		mins = xyz[i][axis] < mins ? xyz[i][axis] : mins;
+		maxs = xyz[i][axis] > maxs ? xyz[i][axis] : maxs;
+	}
+	cut = (float)( floor( mins / SUBDIVIDE_SIZE ) + 1 ) * SUBDIVIDE_SIZE;
+	if ( cut >= maxs - 1.0f || cut <= mins + 1.0f || *n + 2 > SUBDIVIDE_VERTS ) {
+		return 0;
+	}
+	*nb = 0;
+	for ( i = 0 ; i < *n ; i++ ) {
+		int		j = ( i + 1 ) % *n;
+		float	di = xyz[i][axis] - cut, dj = xyz[j][axis] - cut;
+
+		if ( di >= 0 ) {
+			memcpy( front[nf], xyz[i], sizeof( front[0] ) );
+			memcpy( frontSt[nf++], st[i], sizeof( frontSt[0] ) );
+		}
+		if ( di <= 0 ) {
+			memcpy( back[*nb], xyz[i], sizeof( back[0] ) );
+			memcpy( backSt[( *nb )++], st[i], sizeof( backSt[0] ) );
+		}
+		if ( ( di > 0 && dj < 0 ) || ( di < 0 && dj > 0 ) ) {
+			float t = di / ( di - dj );
+
+			for ( k = 0 ; k < 3 ; k++ ) {
+				front[nf][k] = back[*nb][k] = xyz[i][k] + t * ( xyz[j][k] - xyz[i][k] );
+			}
+			front[nf][axis] = back[*nb][axis] = cut;
+			for ( k = 0 ; k < 2 ; k++ ) {
+				frontSt[nf][k] = backSt[*nb][k] = st[i][k] + t * ( st[j][k] - st[i][k] );
+			}
+			nf++;
+			( *nb )++;
+		}
+	}
+	memcpy( xyz, front, nf * sizeof( front[0] ) );
+	memcpy( st, frontSt, nf * sizeof( frontSt[0] ) );
+	*n = nf;
+	return 1;
+}
+
+static void SurfacePolygon( builder_t *b, surfbuilder_t *sb, int n, const float (*xyz)[3], const float (*st)[2],
+	const float normal[3], int lightSector, int lightDelta ) {
+	float	rest[SUBDIVIDE_VERTS][3], restSt[SUBDIVIDE_VERTS][2], strip[SUBDIVIDE_VERTS][3], stripSt[SUBDIVIDE_VERTS][2];
+	float	cell[SUBDIVIDE_VERTS][3], cellSt[SUBDIVIDE_VERTS][2];
+	int		axes[2], dominant = 0, i, nStrip, nCell;
+
+	if ( n < 3 || n > SUBDIVIDE_VERTS ) {
+		EmitPolygon( b, sb, n, xyz, st, normal, lightSector, lightDelta );
+		return;
+	}
+	for ( i = 1 ; i < 3 ; i++ ) {
+		if ( fabs( normal[i] ) > fabs( normal[dominant] ) ) {
+			dominant = i;
+		}
+	}
+	axes[0] = dominant == 0 ? 1 : 0;
+	axes[1] = dominant == 2 ? 1 : 2;
+
+	// strips along the first axis, then cells along the second
+	memcpy( rest, xyz, n * sizeof( rest[0] ) );
+	memcpy( restSt, st, n * sizeof( restSt[0] ) );
+	for ( ;; ) {
+		int more = CutPolygon( &n, rest, restSt, axes[0], &nStrip, strip, stripSt );
+
+		if ( !more ) {
+			nStrip = n;
+			memcpy( strip, rest, n * sizeof( strip[0] ) );
+			memcpy( stripSt, restSt, n * sizeof( stripSt[0] ) );
+		}
+		for ( ;; ) {
+			int moreCells = CutPolygon( &nStrip, strip, stripSt, axes[1], &nCell, cell, cellSt );
+
+			if ( !moreCells ) {
+				EmitPolygon( b, sb, nStrip, (const float (*)[3])strip, (const float (*)[2])stripSt, normal, lightSector, lightDelta );
+				break;
+			}
+			EmitPolygon( b, sb, nCell, (const float (*)[3])cell, (const float (*)[2])cellSt, normal, lightSector, lightDelta );
+		}
+		if ( !more ) {
+			break;
+		}
+	}
 }
 
 /*

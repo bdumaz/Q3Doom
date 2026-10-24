@@ -1028,6 +1028,7 @@ extern	cvar_t	*r_nocurves;
 extern	cvar_t	*r_showcluster;
 
 extern cvar_t	*r_doomTextureFilter;	// Q3Doom: 0 = nearest (crisp Doom pixels), 1 = r_textureMode
+extern cvar_t	*r_doomLightFade;		// Q3Doom: 1 = Doom's light fading with distance
 extern qboolean	glNPOTSupported;		// non power of two textures (OpenGL 2.0+)
 
 extern cvar_t	*r_mode;				// video mode

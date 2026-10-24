@@ -499,6 +499,15 @@ static void AddSprite( const vec3_t origin, float angle, int state, int light, q
 		right[1] /= len;
 	}
 
+	// r_doomLightFade: Doom's colormap at the sprite's distance, as the
+	// renderer does for the walls (tr_shade.c DoomFadedLight)
+	if ( r_doomLightFade.integer && !( st->frame & DOOM_FF_FULLBRIGHT ) ) {
+		float	dist = Distance( origin, cg.refdef.vieworg );
+		int		map = ( 15 - ( light >> 4 ) ) * 4 - (int)( 1280.0f / ( dist > 1.0f ? dist : 1.0f ) );
+
+		map = map < 0 ? 0 : map > 31 ? 31 : map;
+		light = ( 32 - map ) * 255 / 32;
+	}
 	color = ( st->frame & DOOM_FF_FULLBRIGHT ) ? 255 : light;
 	for ( i = 0 ; i < 4 ; i++ ) {
 		float	x = ( i == 1 || i == 2 ) ? width - left : -left;
