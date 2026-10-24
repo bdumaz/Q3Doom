@@ -765,6 +765,7 @@ void CG_DoomInit( void ) {
 
 	RegisterSounds();
 	CG_DoomHudInit();
+	CG_DoomIntermissionChanged();
 }
 
 void CG_DoomShutdown( void ) {

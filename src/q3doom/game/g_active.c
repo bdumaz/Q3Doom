@@ -803,6 +803,15 @@ void ClientThink_real( gentity_t *ent ) {
 		return;
 	}
 
+	// Q3Doom: the level is over, the players watch Doom's intermission
+	if ( doomLevel.intermission ) {
+		client->ps.pm_type = PM_INTERMISSION;
+		client->ps.eFlags &= ~EF_FIRING;
+		client->oldbuttons = client->buttons;
+		client->buttons = ucmd->buttons;
+		return;
+	}
+
 	// spectators don't do much
 	if ( client->sess.sessionTeam == TEAM_SPECTATOR ) {
 		if ( client->sess.spectatorState == SPECTATOR_SCOREBOARD ) {
@@ -969,9 +978,10 @@ void ClientThink_real( gentity_t *ent ) {
 	// touch other objects
 	ClientImpacts( ent, &pm );
 
-	// Q3Doom: walk-over lines
+	// Q3Doom: walk-over lines, switches bumped into
 	if ( !ent->client->noclip ) {
 		Doom_PlayerMoved( ent, doomOldOrigin );
+		Doom_PlayerBump( ent );
 	}
 
 	// save results of triggers and client events
@@ -1000,9 +1010,12 @@ void ClientThink_real( gentity_t *ent ) {
 				return;
 			}
 		
-			// pressing attack or use is the normal respawn method (Q3Doom: +use too)
+			// pressing attack or use is the normal respawn method (Q3Doom: +use too;
+			// alone, the Doom level restarts)
 			if ( ucmd->buttons & ( BUTTON_ATTACK | BUTTON_USE_HOLDABLE | BUTTON_USE ) ) {
-				respawn( ent );
+				if ( !Doom_PlayerDied( ent ) ) {
+					respawn( ent );
+				}
 			}
 		}
 		return;

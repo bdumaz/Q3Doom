@@ -334,6 +334,46 @@ int		doom_switch_texture( const doom_wad_t *wad, const char *name, char out[DOOM
 /*
 =====================================================================
 
+CAMPAIGN PROGRESS (progress.c)
+
+The levels unlocked, the best medal and the best time of each, kept in a
+small text file ("level E1M1 unlocked 1 medal 2 best 4520" per line).
+
+=====================================================================
+*/
+
+#define DOOM_PROGRESS_MAX	64
+
+// medals by skill: none, bronze (skills 0-1), silver (2), gold (3), skull (4)
+enum { DOOM_MEDAL_NONE, DOOM_MEDAL_BRONZE, DOOM_MEDAL_SILVER, DOOM_MEDAL_GOLD, DOOM_MEDAL_SKULL };
+
+typedef struct {
+	char		map[DOOM_LUMP_NAME_LEN + 1];
+	int			unlocked;
+	int			medal;
+	int			best_tics;			// best time in tics, 0 none
+} doom_progress_level_t;
+
+typedef struct {
+	int						count;
+	doom_progress_level_t	levels[DOOM_PROGRESS_MAX];
+} doom_progress_t;
+
+// 'text' may be NULL or empty: a new game (E1M1 unlocked)
+void					doom_progress_parse( const char *text, doom_progress_t *p );
+// returns the length written (always NUL terminated)
+int						doom_progress_write( const doom_progress_t *p, char *buf, size_t size );
+// NULL if the map has no entry and 'create' is 0
+doom_progress_level_t	*doom_progress_level( doom_progress_t *p, const char *map, int create );
+int						doom_progress_unlocked( const doom_progress_t *p, const char *map );
+int						doom_skill_medal( int skill );
+
+// Doom's par time of ExMy in seconds (g_game.c pars[]), 0 if it has none
+int						doom_par_time( int episode, int map );
+
+/*
+=====================================================================
+
 WORLD BUILDER
 
 Builds a Quake 3 BSP (IBSP version 46) from a map model: collision brushes,

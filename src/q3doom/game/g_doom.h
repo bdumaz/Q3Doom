@@ -103,6 +103,13 @@ typedef struct {
 	int					kills, totalKills;
 	int					items, totalItems;
 	int					totalSecrets;
+
+	// campaign (g_doom_campaign.c)
+	qboolean			campaign;		// a campaign level: progress is saved
+	qboolean			intermission;	// the level is over: players wait on Doom's screens
+	qboolean			finale;			// the episode is over
+	int					exitTics;		// the level time, for the tally
+	qboolean			restarting;		// the player died, the level reloads
 } doomLevel_t;
 
 extern doomLevel_t	doomLevel;
@@ -127,8 +134,17 @@ void		Doom_PlaySectorSound( int sector, const char *sound );
 
 void		Doom_Message( gentity_t *ent, const char *message );
 
-void		Doom_ExitLevel( qboolean secret );
 qboolean	Doom_TeleportMobj( gentity_t *ent, int tag );
+void		Doom_PlayerBump( gentity_t *ent );
+void		Doom_ShootSwitch( gentity_t *attacker, const vec3_t start, const vec3_t end );
+
+// g_doom_campaign.c
+void		Doom_InitCampaign( void );
+void		Doom_ExitLevel( qboolean secret );
+void		Doom_CampaignFrame( void );
+qboolean	Doom_CampaignCommand( gentity_t *ent, const char *cmd );
+qboolean	Doom_PlayerDied( gentity_t *ent );
+void		Doom_ApplyCarry( gclient_t *client );
 
 // g_doom_weapon.c
 int			Doom_Random( void );

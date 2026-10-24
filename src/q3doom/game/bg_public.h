@@ -98,8 +98,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // (the engine reads nothing past CS_MAX, so modules may use the rest)
 #define CS_DOOM_LIGHTS			(CS_MAX)
 
-#if (CS_DOOM_LIGHTS) >= MAX_CONFIGSTRINGS
-#error overflow: CS_DOOM_LIGHTS >= MAX_CONFIGSTRINGS
+// Q3Doom: the end of a level, empty while playing:
+// "wi <episode> <last> <next> <didsecret> <kills> <maxkills> <items> <maxitems> <secrets> <maxsecrets> <tics> <par>"
+// (Doom's intermission, maps 0-based) or "finale <episode>"
+#define CS_DOOM_INTERMISSION	(CS_MAX+1)
+
+#if (CS_DOOM_INTERMISSION) >= MAX_CONFIGSTRINGS
+#error overflow: CS_DOOM_INTERMISSION >= MAX_CONFIGSTRINGS
 #endif
 
 typedef enum {

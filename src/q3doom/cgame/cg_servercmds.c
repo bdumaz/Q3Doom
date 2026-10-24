@@ -284,6 +284,8 @@ static void CG_ConfigStringModified( void ) {
 		CG_StartMusic();
 	} else if ( num == CS_DOOM_LIGHTS ) {
 		CG_DoomLightsChanged();
+	} else if ( num == CS_DOOM_INTERMISSION ) {
+		CG_DoomIntermissionChanged();
 	} else if ( num == CS_SERVERINFO ) {
 		CG_ParseServerinfo();
 	} else if ( num == CS_WARMUP ) {

@@ -216,6 +216,11 @@ gentity_t *Doom_LineAttack( gentity_t *ent, const vec3_t eye, float yaw, float p
 	}
 	VectorMA( tr.endpos, -4, forward, pos );
 	hit = &g_entities[tr.entityNum];
+
+	// a switch on the wall is pressed by the shot
+	if ( !hit->takedamage ) {
+		Doom_ShootSwitch( ent, eye, tr.endpos );
+	}
 	if ( Doom_Bleeds( hit ) ) {
 		SpawnBlood( pos, damage );
 	} else {
@@ -443,6 +448,13 @@ void Doom_MissileImpact( gentity_t *ent, trace_t *trace ) {
 		|| ( owner->doomMobj->type == MT_KNIGHT && other->doomMobj->type == MT_BRUISER )
 		|| ( owner->doomMobj->type == MT_BRUISER && other->doomMobj->type == MT_KNIGHT ) ) ) {
 		other = &g_entities[ENTITYNUM_WORLD];
+	}
+	if ( !other->takedamage ) {
+		vec3_t start;
+
+		// a switch hit by the missile is pressed
+		VectorMA( trace->endpos, -64.0f / ( VectorLength( velocity ) + 1 ), velocity, start );
+		Doom_ShootSwitch( owner, start, trace->endpos );
 	}
 	if ( other->takedamage && ent->damage ) {
 		G_Damage( other, ent, owner, velocity, ent->s.origin, ent->damage, 0, ent->methodOfDeath );

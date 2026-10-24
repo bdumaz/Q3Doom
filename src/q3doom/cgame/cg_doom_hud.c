@@ -149,6 +149,62 @@ static void DrawPatch( float x, float y, int lump ) {
 	trap_R_DrawStretchPic( x0 + ( x - left ) * sx, ( y - top ) * sy, w * sx, h * sy, 0, 0, 1, 1, CG_DoomPatchShader( lump ) );
 }
 
+// for the intermission and the finale (cg_doom_wi.c)
+int CG_DoomLump( const char *name ) {
+	return hud.active ? Lump( name ) : -1;
+}
+
+void CG_DoomDrawPatch( float x, float y, int lump ) {
+	if ( hud.active ) {
+		DrawPatch( x, y, lump );
+	}
+}
+
+void CG_DoomPatchSize( int lump, int *width, int *height, int *left, int *top ) {
+	*width = *height = *left = *top = 0;
+	if ( hud.active && lump >= 0 ) {
+		PatchSize( lump, width, height, left, top );
+	}
+}
+
+int CG_DoomFontLump( int c ) {
+	c = toupper( c );
+	return c < HU_FONTSTART || c > HU_FONTEND ? -1 : hud.font[c - HU_FONTSTART];
+}
+
+// columns 'from' to 'to' of a 320 wide full screen picture, drawn at x (F_BunnyScroll)
+void CG_DoomDrawPatchColumns( int lump, float x, float from, float to ) {
+	float	x0, sx, sy;
+	int		w, h, l, t;
+
+	if ( !hud.active || lump < 0 || to <= from ) {
+		return;
+	}
+	CG_DoomHudScale( &x0, &sx, &sy );
+	PatchSize( lump, &w, &h, &l, &t );
+	trap_R_DrawStretchPic( x0 + x * sx, 0, ( to - from ) * sx, h * sy, from / w, 0, to / w, 1, CG_DoomPatchShader( lump ) );
+}
+
+// Doom's whole screen: black outside the 4:3 area, a color or a tiled flat inside
+void CG_DoomFillScreen( qhandle_t flat ) {
+	float	x0, sx, sy, x, y;
+
+	trap_R_SetColor( colorBlack );
+	trap_R_DrawStretchPic( 0, 0, cgs.glconfig.vidWidth, cgs.glconfig.vidHeight, 0, 0, 1, 1, hud.white );
+	trap_R_SetColor( NULL );
+	if ( !flat ) {
+		return;
+	}
+	CG_DoomHudScale( &x0, &sx, &sy );
+	for ( y = 0 ; y < 200 ; y += 64 ) {
+		for ( x = 0 ; x < 320 ; x += 64 ) {
+			float w = x + 64 > 320 ? 320 - x : 64, h = y + 64 > 200 ? 200 - y : 64;
+
+			trap_R_DrawStretchPic( x0 + x * sx, y * sy, w * sx, h * sy, 0, 0, w / 64, h / 64, flat );
+		}
+	}
+}
+
 /*
 =================
 DrawNum

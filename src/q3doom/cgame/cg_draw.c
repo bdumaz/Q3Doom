@@ -2505,6 +2505,10 @@ static void CG_Draw2D( void ) {
 		return;
 	}
 
+	// Q3Doom: Doom's intermission or episode finale replace the Quake 3 one
+	if ( CG_DoomDrawIntermission() ) {
+		return;
+	}
 	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
 		CG_DrawIntermission();
 		return;

@@ -7,6 +7,8 @@ Q3Doom - client side Doom asset test commands
 	doom_playsound <LUMP>			play a DS* sound effect
 	doom_where						Doom sector under the player
 	doom_goto <x> <y> [angle]		teleport to a Doom map position (needs devmap / cheats)
+	doom_campaign [map] [skill]		play an unlocked campaign level
+	doom_progress					print the saved campaign progress
 
 Licensed under the GNU General Public License version 2 or later.
 ===========================================================================
@@ -154,7 +156,80 @@ static void CL_DoomGoto_f( void ) {
 		Cmd_Argc() > 3 ? Cmd_Argv( 3 ) : "0" ) );
 }
 
+/*
+=====================================================================
+
+CAMPAIGN
+
+=====================================================================
+*/
+
+// campaign.dat, written by the game when a level ends
+static void CL_DoomLoadProgress( doom_progress_t *p ) {
+	char	*text = NULL;
+	int		len = FS_ReadFile( "campaign.dat", (void **)&text );
+
+	doom_progress_parse( len > 0 ? text : NULL, p );
+	if ( text ) {
+		FS_FreeFile( text );
+	}
+}
+
+/*
+=================
+CL_DoomCampaign_f
+
+doom_campaign [map] [skill]: plays a level of the campaign the player has
+unlocked, with a pistol start (the menus come in M8)
+=================
+*/
+static void CL_DoomCampaign_f( void ) {
+	doom_progress_t	p;
+	const char		*map = Cmd_Argc() > 1 ? Cmd_Argv( 1 ) : "E1M1";
+	int				skill = Cmd_Argc() > 2 ? atoi( Cmd_Argv( 2 ) ) : Cvar_VariableIntegerValue( "g_doomSkill" );
+	int				i;
+
+	CL_DoomLoadProgress( &p );
+	if ( !doom_progress_unlocked( &p, map ) ) {
+		Com_Printf( "doom_campaign: %s is locked\n", map );
+		return;
+	}
+	if ( skill < 0 || skill > 4 ) {
+		skill = 2;
+	}
+	Cvar_Set( "g_doomSkill", va( "%d", skill ) );
+	Cvar_Set( "g_doomCampaign", "1" );
+	Cvar_Set( "g_doomDidSecret", "0" );
+	for ( i = 0 ; i < MAX_CLIENTS ; i++ ) {
+		Cvar_Set( va( "g_doomCarry%d", i ), "" );
+	}
+	Cbuf_AddText( va( "map %s\n", map ) );
+}
+
+/*
+=================
+CL_DoomProgress_f
+
+doom_progress: the campaign as saved
+=================
+*/
+static void CL_DoomProgress_f( void ) {
+	static const char	*medals[] = { "-", "bronze", "silver", "gold", "skull" };
+	doom_progress_t		p;
+	int					i;
+
+	CL_DoomLoadProgress( &p );
+	for ( i = 0 ; i < p.count ; i++ ) {
+		const doom_progress_level_t *l = &p.levels[i];
+
+		Com_Printf( "%-6s %-8s medal %-6s best %s\n", l->map, l->unlocked ? "unlocked" : "locked", medals[l->medal],
+			l->best_tics ? va( "%d:%02d", l->best_tics / 35 / 60, l->best_tics / 35 % 60 ) : "-" );
+	}
+}
+
 void CL_InitDoomCommands( void ) {
+	Cmd_AddCommand( "doom_campaign", CL_DoomCampaign_f );
+	Cmd_AddCommand( "doom_progress", CL_DoomProgress_f );
 	Cmd_AddCommand( "doom_showimage", CL_DoomShowImage_f );
 	Cmd_AddCommand( "doom_playsound", CL_DoomPlaySound_f );
 	Cmd_AddCommand( "doom_where", CL_DoomWhere_f );

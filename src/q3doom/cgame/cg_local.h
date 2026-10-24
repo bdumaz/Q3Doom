@@ -1716,6 +1716,16 @@ void		CG_DoomMessage( const char *text );
 void		CG_DoomBonus( void );
 void		CG_DoomDamage( int damage, int yawByte );
 void		CG_DoomAutomap_f( void );
+int			CG_DoomLump( const char *name );
+void		CG_DoomDrawPatch( float x, float y, int lump );
+void		CG_DoomPatchSize( int lump, int *width, int *height, int *left, int *top );
+int			CG_DoomFontLump( int c );
+void		CG_DoomDrawPatchColumns( int lump, float x, float from, float to );
+void		CG_DoomFillScreen( qhandle_t flat );
+
+// cg_doom_wi.c (Q3Doom)
+void		CG_DoomIntermissionChanged( void );
+qboolean	CG_DoomDrawIntermission( void );
 
 // the engine's Doom data, shared read-only with this native module
 const struct doom_map_s *trap_Doom_GetMap( const char *mapname );

@@ -1664,7 +1664,9 @@ void ClientCommand( int clientNum ) {
 		return;
 	}
 
-	if (Q_stricmp (cmd, "give") == 0)
+	if ( Doom_CampaignCommand( ent, cmd ) )
+		;
+	else if (Q_stricmp (cmd, "give") == 0)
 		Cmd_Give_f (ent);
 	else if (!Q_stricmp (cmd, "idkfa") || !Q_stricmp (cmd, "idfa") || !Q_stricmp (cmd, "iddqd"))
 		Cmd_DoomCheat_f (ent, cmd);

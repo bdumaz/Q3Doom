@@ -84,6 +84,7 @@ vmCvar_t	g_doomAllKeys;
 vmCvar_t	g_fallDamage;
 vmCvar_t	g_autoaim;
 vmCvar_t	g_doomMonsters;
+vmCvar_t	g_doomCampaign;
 vmCvar_t	pmove_msec;
 vmCvar_t	g_rankings;
 vmCvar_t	g_listEntity;
@@ -194,6 +195,8 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_autoaim, "g_autoaim", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse},
 	// Q3Doom: 0 spawns no monsters (Doom's -nomonsters)
 	{ &g_doomMonsters, "g_doomMonsters", "1", CVAR_SERVERINFO | CVAR_LATCH, 0, qfalse},
+	// Q3Doom: playing the campaign (set by doom_campaign): progress is saved
+	{ &g_doomCampaign, "g_doomCampaign", "0", 0, 0, qfalse},
 	{ &pmove_msec, "pmove_msec", "8", CVAR_SYSTEMINFO, 0, qfalse},
 
 	{ &g_rankings, "g_rankings", "0", 0, 0, qfalse}

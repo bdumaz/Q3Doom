@@ -1206,6 +1206,8 @@ void ClientSpawn(gentity_t *ent) {
 	trap_GetUsercmd( client - level.clients, &ent->client->pers.cmd );
 	Doom_GivePlayerStart( client );
 	ent->health = client->ps.stats[STAT_HEALTH];
+	// what the player had at the end of the previous level
+	Doom_ApplyCarry( client );
 
 	G_SetOrigin( ent, spawn_origin );
 	VectorCopy( spawn_origin, client->ps.origin );

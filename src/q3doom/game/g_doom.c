@@ -261,66 +261,6 @@ EXITS AND TELEPORTERS
 
 /*
 =================
-NextMapName
-
-Doom's level order (G_DoCompleted): ExMy -> ExM(y+1), secret exits to M9,
-and back from M9; Doom II MAPxx in order with its secret levels 31 and 32.
-After an episode's last map, the next episode starts.
-=================
-*/
-static void NextMapName( const char *map, qboolean secret, char *out, int outSize ) {
-	int		e, m;
-
-	if ( map[0] == 'E' && map[2] == 'M' ) {
-		static const int fromSecret[5] = { 0, 4, 6, 7, 3 };	// M9 returns to
-
-		e = map[1] - '0';
-		m = map[3] - '0';
-		if ( secret ) {
-			m = 9;
-		} else if ( m == 9 ) {
-			m = ( e >= 1 && e <= 4 ) ? fromSecret[e] + 1 : 1;
-		} else if ( m == 8 ) {
-			e = e % 4 + 1;
-			m = 1;
-		} else {
-			m++;
-		}
-		Com_sprintf( out, outSize, "E%dM%d", e, m );
-		return;
-	}
-	if ( !Q_stricmpn( map, "MAP", 3 ) ) {
-		m = atoi( map + 3 );
-		if ( secret ) {
-			m = m == 31 ? 32 : 31;
-		} else if ( m == 31 || m == 32 ) {
-			m = 16;
-		} else if ( m == 30 ) {
-			m = 1;
-		} else {
-			m++;
-		}
-		Com_sprintf( out, outSize, "MAP%02d", m );
-		return;
-	}
-	Q_strncpyz( out, map, outSize );
-}
-
-void Doom_ExitLevel( qboolean secret ) {
-	char	mapname[MAX_QPATH];
-
-	if ( doomLevel.exitTime ) {
-		return;
-	}
-	trap_Cvar_VariableStringBuffer( "mapname", mapname, sizeof( mapname ) );
-	NextMapName( mapname, secret, doomLevel.nextMap, sizeof( doomLevel.nextMap ) );
-	doomLevel.exitTime = level.time + 1500;
-	G_Printf( "Doom %sexit: %s -> %s\n", secret ? "secret " : "", mapname, doomLevel.nextMap );
-	trap_SendServerCommand( -1, va( "cp \"%s\n\"", secret ? "Secret exit!" : "Level complete" ) );
-}
-
-/*
-=================
 Teleport
 
 EV_Teleport: to the teleport destination in a sector with the line's tag.
@@ -631,6 +571,118 @@ void Doom_PlayerUse( gentity_t *ent ) {
 }
 
 /*
+=====================================================================
+
+QUAKE-STYLE SWITCHES: bumped into or shot
+
+=====================================================================
+*/
+
+// a switch (S1/SR, exits included) that is not pressed right now
+static qboolean IsSwitch( int line ) {
+	const doom_special_t *sp = doom_line_special( doomLevel.lineSpecial[line] );
+
+	return sp && sp->trigger == DOOM_TRIG_SWITCH && doomLevel.switchUntil[line] == 0;
+}
+
+static float DistanceToLine( const doom_linedef_t *ld, float x, float y ) {
+	const doom_vertex_t	*a = &doomLevel.map->vertexes[ld->v1], *b = &doomLevel.map->vertexes[ld->v2];
+	float				dx = b->x - a->x, dy = b->y - a->y, len2 = dx * dx + dy * dy, t;
+
+	t = len2 > 0 ? ( ( x - a->x ) * dx + ( y - a->y ) * dy ) / len2 : 0;
+	t = t < 0 ? 0 : t > 1 ? 1 : t;
+	dx = a->x + t * dx - x;
+	dy = a->y + t * dy - y;
+	return sqrt( dx * dx + dy * dy );
+}
+
+/*
+=================
+Doom_PlayerBump
+
+A player pushing against the front of a switch presses it, as if using it
+=================
+*/
+void Doom_PlayerBump( gentity_t *ent ) {
+	const doom_map_t	*map;
+	const usercmd_t		*cmd = &ent->client->pers.cmd;
+	const float			*o = ent->client->ps.origin;
+	float				yaw, wish[2];
+	int					i;
+
+	if ( !DOOM_LEVEL() || ent->health <= 0 || doomLevel.intermission || ( !cmd->forwardmove && !cmd->rightmove ) ) {
+		return;
+	}
+	// the direction the player wants to go
+	yaw = DEG2RAD( ent->client->ps.viewangles[YAW] );
+	wish[0] = cos( yaw ) * cmd->forwardmove + sin( yaw ) * cmd->rightmove;
+	wish[1] = sin( yaw ) * cmd->forwardmove - cos( yaw ) * cmd->rightmove;
+
+	map = doomLevel.map;
+	for ( i = 0 ; i < map->num_linedefs ; i++ ) {
+		const doom_linedef_t	*ld = &map->linedefs[i];
+		const doom_vertex_t		*a, *b;
+		float					nx, ny, len;
+
+		if ( !doomLevel.lineSpecial[i] || !IsSwitch( i ) || PointOnLineSide( ld, o[0], o[1] ) != 0 ) {
+			continue;
+		}
+		if ( DistanceToLine( ld, o[0], o[1] ) > 15 + 6 ) {
+			continue;
+		}
+		// moving into the front side
+		a = &map->vertexes[ld->v1];
+		b = &map->vertexes[ld->v2];
+		nx = b->y - a->y;
+		ny = -( b->x - a->x );
+		len = sqrt( nx * nx + ny * ny );
+		if ( len <= 0 || ( wish[0] * nx + wish[1] * ny ) / len >= 0 ) {
+			continue;
+		}
+		Doom_ActivateLine( ent, i, 0, DOOM_TRIG_SWITCH );
+		return;
+	}
+}
+
+/*
+=================
+Doom_ShootSwitch
+
+A shot or a missile from 'start' hit a wall at 'end': the switch there, if
+shot from its front, is pressed
+=================
+*/
+void Doom_ShootSwitch( gentity_t *attacker, const vec3_t start, const vec3_t end ) {
+	const doom_map_t	*map;
+	float				dx = end[0] - start[0], dy = end[1] - start[1], len = sqrt( dx * dx + dy * dy ), bestT = 2;
+	float				x1, y1;
+	int					i, best = -1;
+
+	if ( !DOOM_LEVEL() || !attacker || !attacker->client || len < 0.001f ) {
+		return;
+	}
+	// a little past the hit, into the wall
+	x1 = end[0] + dx / len * 4;
+	y1 = end[1] + dy / len * 4;
+	map = doomLevel.map;
+	for ( i = 0 ; i < map->num_linedefs ; i++ ) {
+		float t;
+
+		if ( !doomLevel.lineSpecial[i] || !IsSwitch( i ) ) {
+			continue;
+		}
+		t = SegmentCrossesLine( &map->linedefs[i], start[0], start[1], x1, y1 );
+		if ( t >= 0 && t < bestT && PointOnLineSide( &map->linedefs[i], start[0], start[1] ) == 0 ) {
+			bestT = t;
+			best = i;
+		}
+	}
+	if ( best >= 0 && bestT * ( len + 4 ) > len - 8 ) {
+		Doom_ActivateLine( attacker, best, 0, DOOM_TRIG_SWITCH );
+	}
+}
+
+/*
 =================
 Doom_ShotTrace
 
@@ -707,9 +759,14 @@ static void PlayerInSpecialSector( gentity_t *ent, int tic ) {
 		damage = 20;
 		break;
 	case 11:	// exit when almost dead (E1M8)
-		damage = 20;
+		// the damage never kills (P_DamageMobj's "end of game hell hack")
+		damage = MIN( 20, ent->health - 1 );
 		if ( ent->health <= 10 ) {
 			Doom_ExitLevel( qfalse );
+			return;
+		}
+		if ( damage < 1 ) {
+			return;
 		}
 		break;
 	case 9:		// secret
@@ -734,6 +791,12 @@ void Doom_RunFrame( void ) {
 	Doom_UpdateHeights();
 	Doom_UpdateItems();
 
+	// the world stops at the end of the level (Doom's intermission)
+	if ( doomLevel.intermission ) {
+		Doom_CampaignFrame();
+		return;
+	}
+
 	tic = ( level.time - level.startTime ) * DOOM_TICRATE / 1000;
 	while ( doomLevel.lastTic < tic ) {
 		doomLevel.lastTic++;
@@ -754,10 +817,8 @@ void Doom_RunFrame( void ) {
 		}
 	}
 
-	if ( doomLevel.exitTime && level.time >= doomLevel.exitTime ) {
-		doomLevel.exitTime = 0;
-		trap_SendConsoleCommand( EXEC_APPEND, va( "%s %s\n", g_cheats.integer ? "devmap" : "map", doomLevel.nextMap ) );
-	}
+	Doom_CampaignFrame();
+
 }
 
 /*
@@ -861,6 +922,7 @@ void Doom_InitLevel( void ) {
 		}
 	}
 	Doom_InitMobjs();
+	Doom_InitCampaign();
 }
 
 /*
