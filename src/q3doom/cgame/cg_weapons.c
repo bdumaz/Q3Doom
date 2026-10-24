@@ -212,46 +212,32 @@ static void CG_NailgunEjectBrass( centity_t *cent ) {
 CG_RailTrail
 ==========================
 */
-void CG_RailTrail (clientInfo_t *ci, vec3_t start, vec3_t end) {
-	vec3_t axis[36], move, move2, next_move, vec, temp;
-	float  len;
-	int    i, j, skip;
- 
-	localEntity_t *le;
-	refEntity_t   *re;
- 
-#define RADIUS   4
-#define ROTATION 1
-#define SPACING  5
- 
-	start[2] -= 4;
-	VectorCopy (start, move);
-	VectorSubtract (end, start, vec);
-	len = VectorNormalize (vec);
-	PerpendicularVector(temp, vec);
-	for (i = 0 ; i < 36; i++) {
-		RotatePointAroundVector(axis[i], vec, temp, i * 10);//banshee 2.4 was 10
-	}
- 
-	le = CG_AllocLocalEntity();
-	re = &le->refEntity;
- 
+// the beam of a rail trail
+static void CG_RailCore( clientInfo_t *ci, const vec3_t start, const vec3_t end, qboolean oldRail ) {
+	localEntity_t	*le = CG_AllocLocalEntity();
+	refEntity_t		*re = &le->refEntity;
+
 	le->leType = LE_FADE_RGB;
 	le->startTime = cg.time;
 	le->endTime = cg.time + cg_railTrailTime.value;
 	le->lifeRate = 1.0 / (le->endTime - le->startTime);
- 
+
 	re->shaderTime = cg.time / 1000.0f;
 	re->reType = RT_RAIL_CORE;
 	re->customShader = cgs.media.railCoreShader;
- 
+
 	VectorCopy(start, re->origin);
 	VectorCopy(end, re->oldorigin);
- 
+	if ( oldRail ) {
+		// nudge down a bit so it isn't exactly in center
+		re->origin[2] -= 8;
+		re->oldorigin[2] -= 8;
+	}
+
 	re->shaderRGBA[0] = ci->color1[0] * 255;
-    re->shaderRGBA[1] = ci->color1[1] * 255;
-    re->shaderRGBA[2] = ci->color1[2] * 255;
-    re->shaderRGBA[3] = 255;
+	re->shaderRGBA[1] = ci->color1[1] * 255;
+	re->shaderRGBA[2] = ci->color1[2] * 255;
+	re->shaderRGBA[3] = 255;
 
 	le->color[0] = ci->color1[0] * 0.75;
 	le->color[1] = ci->color1[1] * 0.75;
@@ -259,23 +245,47 @@ void CG_RailTrail (clientInfo_t *ci, vec3_t start, vec3_t end) {
 	le->color[3] = 1.0f;
 
 	AxisClear( re->axis );
+}
+
+void CG_RailTrail (clientInfo_t *ci, vec3_t start, vec3_t end) {
+	vec3_t axis[36], move, move2, next_move, vec, temp;
+	float  len;
+	int    i, j, skip, spacing;
+
+	localEntity_t *le;
+	refEntity_t   *re;
+
+#define RADIUS   4
+#define ROTATION 1
+#define SPACING  5
+
+	start[2] -= 4;
+	VectorCopy (start, move);
+	VectorSubtract (end, start, vec);
+	len = VectorNormalize (vec);
+	// Q3Doom: at most about 150 rings (one every other step): Doom's open
+	// maps make long shots, and hundreds of rings exhausted the local
+	// entities and the scene's entities
+	spacing = len / 300 > SPACING ? (int)( len / 300 ) : SPACING;
+	PerpendicularVector(temp, vec);
+	for (i = 0 ; i < 36; i++) {
+		RotatePointAroundVector(axis[i], vec, temp, i * 10);//banshee 2.4 was 10
+	}
  
 	VectorMA(move, 20, vec, move);
 	VectorCopy(move, next_move);
-	VectorScale (vec, SPACING, vec);
+	VectorScale (vec, spacing, vec);
 
 	if (cg_oldRail.integer != 0) {
-		// nudge down a bit so it isn't exactly in center
-		re->origin[2] -= 8;
-		re->oldorigin[2] -= 8;
+		CG_RailCore( ci, start, end, qtrue );
 		return;
 	}
 	skip = -1;
- 
+
 	j = 18;
-    for (i = 0; i < len; i += SPACING) {
+    for (i = 0; i < len; i += spacing) {
 		if (i != skip) {
-			skip = i + SPACING;
+			skip = i + spacing;
 			le = CG_AllocLocalEntity();
             re = &le->refEntity;
             le->leFlags = LEF_PUFF_DONT_SCALE;
@@ -315,6 +325,10 @@ void CG_RailTrail (clientInfo_t *ci, vec3_t start, vec3_t end) {
 
         j = j + ROTATION < 36 ? j + ROTATION : (j + ROTATION) % 36;
 	}
+
+	// Q3Doom: the core last; allocated first, the rings of a long shot
+	// (one per 5 units) recycled it when the local entities ran out
+	CG_RailCore( ci, start, end, qfalse );
 }
 
 /*

@@ -1026,9 +1026,16 @@ void Doom_StatusCommand( void ) {
 		if ( !ent->inuse || !ent->doomMobj ) {
 			continue;
 		}
-		G_Printf( "thing %d: type %d at %.0f %.0f %.0f health %d state %d target %d flags 0x%x\n", i, ent->doomMobj->type,
+		vec3_t	mid;
+
+		// "pvs 0": the server would not send it to player 0 (its middle is
+		// in no visible leaf)
+		VectorCopy( ent->r.currentOrigin, mid );
+		mid[2] += ent->doomMobj->height * 0.5f;
+		G_Printf( "thing %d: type %d at %.0f %.0f %.0f health %d state %d target %d flags 0x%x pvs %d\n", i, ent->doomMobj->type,
 			ent->r.currentOrigin[0], ent->r.currentOrigin[1], ent->r.currentOrigin[2], ent->health, ent->doomMobj->state,
-			ent->doomMobj->target ? ent->doomMobj->target->s.number : -1, ent->doomMobj->flags );
+			ent->doomMobj->target ? ent->doomMobj->target->s.number : -1, ent->doomMobj->flags,
+			g_entities[0].client ? trap_InPVS( mid, g_entities[0].client->ps.origin ) : -1 );
 	}
 
 	for ( i = 0 ; i < level.maxclients ; i++ ) {
