@@ -408,6 +408,13 @@ void SV_SpawnServer( char *server, qboolean killBots ) {
 
 	CM_LoadMap( va("maps/%s.bsp", server), qfalse, &checksum );
 
+	// Q3Doom: a match on a Doom level: the bots' navigation, made the first
+	// time (the campaign and DoomFrag have no bots)
+	if ( Cvar_VariableIntegerValue( "bot_enable" ) && !Cvar_VariableIntegerValue( "g_doomCampaign" )
+		&& !Cvar_VariableIntegerValue( "g_doomFrag" ) && Doom_GetMap( server ) ) {
+		Doom_BuildBotNavigation( server, qfalse );
+	}
+
 	// set serverinfo visible name
 	Cvar_Set( "mapname", server );
 

@@ -12,6 +12,7 @@ Licensed under the GNU General Public License version 2 or later.
 #include <pwd.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 /*
 ================
@@ -89,6 +90,29 @@ The folder holding the executable (fs_basepath default), so the game runs
 from any working directory
 ================
 */
+int Sys_RunProcess( const char *exe, const char *args, const char *workdir ) {
+	char	cmdline[MAX_OSPATH * 4];
+	pid_t	pid;
+	int		status;
+
+	Com_sprintf( cmdline, sizeof( cmdline ), "\"%s\" %s", exe, args );
+	pid = fork();
+	if ( pid < 0 ) {
+		return -1;
+	}
+	if ( pid == 0 ) {
+		if ( workdir && chdir( workdir ) ) {
+			_exit( 127 );
+		}
+		execl( "/bin/sh", "sh", "-c", cmdline, (char *)NULL );
+		_exit( 127 );
+	}
+	if ( waitpid( pid, &status, 0 ) < 0 || !WIFEXITED( status ) ) {
+		return -1;
+	}
+	return WEXITSTATUS( status ) == 127 ? -1 : WEXITSTATUS( status );
+}
+
 char *Sys_DefaultInstallPath( void ) {
 	static char	exeDir[MAX_OSPATH];
 	char		*slash;

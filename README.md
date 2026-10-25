@@ -96,6 +96,8 @@ On Doom levels, these settings change the rules:
 - The host chooses the rounds to win, Doom or Quake weapons, weapon and health pickups, and nightmare enemies. Dead enemies come back whenever a player dies.
 - In teams, **To the Goal** sets how many players of a team must get there. Those who arrive watch the rest of the round.
 
+**Bots** play on the Doom levels too. The first time a level is played with bots, the game makes their navigation file (`maps/<level>.aas` in your settings folder) with `bspc`, which is built and copied next to the game. That takes about a second. `doom_botnav all` makes them all at once; `doom_botnav <level>` remakes one. `bspc` is TTimo's maintained copy of id's GPL tool, in `tools/bspc`.
+
 Q3Doom uses its own network protocol (1068). It doesn't see or join Quake 3 servers, and Quake 3 can't join it.
 
 ## Tests

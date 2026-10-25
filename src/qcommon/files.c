@@ -482,6 +482,18 @@ char *FS_BuildOSPath( const char *base, const char *game, const char *qpath ) {
 	return ospath[toggle];
 }
 
+/*
+================
+FS_HomeOSPath
+
+Q3Doom: the OS path of a file in the home game directory, where
+FS_WriteFile writes it
+================
+*/
+char *FS_HomeOSPath( const char *qpath ) {
+	return FS_BuildOSPath( fs_homepath->string, fs_gamedir, qpath );
+}
+
 
 /*
 ============
@@ -1173,7 +1185,8 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 					&& Q_stricmp( filename + l - 5, ".menu" )	// menu files
 					&& Q_stricmp( filename + l - 5, ".game" )	// menu files
 					&& Q_stricmp( filename + l - strlen(demoExt), demoExt )	// menu files
-					&& Q_stricmp( filename + l - 4, ".dat" ) ) {	// for journal files
+					&& Q_stricmp( filename + l - 4, ".dat" )	// for journal files
+					&& Q_stricmp( filename + l - 4, ".aas" ) ) {	// Q3Doom: bot navigation made here (doom_botnav)
 					continue;
 				}
 			}
@@ -1190,7 +1203,8 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 				&& Q_stricmp( filename + l - 5, ".menu" )	// menu files
 				&& Q_stricmp( filename + l - 5, ".game" )	// menu files
 				&& Q_stricmp( filename + l - strlen(demoExt), demoExt )	// menu files
-				&& Q_stricmp( filename + l - 4, ".dat" ) ) {	// for journal files
+				&& Q_stricmp( filename + l - 4, ".dat" )	// for journal files
+					&& Q_stricmp( filename + l - 4, ".aas" ) ) {	// Q3Doom: bot navigation made here (doom_botnav)
 				fs_fakeChkSum = random();
 			}
       

@@ -616,6 +616,104 @@ static void Doom_CheckWorld_f( void ) {
 }
 
 /*
+=====================================================================
+
+BOT NAVIGATION
+
+=====================================================================
+*/
+
+#ifdef _WIN32
+#define EXE_SUFFIX	".exe"
+#else
+#define EXE_SUFFIX	""
+#endif
+
+/*
+=================
+Doom_BuildBotNavigation
+
+The bots' navigation of a Doom level (maps/<NAME>.aas in the home game
+folder), made by bspc (next to the executable) from the level's BSP as
+the engine builds it, so its checksum is the one the bots check. Made only
+when missing, unless 'force'. Returns qtrue if the level has it now.
+=================
+*/
+qboolean Doom_BuildBotNavigation( const char *name, qboolean force ) {
+	char		bsp[MAX_QPATH], aas[MAX_QPATH], bspPath[MAX_OSPATH], dir[MAX_OSPATH], exe[MAX_OSPATH], *slash;
+	const byte	*data;
+	int			size, start, code;
+
+	Com_sprintf( bsp, sizeof( bsp ), "maps/%s.bsp", name );
+	Com_sprintf( aas, sizeof( aas ), "maps/%s.aas", name );
+	data = Doom_GetMapBSP( bsp, &size );
+	if ( !data ) {
+		return qfalse;		// not a Doom level
+	}
+	if ( !force && FS_ReadFile( aas, NULL ) > 0 ) {
+		return qtrue;
+	}
+	Com_sprintf( exe, sizeof( exe ), "%s%cbspc%s", Sys_DefaultInstallPath(), PATH_SEP, EXE_SUFFIX );
+
+	Com_Printf( "Making the bots' navigation of %s...\n", name );
+	start = Sys_Milliseconds();
+	FS_WriteFile( bsp, data, size );
+	Q_strncpyz( bspPath, FS_HomeOSPath( bsp ), sizeof( bspPath ) );
+	Q_strncpyz( dir, bspPath, sizeof( dir ) );
+	slash = strrchr( dir, PATH_SEP );
+	if ( slash ) {
+		*slash = 0;
+	}
+	code = Sys_RunProcess( exe, va( "-bsp2aas \"%s\" -output \"%s\"", bspPath, dir ), dir );
+	remove( bspPath );
+	remove( va( "%s%cbspc.log", dir, PATH_SEP ) );
+
+	if ( code < 0 ) {
+		Com_Printf( S_COLOR_YELLOW "WARNING: %s did not start: no bot navigation for %s\n", exe, name );
+		return qfalse;
+	}
+	if ( FS_ReadFile( aas, NULL ) <= 0 ) {
+		Com_Printf( S_COLOR_YELLOW "WARNING: bspc could not make the bot navigation of %s (exit code %d)\n", name, code );
+		return qfalse;
+	}
+	Com_Printf( "...done in %d msec\n", Sys_Milliseconds() - start );
+	return qtrue;
+}
+
+/*
+=================
+Doom_BotNavigation_f
+
+doom_botnav <map>: makes (again) the bots' navigation of a Doom level;
+doom_botnav all: of every level that has none yet
+=================
+*/
+static void Doom_BotNavigation_f( void ) {
+	char	maps[64][DOOM_LUMP_NAME_LEN + 1];
+	int		i, n, made = 0;
+
+	if ( !doom_wad ) {
+		Com_Printf( "No Doom IWAD loaded\n" );
+		return;
+	}
+	if ( Cmd_Argc() != 2 ) {
+		Com_Printf( "usage: doom_botnav <map|all>\n" );
+		return;
+	}
+	if ( Q_stricmp( Cmd_Argv( 1 ), "all" ) ) {
+		if ( !Doom_BuildBotNavigation( Cmd_Argv( 1 ), qtrue ) ) {
+			Com_Printf( "doom_botnav: no navigation made for %s\n", Cmd_Argv( 1 ) );
+		}
+		return;
+	}
+	n = doom_wad_list_maps( doom_wad, maps, 64 );
+	for ( i = 0 ; i < n && i < 64 ; i++ ) {
+		made += Doom_BuildBotNavigation( maps[i], qfalse );
+	}
+	Com_Printf( "doom_botnav: %d of %d levels have their bot navigation\n", made, n < 64 ? n : 64 );
+}
+
+/*
 =================
 Doom_Init
 
@@ -631,6 +729,7 @@ void Doom_Init( void ) {
 	doom_iwad = Cvar_Get( "doom_iwad", "DOOM.WAD", CVAR_INIT );
 	Cmd_AddCommand( "doom_info", Doom_Info_f );
 	Cmd_AddCommand( "doom_checkworld", Doom_CheckWorld_f );
+	Cmd_AddCommand( "doom_botnav", Doom_BotNavigation_f );
 
 	len = FS_FOpenFileRead( doom_iwad->string, &f, qfalse );
 	if ( len <= 0 || !f ) {

@@ -524,6 +524,8 @@ void	FS_Shutdown( qboolean closemfp );
 
 qboolean	FS_ConditionalRestart( int checksumFeed );
 void	FS_Restart( int checksumFeed );
+char	*FS_HomeOSPath( const char *qpath );		// Q3Doom: where FS_WriteFile writes qpath
+
 // shutdown and restart the filesystem so changes to fs_gamedir can take effect
 
 char	**FS_ListFiles( const char *directory, const char *extension, int *numfiles );
@@ -679,6 +681,8 @@ qboolean	Doom_LoadSound( const char *path, const byte **samples, int *numSamples
 // "maps/<NAME>.bsp" for a map in the IWAD: the runtime-built Quake 3 BSP (cached), else NULL
 const byte	*Doom_GetMapBSP( const char *qpath, int *size );
 const struct doom_map_s *Doom_GetMap( const char *name );		// map model, NULL if not in the IWAD
+// the bots' navigation (maps/<NAME>.aas) of a Doom level, made with bspc if missing (or 'force')
+qboolean	Doom_BuildBotNavigation( const char *name, qboolean force );
 
 // vsnprintf is ISO/IEC 9899:1999. MSVC's _vsnprintf does not terminate the
 // string on overflow; its vsnprintf is conforming since VS 2015.
@@ -1011,6 +1015,9 @@ void	Sys_SetDefaultCDPath(const char *path);
 char	*Sys_DefaultCDPath(void);
 void	Sys_SetDefaultInstallPath(const char *path);
 char	*Sys_DefaultInstallPath(void);
+// Q3Doom: runs a program (no console window) in a folder and waits for it;
+// its exit code, -1 if it could not start
+int		Sys_RunProcess( const char *exe, const char *args, const char *workdir );
 void  Sys_SetDefaultHomePath(const char *path);
 char	*Sys_DefaultHomePath(void);
 

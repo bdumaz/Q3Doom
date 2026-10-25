@@ -103,6 +103,26 @@ The folder holding the executable (fs_basepath default), so shortcuts and
 double-clicking work from any working directory
 ================
 */
+int Sys_RunProcess( const char *exe, const char *args, const char *workdir ) {
+	char				cmdline[MAX_OSPATH * 4];
+	STARTUPINFO			si;
+	PROCESS_INFORMATION	pi;
+	DWORD				code = (DWORD)-1;
+
+	Com_sprintf( cmdline, sizeof( cmdline ), "\"%s\" %s", exe, args );
+	memset( &si, 0, sizeof( si ) );
+	si.cb = sizeof( si );
+	memset( &pi, 0, sizeof( pi ) );
+	if ( !CreateProcess( NULL, cmdline, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, workdir, &si, &pi ) ) {
+		return -1;
+	}
+	WaitForSingleObject( pi.hProcess, INFINITE );
+	GetExitCodeProcess( pi.hProcess, &code );
+	CloseHandle( pi.hThread );
+	CloseHandle( pi.hProcess );
+	return (int)code;
+}
+
 char *Sys_DefaultInstallPath(void)
 {
 	static char	exeDir[MAX_OSPATH];

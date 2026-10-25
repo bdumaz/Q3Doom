@@ -69,6 +69,36 @@ set_target_properties(libdoom PROPERTIES OUTPUT_NAME doom)
 add_executable(doomtool ${CMAKE_CURRENT_SOURCE_DIR}/tools/doomtool/doomtool.c)
 target_link_libraries(doomtool PRIVATE libdoom)
 
+# --- bspc: the map compiler of Quake 3's bots (TTimo's maintained copy of
+# id's GPL source, tools/bspc), for the navigation files (.aas) of the Doom
+# levels: doomtool builds their .bsp, bspc -bsp2aas reads it
+set(BSPC ${CMAKE_CURRENT_SOURCE_DIR}/tools/bspc)
+set(BSPC_SRC)
+foreach(f _files aas_areamerging aas_cfg aas_create aas_edgemelting aas_facemerging aas_file
+    aas_gsubdiv aas_map aas_prunenodes aas_store be_aas_bspc brushbsp bspc csg glfile
+    l_bsp_ent l_bsp_hl l_bsp_q1 l_bsp_q2 l_bsp_q3 l_bsp_sin l_cmd l_log l_math l_mem
+    l_poly l_qfiles l_threads l_utils leakfile map map_hl map_q1 map_q2 map_q3 map_sin
+    nodraw portals textures tree
+    deps/botlib/be_aas_bspq3 deps/botlib/be_aas_cluster deps/botlib/be_aas_move deps/botlib/be_aas_optimize
+    deps/botlib/be_aas_reach deps/botlib/be_aas_sample deps/botlib/l_libvar deps/botlib/l_precomp
+    deps/botlib/l_script deps/botlib/l_struct
+    deps/qcommon/cm_load deps/qcommon/cm_patch deps/qcommon/cm_test deps/qcommon/cm_trace
+    deps/qcommon/md4 deps/qcommon/unzip)
+  list(APPEND BSPC_SRC ${BSPC}/${f}.c)
+endforeach()
+add_executable(bspc ${BSPC_SRC})
+target_include_directories(bspc PRIVATE ${BSPC} ${BSPC}/deps)
+target_compile_definitions(bspc PRIVATE BSPC Com_Memcpy=memcpy Com_Memset=memset MAC_STATIC= QDECL=)
+if(MSVC)
+  target_compile_definitions(bspc PRIVATE _CRT_SECURE_NO_WARNINGS)
+  target_compile_options(bspc PRIVATE /wd4311 /wd4312 /wd4244 /wd4267 /wd4018 /wd4305)
+else()
+  target_compile_definitions(bspc PRIVATE LINUX stricmp=strcasecmp)
+  target_compile_options(bspc PRIVATE -w)		# id's code, as it is
+  target_link_libraries(bspc PRIVATE m pthread)
+endif()
+q3_deploy(bspc "")		# next to the engine, which runs it (doom_botnav)
+
 enable_testing()
 set(DOOM_IWAD ${CMAKE_CURRENT_SOURCE_DIR}/GameData/DOOM.WAD CACHE FILEPATH "IWAD used by the tests")
 add_executable(test_libdoom ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_libdoom.c)
