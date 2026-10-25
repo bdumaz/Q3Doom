@@ -428,7 +428,7 @@ extern void ArenaServers_Cache( void );
 // ui_startserver.c
 //
 extern void UI_StartServerMenu( qboolean multiplayer );
-extern void UI_StartServerDuelMenu( qboolean options );
+extern void UI_StartServerDuelMenu( qboolean options, qboolean doomMatch );
 extern void StartServer_Cache( void );
 extern void ServerOptions_Cache( void );
 extern void UI_BotSelectMenu( char *bot );

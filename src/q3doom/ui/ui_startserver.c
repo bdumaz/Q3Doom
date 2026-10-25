@@ -94,20 +94,25 @@ typedef struct {
 static startserver_t s_startserver;
 
 static const char *gametype_items[] = {
-	"Free For All",
+	"Doom for All",
 	"Team Deathmatch",
 	"Tournament",
 	"Capture the Flag",
 	"Doom Duel",
+	"Quake DoomMatch",
 	0
 };
 
-// Q3Doom: Doom Duel is Team Deathmatch with g_doomDuel, on the Doom levels
-// (their "duel" type)
-#define GAMETYPE_DUEL	4
-#define DUEL_BIT		( 1 << 16 )
+// Q3Doom: Doom for All is the free for all on Quake 3's maps; Doom Duel is
+// Team Deathmatch with g_doomDuel on the Doom levels (their "duel" type);
+// Quake DoomMatch the free for all on the Doom levels ("doommatch"), with
+// Doom's or Quake 3's weapons
+#define GAMETYPE_DUEL		4
+#define GAMETYPE_DOOMMATCH	5
+#define DUEL_BIT			( 1 << 16 )
+#define DOOMMATCH_BIT		( 1 << 17 )
 
-static int gametype_remap[] = {GT_FFA, GT_TEAM, GT_TOURNAMENT, GT_CTF, GT_TEAM};
+static int gametype_remap[] = {GT_FFA, GT_TEAM, GT_TOURNAMENT, GT_CTF, GT_TEAM, GT_FFA};
 static int gametype_remap2[] = {0, 2, 0, 1, 3};
 
 // use ui_servers2.c definition
@@ -161,6 +166,11 @@ static int GametypeBits( char *string ) {
 
 		if( Q_stricmp( token, "duel" ) == 0 ) {
 			bits |= DUEL_BIT;
+			continue;
+		}
+
+		if( Q_stricmp( token, "doommatch" ) == 0 ) {
+			bits |= DOOMMATCH_BIT;
 			continue;
 		}
 	}
@@ -271,7 +281,9 @@ static void StartServer_GametypeEvent( void* ptr, int event ) {
 	if( s_startserver.gametype.curvalue == GAMETYPE_DUEL ) {
 		matchbits = DUEL_BIT;
 	}
-	if( gametype_remap[s_startserver.gametype.curvalue] == GT_FFA ) {
+	if( s_startserver.gametype.curvalue == GAMETYPE_DOOMMATCH ) {
+		matchbits = DOOMMATCH_BIT;
+	} else if( gametype_remap[s_startserver.gametype.curvalue] == GT_FFA ) {
 		matchbits |= ( 1 << GT_SINGLE_PLAYER );
 	}
 	for( i = 0; i < count; i++ ) {
@@ -323,6 +335,7 @@ static void StartServer_MenuEvent( void* ptr, int event ) {
 	case ID_STARTSERVERNEXT:
 		trap_Cvar_SetValue( "g_gameType", gametype_remap[s_startserver.gametype.curvalue] );
 		trap_Cvar_SetValue( "g_doomDuel", s_startserver.gametype.curvalue == GAMETYPE_DUEL );
+		trap_Cvar_SetValue( "ui_doomMatch", s_startserver.gametype.curvalue == GAMETYPE_DOOMMATCH );
 		UI_ServerOptionsMenu( s_startserver.multiplayer );
 		break;
 
@@ -625,13 +638,14 @@ Q3Doom: doom_hostmenu duel [options]: the host menu on Doom Duel, or
 straight to its options
 =================
 */
-void UI_StartServerDuelMenu( qboolean options ) {
+void UI_StartServerDuelMenu( qboolean options, qboolean doomMatch ) {
 	UI_StartServerMenu( qtrue );
-	s_startserver.gametype.curvalue = GAMETYPE_DUEL;
+	s_startserver.gametype.curvalue = doomMatch ? GAMETYPE_DOOMMATCH : GAMETYPE_DUEL;
 	StartServer_GametypeEvent( NULL, QM_ACTIVATED );
 	if ( options ) {
-		trap_Cvar_SetValue( "g_gameType", GT_TEAM );
-		trap_Cvar_SetValue( "g_doomDuel", 1 );
+		trap_Cvar_SetValue( "g_gameType", gametype_remap[s_startserver.gametype.curvalue] );
+		trap_Cvar_SetValue( "g_doomDuel", !doomMatch );
+		trap_Cvar_SetValue( "ui_doomMatch", doomMatch );
 		UI_ServerOptionsMenu( qtrue );
 	}
 }
@@ -672,8 +686,10 @@ typedef struct {
 	menuradiobutton_s	pure;
 	menulist_s			botSkill;
 
-	// Q3Doom: Doom Duel's options (the frag limit field takes the rounds)
+	// Q3Doom: Doom Duel's options (the frag limit field takes the rounds);
+	// Quake DoomMatch uses its Weapons control
 	qboolean			duel;
+	qboolean			doomMatch;
 	menulist_s			duelWeapons;
 	menuradiobutton_s	duelWeaponPickups;
 	menuradiobutton_s	duelHealthPickups;
@@ -843,6 +859,9 @@ static void ServerOptions_Start( void ) {
 	trap_Cvar_Set( "g_doomFrag", "0" );
 	trap_Cvar_Set( "g_doomDeathmatch", "1" );
 	trap_Cvar_SetValue( "g_doomDuel", s_serveroptions.duel );
+	if( s_serveroptions.doomMatch ) {
+		trap_Cvar_SetValue( "g_doomMatchWeapons", s_serveroptions.duelWeapons.curvalue );
+	}
 	if( s_serveroptions.duel ) {
 		// the rounds to win in the frag limit field; enemies at nightmare
 		trap_Cvar_SetValue( "g_duelRounds", Com_Clamp( 1, 99, fraglimit ) );
@@ -1094,7 +1113,8 @@ static void ServerOptions_LevelshotDraw( void *self ) {
 	UI_DrawString( x, y, s_serveroptions.mapnamebuffer, UI_CENTER|UI_SMALLFONT, color_orange );
 
 	y += SMALLCHAR_HEIGHT;
-	UI_DrawString( x, y, gametype_items[s_serveroptions.duel ? GAMETYPE_DUEL : gametype_remap2[s_serveroptions.gametype]], UI_CENTER|UI_SMALLFONT, color_orange );
+	UI_DrawString( x, y, gametype_items[s_serveroptions.duel ? GAMETYPE_DUEL : s_serveroptions.doomMatch ? GAMETYPE_DOOMMATCH
+		: gametype_remap2[s_serveroptions.gametype]], UI_CENTER|UI_SMALLFONT, color_orange );
 }
 
 
@@ -1230,6 +1250,10 @@ static void ServerOptions_SetMenuItems( void ) {
 		Com_sprintf( s_serveroptions.duelGoal.field.buffer, 3, "%i", (int)Com_Clamp( 1, 16, trap_Cvar_VariableValue( "g_duelGoalPlayers" ) ) );
 	}
 
+	if( s_serveroptions.doomMatch ) {
+		s_serveroptions.duelWeapons.curvalue = (int)Com_Clamp( 0, 1, trap_Cvar_VariableValue( "g_doomMatchWeapons" ) );
+	}
+
 	Q_strncpyz( s_serveroptions.hostname.field.buffer, UI_Cvar_VariableString( "sv_hostname" ), sizeof( s_serveroptions.hostname.field.buffer ) );
 	s_serveroptions.pure.curvalue = Com_Clamp( 0, 1, trap_Cvar_VariableValue( "sv_pure" ) );
 
@@ -1312,6 +1336,7 @@ static void ServerOptions_MenuInit( qboolean multiplayer ) {
 	s_serveroptions.multiplayer = multiplayer;
 	s_serveroptions.gametype = (int)Com_Clamp( 0, 5, trap_Cvar_VariableValue( "g_gameType" ) );
 	s_serveroptions.duel = s_serveroptions.gametype == GT_TEAM && trap_Cvar_VariableValue( "g_doomDuel" );
+	s_serveroptions.doomMatch = s_serveroptions.gametype == GT_FFA && trap_Cvar_VariableValue( "ui_doomMatch" );
 	s_serveroptions.punkbuster.curvalue = Com_Clamp( 0, 1, trap_Cvar_VariableValue( "sv_punkbuster" ) );
 
 	ServerOptions_Cache();
@@ -1417,6 +1442,15 @@ static void ServerOptions_MenuInit( qboolean multiplayer ) {
 
 	if( s_serveroptions.duel ) {
 		y -= BIGCHAR_HEIGHT+2;
+	}
+	if( s_serveroptions.doomMatch ) {
+		y += BIGCHAR_HEIGHT+2;
+		s_serveroptions.duelWeapons.generic.type		= MTYPE_SPINCONTROL;
+		s_serveroptions.duelWeapons.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+		s_serveroptions.duelWeapons.generic.x			= OPTIONS_X;
+		s_serveroptions.duelWeapons.generic.y			= y;
+		s_serveroptions.duelWeapons.generic.name		= "Weapons:";
+		s_serveroptions.duelWeapons.itemnames			= duelWeapons_list;
 	}
 	if( s_serveroptions.gametype >= GT_TEAM && !s_serveroptions.duel ) {
 		y += BIGCHAR_HEIGHT+2;
@@ -1581,6 +1615,9 @@ static void ServerOptions_MenuInit( qboolean multiplayer ) {
 		Menu_AddItem( &s_serveroptions.menu, &s_serveroptions.duelGoal );
 	} else {
 		Menu_AddItem( &s_serveroptions.menu, &s_serveroptions.timelimit );
+	}
+	if( s_serveroptions.doomMatch ) {
+		Menu_AddItem( &s_serveroptions.menu, &s_serveroptions.duelWeapons );
 	}
 	if( s_serveroptions.gametype >= GT_TEAM && !s_serveroptions.duel ) {
 		Menu_AddItem( &s_serveroptions.menu, &s_serveroptions.friendlyfire );

@@ -790,6 +790,7 @@ extern	vmCvar_t	g_doomDeathmatch;
 extern	vmCvar_t	g_doomMatchMonsters;
 extern	vmCvar_t	g_doomWeaponsStay;
 extern	vmCvar_t	g_doomExitEndsMatch;
+extern	vmCvar_t	g_doomMatchWeapons;
 extern	vmCvar_t	g_doomDuel;
 extern	vmCvar_t	g_duelRounds;
 extern	vmCvar_t	g_duelWeapons;

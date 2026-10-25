@@ -814,6 +814,12 @@ static void QV_LoadItems( void ) {
 	free( buf );
 }
 
+// the items are Quake 3 models: Quake Visuals, or a match played with
+// Quake 3's weapons (Quake DoomMatch, Doom Duel)
+static qboolean QV_ItemsShown( void ) {
+	return r_quakeVisuals.integer || ( cgs.doomDeathmatch && cgs.doomWeapons == DOOM_WEAPONS_Q3 );
+}
+
 static const qvItem_t *QV_Item( int ednum ) {
 	int		i;
 
@@ -925,7 +931,7 @@ void CG_DoomItem( centity_t *cent ) {
 	if ( !DOOM_GAME() || !es->modelindex || es->modelindex >= bg_numItems || ( es->eFlags & EF_NODRAW ) ) {
 		return;
 	}
-	if ( r_quakeVisuals.integer && ( q = QV_Item( bg_itemlist[es->modelindex].doomednum ) ) != NULL ) {
+	if ( QV_ItemsShown() && ( q = QV_Item( bg_itemlist[es->modelindex].doomednum ) ) != NULL ) {
 		QV_DrawItem( cent, q );
 		return;
 	}
@@ -1134,7 +1140,7 @@ void CG_DoomInit( void ) {
 	BuildSpriteFrames();
 	RegisterSounds();
 	qvNumItems = 0;
-	if ( r_quakeVisuals.integer ) {
+	if ( QV_ItemsShown() ) {
 		QV_LoadItems();
 	}
 

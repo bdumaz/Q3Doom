@@ -1043,8 +1043,8 @@ qboolean UI_ConsoleCommand( int realTime ) {
 		if ( !Q_stricmp( cmd, "doom_servermenu" ) ) {
 			UI_ArenaServersMenu();
 		} else if ( !Q_stricmp( cmd, "doom_hostmenu" ) ) {
-			if ( !Q_stricmp( UI_Argv( 1 ), "duel" ) ) {
-				UI_StartServerDuelMenu( !Q_stricmp( UI_Argv( 2 ), "options" ) );
+			if ( !Q_stricmp( UI_Argv( 1 ), "duel" ) || !Q_stricmp( UI_Argv( 1 ), "doommatch" ) ) {
+				UI_StartServerDuelMenu( !Q_stricmp( UI_Argv( 2 ), "options" ), !Q_stricmp( UI_Argv( 1 ), "doommatch" ) );
 			} else {
 				UI_StartServerMenu( qtrue );
 			}

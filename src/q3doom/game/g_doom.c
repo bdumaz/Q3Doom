@@ -878,6 +878,8 @@ static void SetWeaponSet( void ) {
 		doomLevel.weaponSet = (int)Com_Clamp( DOOM_WEAPONS_DOOM, DOOM_WEAPONS_NONE, g_doomWeapons.integer );
 	} else if ( Doom_DuelActive() ) {
 		doomLevel.weaponSet = g_duelWeapons.integer ? DOOM_WEAPONS_Q3 : DOOM_WEAPONS_DOOM;
+	} else if ( doomLevel.deathmatch ) {
+		doomLevel.weaponSet = g_doomMatchWeapons.integer ? DOOM_WEAPONS_Q3 : DOOM_WEAPONS_DOOM;		// Quake DoomMatch's option
 	} else if ( doomLevel.campaign && g_doomCampaignWeapons.integer ) {
 		doomLevel.weaponSet = DOOM_WEAPONS_Q3;
 	} else {
@@ -949,8 +951,8 @@ void Doom_InitLevel( void ) {
 	}
 	Doom_InitMobjs();
 	Doom_InitCampaign();
-	SetWeaponSet();
 	doomLevel.deathmatch = g_doomDeathmatch.integer && !g_doomCampaign.integer && !g_doomFrag.integer && !Doom_DuelActive();
+	SetWeaponSet();
 }
 
 /*

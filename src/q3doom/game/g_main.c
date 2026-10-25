@@ -96,6 +96,7 @@ vmCvar_t	g_doomDeathmatch;
 vmCvar_t	g_doomMatchMonsters;
 vmCvar_t	g_doomWeaponsStay;
 vmCvar_t	g_doomExitEndsMatch;
+vmCvar_t	g_doomMatchWeapons;
 vmCvar_t	g_doomDuel;
 vmCvar_t	g_duelRounds;
 vmCvar_t	g_duelWeapons;
@@ -237,6 +238,8 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_doomMatchMonsters, "g_doomMatchMonsters", "0", CVAR_ARCHIVE, 0, qfalse},
 	{ &g_doomWeaponsStay, "g_doomWeaponsStay", "1", CVAR_ARCHIVE, 0, qfalse},
 	{ &g_doomExitEndsMatch, "g_doomExitEndsMatch", "0", CVAR_ARCHIVE, 0, qfalse},
+	// Q3Doom: the weapons of deathmatch on Doom levels (Quake DoomMatch): 0 Doom's, 1 Quake 3's
+	{ &g_doomMatchWeapons, "g_doomMatchWeapons", "0", CVAR_ARCHIVE, 0, qfalse},
 	// Q3Doom: Doom Duel (Team Deathmatch on a Doom level, g_doom_duel.c): rounds
 	// to win; Doom or Quake weapons; weapon and ammo, health and armor pickups;
 	// monsters (at nightmare: g_doomSkill 4); players of a team to reach the goal
