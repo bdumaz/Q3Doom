@@ -111,6 +111,14 @@ ctest --test-dir build/linux                      # Linux
 
 `doomtool` (built in `build/x64/RelWithDebInfo/`, or `build/linux/`) inspects a WAD: map statistics, texture and sound export, BSP building, and music rendering. Run it without arguments for its commands.
 
+`tools/qvedit/qvedit.py` is the **Quake Visuals editor**. It shows Doom's wall textures, flats, skies and items next to the Quake 3 textures and models that replace them in Quake Visuals. Pick a Doom texture, then a Quake 3 one, and save; in the game, `vid_restart` reloads the result.
+
+```
+python tools/qvedit/qvedit.py [--game <folder with baseq3/ and q3doom/>]
+```
+
+It needs Python 3 and nothing else, and opens in your browser. Everything stays on your computer: the page is served on 127.0.0.1. It saves `q3doom/quakevisuals.dat` in the game folder. In the source tree it also saves `data/q3doom/quakevisuals.dat`, because a build copies that file over the run folder's copy.
+
 ## License
 
 The source code is licensed under the GNU General Public License, version 2 or later (see `src/COPYING.txt`). It is based on id Software's Quake III Arena source release.

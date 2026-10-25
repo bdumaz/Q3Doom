@@ -2555,7 +2555,7 @@ to the Quake 3 one (by default 0.5 units a texel, as in Quake 3 maps).
 =====================================================================
 */
 
-#define MAX_QV_ENTRIES	512
+#define MAX_QV_ENTRIES	1024		// room for every Doom texture and flat listed one by one (qvedit)
 
 typedef struct {
 	char	kind[8];		// wall, flat, sky, keep
