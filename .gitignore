@@ -19,4 +19,4 @@ release/
 
 # Personal files
 
-personal/
+personal/__pycache__/
