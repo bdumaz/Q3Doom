@@ -564,6 +564,11 @@ int AAS_ValidEntity(entity_t *mapent)
 	{
 		return true;
 	} //end else if
+	// Q3Doom: a Doom level's shut door that only opens from elsewhere: a wall
+	else if (!strcmp("func_doom_plane", ValueForKey(mapent, "classname")) && atoi(ValueForKey(mapent, "aas_solid")))
+	{
+		return true;
+	} //end else if
 	return false;
 } //end of the function AAS_ValidEntity
 //===========================================================================

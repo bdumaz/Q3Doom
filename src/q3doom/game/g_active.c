@@ -1013,6 +1013,8 @@ void ClientThink_real( gentity_t *ent ) {
 	// Q3Doom: use doors and switches when +use is pressed
 	if ( ( client->buttons & BUTTON_USE ) && !( client->oldbuttons & BUTTON_USE ) && client->ps.stats[STAT_HEALTH] > 0 ) {
 		Doom_PlayerUse( ent );
+	} else if ( ( ent->r.svFlags & SVF_BOT ) && client->ps.stats[STAT_HEALTH] > 0 ) {
+		Doom_BotUse( ent );
 	}
 
 	// check for respawning

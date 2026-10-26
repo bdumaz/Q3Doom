@@ -128,6 +128,7 @@ vmCvar_t	cg_brassTime;
 vmCvar_t	cg_viewsize;
 vmCvar_t	cg_drawGun;
 vmCvar_t	cg_hudStyle;
+vmCvar_t	cg_drawFollow;
 vmCvar_t	cg_doomAspect;
 vmCvar_t	r_doomLightFade;
 vmCvar_t	r_quakeVisuals;
@@ -213,6 +214,7 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_autoswitch, "cg_autoswitch", "1", CVAR_ARCHIVE },
 	{ &cg_drawGun, "cg_drawGun", "1", CVAR_ARCHIVE },
 	{ &cg_hudStyle, "cg_hudStyle", "0", CVAR_ARCHIVE },		// Q3Doom: 0 Doom status bar, 1 Quake 3 HUD
+	{ &cg_drawFollow, "cg_drawFollow", "1", 0 },		// Q3Doom: 0 hides the name of the player followed
 	{ &cg_doomAspect, "cg_doomAspect", "0", CVAR_ARCHIVE },	// Q3Doom: 1 stretches the view 1.2 times vertically, like Doom's 320x200 on a 4:3 screen
 	{ &r_doomLightFade, "r_doomLightFade", "0", CVAR_ARCHIVE },	// Q3Doom: the renderer's Doom light fading, for the sprites
 	{ &r_quakeVisuals, "r_quakeVisuals", "0", CVAR_ARCHIVE | CVAR_LATCH },	// Q3Doom: Quake 3 models for the items (quakevisuals.dat)

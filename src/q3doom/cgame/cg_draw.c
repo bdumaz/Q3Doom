@@ -2258,6 +2258,11 @@ static qboolean CG_DrawFollow( void ) {
 	if ( !(cg.snap->ps.pm_flags & PMF_FOLLOW) ) {
 		return qfalse;
 	}
+	// Q3Doom: cg_drawFollow 0 shows the followed player's screen as theirs
+	// (videos), the countdown included
+	if ( !cg_drawFollow.integer ) {
+		return qfalse;
+	}
 	color[0] = 1;
 	color[1] = 1;
 	color[2] = 1;

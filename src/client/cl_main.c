@@ -44,6 +44,8 @@ cvar_t	*cl_shownet;
 cvar_t	*cl_showSend;
 cvar_t	*cl_timedemo;
 cvar_t	*cl_avidemo;
+cvar_t	*cl_avidemoTimes;
+cvar_t	*cl_avidemoJPEG;
 cvar_t	*cl_forceavidemo;
 
 cvar_t	*cl_freelook;
@@ -1994,6 +1996,43 @@ CL_Frame
 
 ==================
 */
+/*
+==================
+CL_AvidemoWindow
+
+Q3Doom: the current server time is inside one of cl_avidemoTimes'
+"<from>-<to>" windows (seconds), or there are none
+==================
+*/
+static qboolean CL_AvidemoWindow( void ) {
+	const char	*s = cl_avidemoTimes->string;
+	float		t = cl.serverTime / 1000.0f, from, to;
+	int			n;
+
+	float		last = 0;
+
+	if ( !*s ) {
+		return qtrue;
+	}
+	while ( sscanf( s, "%f-%f%n", &from, &to, &n ) == 2 ) {
+		if ( t >= from && t < to ) {
+			return qtrue;
+		}
+		if ( to > last ) {
+			last = to;
+		}
+		s += n;
+		while ( *s == ' ' ) {
+			s++;
+		}
+	}
+	// past the last window: done (the rest of the demo is not needed)
+	if ( last > 0 && t >= last ) {
+		Cbuf_AddText( "quit\n" );
+	}
+	return qfalse;
+}
+
 void CL_Frame ( int msec ) {
 
 	if ( !com_cl_running->integer ) {
@@ -2014,8 +2053,11 @@ void CL_Frame ( int msec ) {
 	// if recording an avi, lock to a fixed fps
 	if ( cl_avidemo->integer && msec) {
 		// save the current screen
-		if ( cls.state == CA_ACTIVE || cl_forceavidemo->integer) {
-			Cbuf_ExecuteText( EXEC_NOW, "screenshot silent\n" );
+		// Q3Doom: cl_avidemoTimes "<from>-<to> ...": only those seconds of
+		// server time are saved (a demo is fast-forwarded in between);
+		// cl_avidemoJPEG: JPEG frames
+		if ( ( cls.state == CA_ACTIVE || cl_forceavidemo->integer ) && CL_AvidemoWindow() ) {
+			Cbuf_ExecuteText( EXEC_NOW, cl_avidemoJPEG->integer ? "screenshotJPEG silent\n" : "screenshot silent\n" );
 		}
 		// fixed time for next frame'
 		msec = (1000 / cl_avidemo->integer) * com_timescale->value;
@@ -2295,6 +2337,8 @@ void CL_Init( void ) {
 
 	cl_timedemo = Cvar_Get ("timedemo", "0", 0);
 	cl_avidemo = Cvar_Get ("cl_avidemo", "0", 0);
+	cl_avidemoTimes = Cvar_Get ("cl_avidemoTimes", "", 0);
+	cl_avidemoJPEG = Cvar_Get ("cl_avidemoJPEG", "0", 0);
 	cl_forceavidemo = Cvar_Get ("cl_forceavidemo", "0", 0);
 
 	rconAddress = Cvar_Get ("rconAddress", "", 0);

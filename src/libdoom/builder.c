@@ -1848,6 +1848,38 @@ static void EntPrintf( builder_t *b, const char *fmt, ... ) {
 
 /*
 =================
+ShutRemoteDoor
+
+A sector whose ceiling closes it at the start (lower than a player) and
+that no door line on its own sides opens (D1/DR): it opens from a switch
+or a line crossed elsewhere, if at all
+=================
+*/
+#define PLAYER_HEIGHT	56
+
+static int ShutRemoteDoor( const doom_map_t *map, int sector ) {
+	const doom_sector_t	*sec = &map->sectors[sector];
+	int					i;
+
+	if ( sec->ceiling_height - sec->floor_height >= PLAYER_HEIGHT ) {
+		return 0;
+	}
+	for ( i = 0 ; i < map->num_linedefs ; i++ ) {
+		const doom_linedef_t	*ld = &map->linedefs[i];
+		const doom_special_t	*sp = doom_line_special( ld->special );
+
+		if ( !sp || sp->trigger != DOOM_TRIG_MANUAL || ld->side[1] == DOOM_NO_SIDE ) {
+			continue;
+		}
+		if ( map->sidedefs[ld->side[0]].sector == sector || map->sidedefs[ld->side[1]].sector == sector ) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+/*
+=================
 BuildEntities
 
 worldspawn plus player starts (1-4 coop, 11 deathmatch). Other things
@@ -1879,8 +1911,12 @@ static void BuildEntities( builder_t *b ) {
 	for ( i = 0 ; i < b->movers.count ; i++ ) {
 		const mover_t *m = BufAt( &b->movers, mover_t, i );
 
-		EntPrintf( b, "{\n\"classname\" \"func_doom_plane\"\n\"model\" \"*%d\"\n\"doom_sector\" \"%d\"\n\"doom_plane\" \"%s\"\n}\n",
-			m->model, m->sector, m->ceiling ? "ceiling" : "floor" );
+		// "aas_solid": a door shut at the start that its own lines do not
+		// open (a switch or a trigger elsewhere does): a wall for the bots'
+		// navigation (bspc), which otherwise sees every mover open
+		EntPrintf( b, "{\n\"classname\" \"func_doom_plane\"\n\"model\" \"*%d\"\n\"doom_sector\" \"%d\"\n\"doom_plane\" \"%s\"\n%s}\n",
+			m->model, m->sector, m->ceiling ? "ceiling" : "floor",
+			m->ceiling && ShutRemoteDoor( b->map, m->sector ) ? "\"aas_solid\" \"1\"\n" : "" );
 	}
 	*(char *)BufPush( &b->entities ) = 0;
 }

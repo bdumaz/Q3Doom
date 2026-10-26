@@ -519,7 +519,7 @@ P_UseLines: along the view direction, up to USERANGE. The first line with
 a special is used; a wall or a closed opening stops the search with an "oof".
 =================
 */
-void Doom_PlayerUse( gentity_t *ent ) {
+static void PlayerUse( gentity_t *ent, qboolean quiet ) {
 	const doom_map_t	*map = doomLevel.map;
 	const float			*o = ent->client->ps.origin;
 	float				yaw = DEG2RAD( ent->client->ps.viewangles[YAW] );
@@ -559,14 +559,26 @@ void Doom_PlayerUse( gentity_t *ent ) {
 	if ( best >= 0 && bestT < blockT ) {
 		int side = PointOnLineSide( &map->linedefs[best], o[0], o[1] );
 
-		if ( Doom_ActivateLine( ent, best, side, DOOM_TRIG_SWITCH ) ) {
+		if ( Doom_ActivateLine( ent, best, side, DOOM_TRIG_SWITCH ) || quiet ) {
 			return;
 		}
 		SoundAt( o, "DSNOWAY" );
 		return;
 	}
-	if ( blocker >= 0 ) {
+	if ( blocker >= 0 && !quiet ) {
 		SoundAt( o, "DSNOWAY" );
+	}
+}
+
+void Doom_PlayerUse( gentity_t *ent ) {
+	PlayerUse( ent, qfalse );
+}
+
+// bots use what is in front of them (doors, lifts, switches) as they go,
+// without the "oof" of a use that does nothing
+void Doom_BotUse( gentity_t *ent ) {
+	if ( level.time / 500 != level.previousTime / 500 ) {
+		PlayerUse( ent, qtrue );
 	}
 }
 

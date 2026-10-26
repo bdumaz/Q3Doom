@@ -209,6 +209,10 @@ qboolean EntityIsDead(aas_entityinfo_t *entinfo) {
 		BotAI_GetClientState( entinfo->number, &ps );
 		if (ps.pm_type != PM_NORMAL) return qtrue;
 	}
+	// Q3Doom: a Doom monster is dead once its health is gone
+	else if (entinfo->number >= MAX_CLIENTS && entinfo->number < MAX_GENTITIES && g_entities[entinfo->number].doomMobj) {
+		return !g_entities[entinfo->number].inuse || g_entities[entinfo->number].health <= 0;
+	}
 	return qfalse;
 }
 
@@ -2321,6 +2325,11 @@ BotWantsToChase
 int BotWantsToChase(bot_state_t *bs) {
 	aas_entityinfo_t entinfo;
 
+	// Q3Doom: in Doom Duel the race comes first: fight what is in sight, never chase
+	if (Doom_DuelActive()) {
+		return qfalse;
+	}
+
 	if (gametype == GT_CTF) {
 		//never chase when carrying a CTF flag
 		if (BotCTFCarryingFlag(bs))
@@ -3042,6 +3051,32 @@ int BotFindEnemy(bot_state_t *bs, int curenemy) {
 		bs->enemydeath_time = 0;
 		bs->enemyvisible_time = FloatTime();
 		return qtrue;
+	}
+	// Q3Doom: no player to fight: the nearest Doom monster in sight, if close
+	// (farther ones are run past, as a player would in a race)
+	if (curenemy < 0) {
+		int		best = -1;
+		float	bestdist = Square(500);
+
+		for (i = MAX_CLIENTS; i < level.num_entities; i++) {
+			gentity_t *ent = &g_entities[i];
+
+			if (!ent->inuse || !ent->doomMobj || ent->health <= 0 || !(ent->doomMobj->flags & MF_COUNTKILL)) continue;
+			VectorSubtract(ent->r.currentOrigin, bs->origin, dir);
+			squaredist = VectorLengthSquared(dir);
+			if (squaredist > bestdist) continue;
+			if (BotEntityVisible(bs->entitynum, bs->eye, bs->viewangles, 360, i) <= 0) continue;
+			best = i;
+			bestdist = squaredist;
+		}
+		if (best >= 0) {
+			bs->enemy = best;
+			bs->enemysight_time = FloatTime();
+			bs->enemysuicide = qfalse;
+			bs->enemydeath_time = 0;
+			bs->enemyvisible_time = FloatTime();
+			return qtrue;
+		}
 	}
 	return qfalse;
 }

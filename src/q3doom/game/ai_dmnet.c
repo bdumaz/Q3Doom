@@ -1046,6 +1046,20 @@ int BotLongTermGoal(bot_state_t *bs, int tfl, int retreat, bot_goal_t *goal) {
 	int areanum;
 	vec3_t dir;
 
+	// Q3Doom: Doom Duel: the race to the team's flag
+	if (Doom_DuelGoal(&g_entities[bs->client], goal->origin)) {
+		goal->areanum = BotPointAreaNum(goal->origin);
+		if (goal->areanum) {
+			VectorSet(goal->mins, -16, -16, -16);
+			VectorSet(goal->maxs, 16, 16, 16);
+			goal->entitynum = -1;
+			goal->number = 0;
+			goal->flags = 0;
+			goal->iteminfo = 0;
+			return qtrue;
+		}
+	}
+
 	//FIXME: also have air long term goals?
 	//
 	//if the bot is leading someone and not retreating

@@ -1,4 +1,4 @@
-/*
+﻿/*
 ===========================================================================
 Q3Doom - Doom Duel
 
@@ -377,6 +377,29 @@ static void RoundOver( void ) {
 	duel.state = DUEL_WAITING;
 	duel.stateTime = 0;
 	trap_SendConsoleCommand( EXEC_APPEND, "map_restart 0\n" );
+}
+
+/*
+=================
+Doom_DuelGoal
+
+Where a player's team must get this round (the bots' goal), qfalse when
+there is no race on
+=================
+*/
+qboolean Doom_DuelGoal( gentity_t *ent, vec3_t point ) {
+	int team;
+
+	if ( !duel.active || !ent->client || duel.finished[ent - g_entities] ) {
+		return qfalse;
+	}
+	team = ent->client->sess.sessionTeam;
+	if ( team != TEAM_RED && team != TEAM_BLUE ) {
+		return qfalse;
+	}
+	VectorCopy( duel.sides[TeamSide( team ) ^ 1], point );
+	point[2] += 24;		// a player's middle above the floor
+	return qtrue;
 }
 
 /*

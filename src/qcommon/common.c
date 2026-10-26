@@ -34,8 +34,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 #endif
 
+// Q3Doom: its own protocol first (Quake 3's demos do not play: other snapshots)
 int demo_protocols[] =
-{ 66, 67, 68, 0 };
+{ PROTOCOL_VERSION, 0 };
 
 #define MAX_NUM_ARGVS	50
 

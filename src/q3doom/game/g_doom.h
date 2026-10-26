@@ -128,6 +128,7 @@ void		Doom_StatusCommand( void );
 void		Doom_RunFrame( void );
 void		Doom_PlayerMoved( gentity_t *ent, const vec3_t oldOrigin );
 void		Doom_PlayerUse( gentity_t *ent );
+void		Doom_BotUse( gentity_t *ent );		// twice a second, quietly
 void		Doom_ShotTrace( gentity_t *attacker, const vec3_t start, const vec3_t end );
 qboolean	Doom_PlayerHasKey( gentity_t *ent, int key );
 void		Doom_KeyMessage( gentity_t *ent, int key );
@@ -154,6 +155,7 @@ qboolean	Doom_FragCommand( gentity_t *ent, const char *cmd );
 // g_doom_duel.c
 qboolean	Doom_DuelActive( void );
 qboolean	Doom_DuelNearSpawn( float x, float y );		// no monsters come to life there
+qboolean	Doom_DuelGoal( gentity_t *ent, vec3_t point );	// where a player must go (bots)
 void		Doom_InitDuel( void );		// after the entities spawned
 void		Doom_DuelFrame( void );
 void		Doom_DuelThink( gentity_t *ent );

@@ -650,8 +650,23 @@ qboolean Doom_BuildBotNavigation( const char *name, qboolean force ) {
 	if ( !data ) {
 		return qfalse;		// not a Doom level
 	}
-	if ( !force && FS_ReadFile( aas, NULL ) > 0 ) {
-		return qtrue;
+	// kept while it was made from this very BSP (the bots check its checksum:
+	// a builder change makes it out of date)
+	if ( !force ) {
+		void	*header;
+		int		len = FS_ReadFile( aas, &header );
+
+		if ( len >= 12 ) {
+			int stored = LittleLong( ( (int *)header )[2] );
+
+			FS_FreeFile( header );
+			if ( stored == LittleLong( Com_BlockChecksum( data, size ) ) ) {
+				return qtrue;
+			}
+			Com_Printf( "The bots' navigation of %s is out of date\n", name );
+		} else if ( len > 0 ) {
+			FS_FreeFile( header );
+		}
 	}
 	Com_sprintf( exe, sizeof( exe ), "%s%cbspc%s", Sys_DefaultInstallPath(), PATH_SEP, EXE_SUFFIX );
 

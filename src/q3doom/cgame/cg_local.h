@@ -1138,6 +1138,7 @@ extern	vmCvar_t		cg_gun_y;
 extern	vmCvar_t		cg_gun_z;
 extern	vmCvar_t		cg_drawGun;
 extern	vmCvar_t		cg_hudStyle;		// Q3Doom: 0 Doom status bar, 1 Quake 3 HUD
+extern	vmCvar_t		cg_drawFollow;		// Q3Doom: 0 hides "following <name>" (videos)
 extern	vmCvar_t		cg_doomAspect;		// Q3Doom: 1 Doom's taller pixels
 extern	vmCvar_t		r_doomLightFade;	// Q3Doom: Doom's light fading with distance
 extern	vmCvar_t		r_quakeVisuals;		// Q3Doom: Quake Visuals (Quake 3 textures, items and lights)
