@@ -48,6 +48,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "ai_cmd.h"
 #include "ai_dmnet.h"
 #include "ai_team.h"
+#include "ai_goap.h"
 //
 #include "chars.h"				//characteristics
 #include "inv.h"				//indexes into the inventory
@@ -1564,6 +1565,67 @@ int BotSynonymContext(bot_state_t *bs) {
 
 /*
 ==================
+BotSelectWeapon
+
+Q3Doom: with Doom's weapons the player state holds the Doom weapon + 1 (see
+BotDoomInventory): the number to select for the Quake 3 weapon the bot chose
+==================
+*/
+int BotSelectWeapon(bot_state_t *bs, int weapon) {
+	if (!DOOM_LEVEL() || DOOM_WEAPONSET(&bs->cur_ps) != DOOM_WEAPONS_DOOM) {
+		return weapon;
+	}
+	switch (weapon) {
+	case WP_GAUNTLET:
+		if (bs->cur_ps.stats[STAT_WEAPONS] & (1 << (DWP_CHAINSAW + 1))) return DWP_CHAINSAW + 1;
+		return DWP_FIST + 1;
+	case WP_MACHINEGUN:			return DWP_PISTOL + 1;
+	case WP_SHOTGUN:			return DWP_SHOTGUN + 1;
+	case WP_LIGHTNING:			return DWP_CHAINGUN + 1;
+	case WP_ROCKET_LAUNCHER:	return DWP_MISSILE + 1;
+	case WP_PLASMAGUN:			return DWP_PLASMA + 1;
+	case WP_BFG:				return DWP_BFG + 1;
+	}
+	return DWP_PISTOL + 1;
+}
+
+/*
+==================
+BotDoomInventory
+
+Q3Doom: with Doom's weapons, each Doom weapon stands in the bot's inventory
+for the Quake 3 weapon nearest to it (the pistol for the machinegun, the
+chaingun for the lightning gun), with its Doom ammo, so the bots' weapon
+choice and aim work unchanged
+==================
+*/
+static void BotDoomInventory(bot_state_t *bs) {
+	int owned = bs->cur_ps.stats[STAT_WEAPONS], *ammo = bs->cur_ps.ammo, *inv = bs->inventory;
+
+#define BOT_DOOM_OWNS(w) ((owned & (1 << ((w) + 1))) != 0)
+	inv[INVENTORY_GAUNTLET] = BOT_DOOM_OWNS(DWP_FIST) || BOT_DOOM_OWNS(DWP_CHAINSAW);
+	inv[INVENTORY_MACHINEGUN] = BOT_DOOM_OWNS(DWP_PISTOL);
+	inv[INVENTORY_SHOTGUN] = BOT_DOOM_OWNS(DWP_SHOTGUN);
+	inv[INVENTORY_LIGHTNING] = BOT_DOOM_OWNS(DWP_CHAINGUN);
+	inv[INVENTORY_ROCKETLAUNCHER] = BOT_DOOM_OWNS(DWP_MISSILE);
+	inv[INVENTORY_PLASMAGUN] = BOT_DOOM_OWNS(DWP_PLASMA);
+	inv[INVENTORY_BFG10K] = BOT_DOOM_OWNS(DWP_BFG);
+	inv[INVENTORY_GRENADELAUNCHER] = 0;
+	inv[INVENTORY_RAILGUN] = 0;
+	inv[INVENTORY_GRAPPLINGHOOK] = 0;
+#undef BOT_DOOM_OWNS
+	inv[INVENTORY_BULLETS] = ammo[DAM_CLIP];
+	inv[INVENTORY_LIGHTNINGAMMO] = ammo[DAM_CLIP];
+	inv[INVENTORY_SHELLS] = ammo[DAM_SHELL];
+	inv[INVENTORY_ROCKETS] = ammo[DAM_MISL];
+	inv[INVENTORY_CELLS] = ammo[DAM_CELL];
+	inv[INVENTORY_BFGAMMO] = ammo[DAM_CELL] / 40;	// 40 cells a shot
+	inv[INVENTORY_GRENADES] = 0;
+	inv[INVENTORY_SLUGS] = 0;
+}
+
+/*
+==================
 BotChooseWeapon
 ==================
 */
@@ -1572,14 +1634,14 @@ void BotChooseWeapon(bot_state_t *bs) {
 
 	if (bs->cur_ps.weaponstate == WEAPON_RAISING ||
 			bs->cur_ps.weaponstate == WEAPON_DROPPING) {
-		trap_EA_SelectWeapon(bs->client, bs->weaponnum);
+		trap_EA_SelectWeapon(bs->client, BotSelectWeapon(bs, bs->weaponnum));
 	}
 	else {
 		newweaponnum = trap_BotChooseBestFightWeapon(bs->ws, bs->inventory);
 		if (bs->weaponnum != newweaponnum) bs->weaponchange_time = FloatTime();
 		bs->weaponnum = newweaponnum;
 		//BotAI_Print(PRT_MESSAGE, "bs->weaponnum = %d\n", bs->weaponnum);
-		trap_EA_SelectWeapon(bs->client, bs->weaponnum);
+		trap_EA_SelectWeapon(bs->client, BotSelectWeapon(bs, bs->weaponnum));
 	}
 }
 
@@ -1755,6 +1817,10 @@ void BotUpdateInventory(bot_state_t *bs) {
 	bs->inventory[INVENTORY_MINES] = bs->cur_ps.ammo[WP_PROX_LAUNCHER];
 	bs->inventory[INVENTORY_BELT] = bs->cur_ps.ammo[WP_CHAINGUN];
 #endif
+	// Q3Doom: Doom's weapons and ammo
+	if (DOOM_LEVEL() && DOOM_WEAPONSET(&bs->cur_ps) == DOOM_WEAPONS_DOOM) {
+		BotDoomInventory(bs);
+	}
 	//powerups
 	bs->inventory[INVENTORY_HEALTH] = bs->cur_ps.stats[STAT_HEALTH];
 	bs->inventory[INVENTORY_TELEPORTER] = bs->cur_ps.stats[STAT_HOLDABLE_ITEM] == MODELINDEX_TELEPORTER;
@@ -2272,6 +2338,11 @@ BotWantsToRetreat
 int BotWantsToRetreat(bot_state_t *bs) {
 	aas_entityinfo_t entinfo;
 
+	// Q3Doom: the plan says whether to fight or move on, shooting
+	if (BotGoapSteers(bs)) {
+		return BotGoapWantsToRetreat(bs);
+	}
+
 	if (gametype == GT_CTF) {
 		//always retreat when carrying a CTF flag
 		if (BotCTFCarryingFlag(bs))
@@ -2330,6 +2401,10 @@ BotWantsToChase
 int BotWantsToChase(bot_state_t *bs) {
 	aas_entityinfo_t entinfo;
 
+	// Q3Doom: the plan says whether to chase
+	if (BotGoapSteers(bs)) {
+		return BotGoapWantsToChase(bs);
+	}
 	// Q3Doom: in Doom Duel the race comes first: fight what is in sight, never chase
 	if (Doom_DuelActive()) {
 		return qfalse;
@@ -2639,6 +2714,72 @@ void BotRoamGoal(bot_state_t *bs, vec3_t goal) {
 
 /*
 ==================
+BotBestRange
+
+Q3Doom: the distance a weapon is best used from
+==================
+*/
+static float BotBestRange(int weapon) {
+	switch (weapon) {
+	case WP_GAUNTLET:			return 0;
+	case WP_SHOTGUN:			return 150;
+	case WP_GRENADE_LAUNCHER:	return 300;
+	case WP_PLASMAGUN:			return 300;
+	case WP_ROCKET_LAUNCHER:	return 350;
+	case WP_LIGHTNING:			return 350;
+	case WP_RAILGUN:			return 700;
+	case WP_BFG:				return 400;
+	default:					return 400;
+	}
+}
+
+/*
+==================
+BotCircleStrafe
+
+Q3Doom (M19): keep moving round the target, at the weapon's best range,
+turning about now and then at random; step aside from a missile coming
+==================
+*/
+static bot_moveresult_t BotCircleStrafe(bot_state_t *bs, vec3_t forward, float dist, int movetype, float attack_skill) {
+	bot_moveresult_t moveresult;
+	vec3_t hordir, sideward, dir, up = {0, 0, 1};
+	float range, radial;
+	int i;
+
+	memset(&moveresult, 0, sizeof(bot_moveresult_t));
+	//a missile coming: step aside first
+	if (BotGoapDodge(bs, dir)) {
+		if (trap_BotMoveInDirection(bs->ms, dir, 400, MOVE_WALK)) return moveresult;
+	}
+	//turn about now and then, not on a beat
+	if (bs->goap.strafeFlipTime < FloatTime() || bs->goap.strafeFlipTime > FloatTime() + 10) {
+		if (random() < 0.7f) bs->flags ^= BFL_STRAFERIGHT;
+		bs->goap.strafeFlipTime = FloatTime() + 0.5f + random() * (1.0f + attack_skill);
+	}
+	range = BotBestRange(bs->weaponnum);
+	hordir[0] = forward[0];
+	hordir[1] = forward[1];
+	hordir[2] = 0;
+	VectorNormalize(hordir);
+	for (i = 0; i < 2; i++) {
+		CrossProduct(hordir, up, sideward);
+		if (bs->flags & BFL_STRAFERIGHT) VectorNegate(sideward, sideward);
+		//closer or farther to keep the range, more the farther off it
+		radial = range > 0 ? (dist - range) / 200 : 1;
+		if (radial > 1) radial = 1;
+		if (radial < -1) radial = -1;
+		VectorMA(sideward, radial, hordir, dir);
+		if (trap_BotMoveInDirection(bs->ms, dir, 400, movetype)) return moveresult;
+		//blocked: the other way
+		bs->flags ^= BFL_STRAFERIGHT;
+		bs->goap.strafeFlipTime = FloatTime() + 0.5f + random();
+	}
+	return moveresult;
+}
+
+/*
+==================
 BotAttackMove
 ==================
 */
@@ -2724,6 +2865,10 @@ bot_moveresult_t BotAttackMove(bot_state_t *bs, int tfl) {
 			if (trap_BotMoveInDirection(bs->ms, backward, 400, movetype)) return moveresult;
 		}
 		return moveresult;
+	}
+	// Q3Doom: circle strafing on the Doom levels
+	if (BotGoapActive(bs)) {
+		return BotCircleStrafe(bs, forward, dist, movetype, attack_skill);
 	}
 	//increase the strafe time
 	bs->attackstrafe_time += bs->thinktime;
@@ -2953,6 +3098,10 @@ int BotFindEnemy(bot_state_t *bs, int curenemy) {
 	healthdecrease = bs->lasthealth > bs->inventory[INVENTORY_HEALTH];
 	//remember the current health value
 	bs->lasthealth = bs->inventory[INVENTORY_HEALTH];
+	// Q3Doom: the plan says what to fight
+	if (BotGoapSteers(bs)) {
+		return BotGoapFindEnemy(bs, curenemy);
+	}
 	//
 	if (curenemy >= 0) {
 		BotEntityInfo(curenemy, &curenemyinfo);
@@ -5414,6 +5563,8 @@ void BotDeathmatchAI(bot_state_t *bs, float thinktime) {
 		}
 		bs->entergamechat = qtrue;
 	}
+	// Q3Doom: the planner reads the world and plans
+	BotGoapUpdate(bs);
 	//reset the node switches from the previous frame
 	BotResetNodeSwitches();
 	//execute AI nodes

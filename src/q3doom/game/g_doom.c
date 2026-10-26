@@ -515,20 +515,22 @@ void Doom_PlayerMoved( gentity_t *ent, const vec3_t oldOrigin ) {
 =================
 Doom_PlayerUse
 
-P_UseLines: along the view direction, up to USERANGE. The first line with
-a special is used; a wall or a closed opening stops the search with an "oof".
+P_UseLines: along a direction (the view's), up to USERANGE. The first line
+with a special is used; a wall or a closed opening stops the search with an
+"oof". qtrue when a line with a special was in reach. doorsOnly: only a
+door or a lift is used, nothing else.
 =================
 */
-static void PlayerUse( gentity_t *ent, qboolean quiet ) {
+static qboolean PlayerUseYaw( gentity_t *ent, float yawDegrees, qboolean quiet, qboolean doorsOnly ) {
 	const doom_map_t	*map = doomLevel.map;
 	const float			*o = ent->client->ps.origin;
-	float				yaw = DEG2RAD( ent->client->ps.viewangles[YAW] );
+	float				yaw = DEG2RAD( yawDegrees );
 	float				x1 = o[0] + cos( yaw ) * USERANGE, y1 = o[1] + sin( yaw ) * USERANGE;
 	int					i, best = -1, blocker = -1;
 	float				bestT = 2, blockT = 2;
 
 	if ( !DOOM_LEVEL() || ent->health <= 0 ) {
-		return;
+		return qfalse;
 	}
 	for ( i = 0 ; i < map->num_linedefs ; i++ ) {
 		const doom_linedef_t	*ld = &map->linedefs[i];
@@ -559,15 +561,28 @@ static void PlayerUse( gentity_t *ent, qboolean quiet ) {
 	if ( best >= 0 && bestT < blockT ) {
 		int side = PointOnLineSide( &map->linedefs[best], o[0], o[1] );
 
+		if ( doorsOnly ) {
+			const doom_special_t *sp = doom_line_special( doomLevel.lineSpecial[best] );
+
+			if ( !sp || ( sp->kind != DOOM_KIND_DOOR && sp->kind != DOOM_KIND_PLAT ) ) {
+				return qfalse;
+			}
+		}
+
 		if ( Doom_ActivateLine( ent, best, side, DOOM_TRIG_SWITCH ) || quiet ) {
-			return;
+			return qtrue;
 		}
 		SoundAt( o, "DSNOWAY" );
-		return;
+		return qtrue;
 	}
 	if ( blocker >= 0 && !quiet ) {
 		SoundAt( o, "DSNOWAY" );
 	}
+	return qfalse;
+}
+
+static void PlayerUse( gentity_t *ent, qboolean quiet ) {
+	PlayerUseYaw( ent, ent->client->ps.viewangles[YAW], quiet, qfalse );
 }
 
 void Doom_PlayerUse( gentity_t *ent ) {
@@ -577,8 +592,25 @@ void Doom_PlayerUse( gentity_t *ent ) {
 // bots use what is in front of them (doors, lifts, switches) as they go,
 // without the "oof" of a use that does nothing
 void Doom_BotUse( gentity_t *ent ) {
-	if ( level.time / 500 != level.previousTime / 500 ) {
-		PlayerUse( ent, qtrue );
+	static const float	turns[] = { 0, -45, 45, -90, 90 };
+	usercmd_t			*cmd = &ent->client->pers.cmd;
+	float				walk;
+	int					i;
+
+	if ( level.time / 500 == level.previousTime / 500 ) {
+		return;
+	}
+	if ( PlayerUseYaw( ent, ent->client->ps.viewangles[YAW], qtrue, qfalse ) || ( !cmd->forwardmove && !cmd->rightmove ) ) {
+		return;
+	}
+	// a bot walking into a door at an angle (into the corner by its side)
+	// does not look at it: a door or lift near the way it walks is opened,
+	// as a player would turn to it
+	walk = ent->client->ps.viewangles[YAW] + RAD2DEG( atan2( -cmd->rightmove, cmd->forwardmove ) );
+	for ( i = 0 ; i < (int)( sizeof( turns ) / sizeof( turns[0] ) ) ; i++ ) {
+		if ( PlayerUseYaw( ent, walk + turns[i], qtrue, qtrue ) ) {
+			return;
+		}
 	}
 }
 

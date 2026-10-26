@@ -100,7 +100,16 @@ On Doom levels, these settings change the rules:
 
 **Bots** play on the Doom levels too. The first time a level is played with bots, the game makes their navigation file (`maps/<level>.aas` in your settings folder) with `bspc`, which is built and copied next to the game. That takes about a second. `doom_botnav all` makes them all at once; `doom_botnav <level>` remakes one. `bspc` is TTimo's maintained copy of id's GPL tool, in `tools/bspc`.
 
-To measure how the bots play, set `bot_stats 1` on the server. At the end of a match it prints, for each bot: shots, hit rate, where hits landed (feet, body, head), deaths, average speed, time with an enemy in sight, and how much of that time the bot spent aiming without firing or backing away without firing. `botstats` prints the same report at any time. `bot_stats 2` also traces each bot once a second.
+On the Doom levels the bots plan (`bot_goap 1`, the default). Several times a second each bot sizes up what it sees and hears: how far its objective is, a monster in its way, the damage the monsters around would do if it went on, a player shooting at it, an item worth a detour. It then picks the goal that pays most (stay alive, stop the rival, reach the objective, stock up) and the cheapest way there: run on while shooting, fight a player, clear a monster, or pick something up. In a fight they circle-strafe at their weapon's best range and step aside from fireballs and rockets coming at them. On the Doom levels they don't chat. `bot_plan 1` prints each bot's plan as it changes, and `bot_debug 1` what it knows.
+
+To measure how the bots play, set `bot_stats 1` on the server. At the end of a match it prints, for each bot:
+- shots, hit rate, and where hits landed (feet, body, head);
+- deaths and average speed;
+- time with an enemy in sight, and how much of it the bot spent aiming without firing or backing away without firing;
+- how much of its firing was done moving sideways;
+- how many of the missiles that came at it it dodged.
+
+`botstats` prints the same report at any time. `bot_stats 2` also traces each bot once a second.
 
 Q3Doom uses its own network protocol (1068). It doesn't see or join Quake 3 servers, and Quake 3 can't join it.
 

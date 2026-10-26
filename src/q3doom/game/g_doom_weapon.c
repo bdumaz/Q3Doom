@@ -503,6 +503,9 @@ void Doom_FireWeapon( gentity_t *ent, int parm ) {
 	if ( !ent->client ) {
 		return;
 	}
+	if ( action != ACT_Saw && action != ACT_Punch ) {
+		BotStats_Fire( ent );		// a bot's shot, for its statistics
+	}
 	// firing ends the spawn protection
 	ent->client->spawnProtectedUntil = 0;
 	EyePoint( ent, eye );

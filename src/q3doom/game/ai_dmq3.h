@@ -122,6 +122,8 @@ void BotRoamGoal(bot_state_t *bs, vec3_t goal);
 float BotEntityVisible(int viewer, vec3_t eye, vec3_t viewangles, float fov, int ent);
 //the bot will aim at the current enemy
 void BotAimAtEnemy(bot_state_t *bs);
+// Q3Doom: the weapon number to select (Doom's weapons)
+int BotSelectWeapon(bot_state_t *bs, int weapon);
 // Q3Doom: while moving away, whether to look back at the enemy
 qboolean BotFaceEnemyWhileMoving(bot_state_t *bs);
 //check if the bot should attack

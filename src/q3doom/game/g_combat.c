@@ -849,6 +849,10 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 	if ( targ->client || targ->doomMobj ) {
 		BotStats_Damage( targ, attacker, point, dflags );
 	}
+	// Q3Doom: a bot remembers who hurt it (its planner's facts)
+	if ( targ->client ) {
+		BotGoapDamaged( targ, inflictor, attacker );
+	}
 
 	// Q3Doom: monsters and barrels take Doom damage (P_DamageMobj)
 	if ( targ->doomMobj ) {

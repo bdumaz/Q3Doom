@@ -47,6 +47,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "ai_cmd.h"
 #include "ai_dmnet.h"
 #include "ai_team.h"
+#include "ai_goap.h"
 //data file headers
 #include "chars.h"			//characteristics
 #include "inv.h"			//indexes into the inventory
@@ -193,7 +194,7 @@ BotNearbyGoal
 ==================
 */
 int BotNearbyGoal(bot_state_t *bs, int tfl, bot_goal_t *ltg, float range) {
-	int ret;
+	int ret, i;
 
 	//check if the bot should go for air
 	if (BotGoForAir(bs, tfl, ltg, range)) return qtrue;
@@ -206,8 +207,17 @@ int BotNearbyGoal(bot_state_t *bs, int tfl, bot_goal_t *ltg, float range) {
 			range = 50;
 		}
 	}
+	// Q3Doom: the plan's item, or how far to go for one
+	if (BotGoapSteers(bs)) {
+		if (BotGoapPickUp(bs, ltg)) return qtrue;
+		range = BotGoapItemRange(bs, range);
+	}
 	//
 	ret = trap_BotChooseNBGItem(bs->gs, bs->origin, bs->inventory, tfl, ltg, range);
+	// Q3Doom: no item down a one-way drop (it is avoided from now on)
+	for (i = 0; ret && i < 4 && BotGoapTopGoalIsTrap(bs); i++) {
+		ret = trap_BotChooseNBGItem(bs->gs, bs->origin, bs->inventory, tfl, ltg, range);
+	}
 	/*
 	if (ret)
 	{
@@ -248,6 +258,10 @@ int BotReachedGoal(bot_state_t *bs, bot_goal_t *goal) {
 					return qtrue;
 			}
 			*/
+			// Q3Doom: seen gone: not worth coming back for a while
+			if (!(goal->flags & GFL_DROPPED)) {
+				trap_BotSetAvoidGoalTime(bs->gs, goal->number, 30);
+			}
 			return qtrue;
 		}
 		//if in the goal area and below or above the goal and not swimming
@@ -297,7 +311,9 @@ int BotGetItemLongTermGoal(bot_state_t *bs, int tfl, bot_goal_t *goal) {
 		//BotAI_Print(PRT_MESSAGE, "%s: choosing new ltg\n", ClientName(bs->client, netname, sizeof(netname)));
 		//choose a new goal
 		//BotAI_Print(PRT_MESSAGE, "%6.1f client %d: BotChooseLTGItem\n", FloatTime(), bs->client);
-		if (trap_BotChooseLTGItem(bs->gs, bs->origin, bs->inventory, tfl)) {
+		if (trap_BotChooseLTGItem(bs->gs, bs->origin, bs->inventory, tfl) &&
+			// Q3Doom: no item down a one-way drop (it is avoided from now on)
+			(!BotGoapTopGoalIsTrap(bs) || trap_BotChooseLTGItem(bs->gs, bs->origin, bs->inventory, tfl))) {
 			/*
 			char buf[128];
 			//get the goal at the top of the stack
@@ -1812,6 +1828,7 @@ AINode_Seek_LTG
 */
 int AINode_Seek_LTG(bot_state_t *bs)
 {
+	vec3_t dodgedir;
 	bot_goal_t goal;
 	vec3_t target, dir;
 	bot_moveresult_t moveresult;
@@ -1924,8 +1941,13 @@ int AINode_Seek_LTG(bot_state_t *bs)
 		return qfalse;
 	//initialize the movement state
 	BotSetupForMovement(bs);
+	// Q3Doom: a missile coming: step aside first
+	if (BotGoapActive(bs) && BotGoapDodge(bs, dodgedir) &&
+			trap_BotMoveInDirection(bs->ms, dodgedir, 400, MOVE_WALK)) {
+		memset(&moveresult, 0, sizeof(bot_moveresult_t));
+	}
 	//move towards the goal
-	trap_BotMoveToGoal(&moveresult, bs->ms, &goal, bs->tfl);
+	else trap_BotMoveToGoal(&moveresult, bs->ms, &goal, bs->tfl);
 	//if the movement failed
 	if (moveresult.failure) {
 		//reset the avoid reach, otherwise bot is stuck in current area
@@ -2306,6 +2328,7 @@ AINode_Battle_Retreat
 ==================
 */
 int AINode_Battle_Retreat(bot_state_t *bs) {
+	vec3_t dodgedir;
 	bot_goal_t goal;
 	aas_entityinfo_t entinfo;
 	bot_moveresult_t moveresult;
@@ -2436,8 +2459,13 @@ int AINode_Battle_Retreat(bot_state_t *bs) {
 	}
 	//initialize the movement state
 	BotSetupForMovement(bs);
+	// Q3Doom: a missile coming: step aside first
+	if (BotGoapActive(bs) && BotGoapDodge(bs, dodgedir) &&
+			trap_BotMoveInDirection(bs->ms, dodgedir, 400, MOVE_WALK)) {
+		memset(&moveresult, 0, sizeof(bot_moveresult_t));
+	}
 	//move towards the goal
-	trap_BotMoveToGoal(&moveresult, bs->ms, &goal, bs->tfl);
+	else trap_BotMoveToGoal(&moveresult, bs->ms, &goal, bs->tfl);
 	//if the movement failed
 	if (moveresult.failure) {
 		//reset the avoid reach, otherwise bot is stuck in current area

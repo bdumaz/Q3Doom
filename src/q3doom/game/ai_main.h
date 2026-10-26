@@ -118,6 +118,74 @@ typedef struct bot_activategoal_s
 	struct bot_activategoal_s *next;		//next activate goal on stack
 } bot_activategoal_t;
 
+// Q3Doom: the bot's planner (ai_goap.c): what it knows of the world (the
+// facts), the goal it pursues and the plan that gets there
+#define GOAP_MAX_PLAN		4
+
+typedef enum {
+	GA_NONE,
+	GA_TRAVEL,				// go to the objective, shooting what is in the way
+	GA_ENGAGE_PLAYER,		// fight a player at the weapon's best range
+	GA_CLEAR_MONSTER,		// kill a monster before going on
+	GA_PICKUP,				// detour to an item
+	GA_NUM_ACTIONS
+} goapAction_t;
+
+typedef enum {
+	GG_NONE,
+	GG_STAY_ALIVE,
+	GG_STOP_RIVAL,			// a player engaging me (or, in deathmatch, one in sight)
+	GG_REACH_OBJECTIVE,
+	GG_STOCK_UP,
+	GG_NUM_GOALS
+} goapGoal_t;
+
+typedef struct botFacts_s {
+	float		time;				// when they were last worked out
+	qboolean	hasObjective;		// a place to get to (Doom Duel)
+	int			objectiveArea;
+	float		objectiveTime;		// seconds of travel to it
+	int			health, armor;
+	float		weaponPower;		// 0 to 1: the best weapon held, with ammo
+	float		dps;				// the damage per second the bot deals with it
+	int			playerThreat;		// an enemy player engaging the bot, -1 none
+	int			visiblePlayer;		// the nearest enemy player in sight, -1 none
+	int			monsterBlocking;	// a monster on the route, a few seconds ahead, -1 none
+	float		blockPenalty;		// seconds it costs to push past it
+	float		monsterCost;		// damage expected from the monsters if the bot goes on
+	float		monsterDps;			// what the monsters in sight deal per second, all together
+	int			worstMonster;		// the monster expected to do most of it, -1 none
+	float		worstMonsterCost;
+	float		blockingDps, blockingTtk;	// the blocking monster's damage per second, and time to kill it
+	float		worstDps, worstTtk;
+	int			resourceType;		// IT_HEALTH, IT_ARMOR, IT_WEAPON, IT_AMMO of an item worth a detour, 0 none
+	float		resourceTime;		// seconds of detour to it
+	float		resourceNeed;		// 0 to 1
+	bot_goal_t	resourceGoal;		// the item itself
+} botFacts_t;
+
+typedef struct botGoap_s {
+	botFacts_t	facts;
+	goapGoal_t	goal;
+	int			plan[GOAP_MAX_PLAN];
+	int			planLength;
+	float		planCost;
+	int			target;				// what the first action shoots at, -1 nothing
+	float		replanTime;
+	int			lastState;			// the world state the plan was made from
+	float		hurtTime;			// when the bot was last hurt, and by whom
+	int			hurtBy;
+	float		dodgeTime;			// M19: stepping aside from a missile until then
+	vec3_t		dodgeDir;
+	int			dodgeMissile;		// the last missile seen coming
+	qboolean	dodgeSkip;			// and it is not dodged
+	float		debugTime;
+	float		trappedTime;		// since when the bot can't get anywhere, 0 when it can
+	float		trapCheckTime;
+	float		strafeFlipTime;		// M19: when the circle strafe turns about
+	float		jumpTime;
+} botGoap_t;
+
 //bot state
 typedef struct bot_state_s
 {
@@ -231,6 +299,7 @@ typedef struct bot_state_s
 	float lastattack_time;							//last time the bot pressed fire
 	int noattack;									//line where BotCheckAttack last gave up (bot_stats 2)
 	float runaway_time;								//retreating: face the way until then
+	botGoap_t goap;									// Q3Doom: the planner
 	//
 	int ltgtype;									//long term goal type
 	// team goals
@@ -307,6 +376,8 @@ int		BotAI_GetClientState( int clientNum, playerState_t *state );
 int		BotAI_GetEntityState( int entityNum, entityState_t *state );
 int		BotAI_GetSnapshotEntity( int clientNum, int sequence, entityState_t *state );
 int		BotTeamLeader(bot_state_t *bs);
+void	BotStats_MissileThreat(int client);
+void	BotStats_MissileHit(int client);
 float	AngleDifference(float ang1, float ang2);
 // Q3Doom: bot statistics
 void	BotStats_Frame(bot_state_t *bs, float thinktime);

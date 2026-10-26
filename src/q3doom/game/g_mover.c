@@ -315,6 +315,14 @@ qboolean G_MoverPush( gentity_t *pusher, vec3_t move, vec3_t amove, gentity_t **
 	VectorAdd( pusher->r.currentAngles, amove, pusher->r.currentAngles );
 	trap_LinkEntity( pusher );
 
+	// Q3Doom: a rising Doom ceiling (a door opening) carries nothing, as in
+	// Doom: a player pressed against its side would be lifted with it, hit
+	// the ceiling and keep the door shut
+	if ( pusher->doomPlane && move[2] > 0 && !move[0] && !move[1] &&
+		( pusher->doomPlane->kind == DOOM_KIND_DOOR || pusher->doomPlane->kind == DOOM_KIND_CEILING ) ) {
+		return qtrue;
+	}
+
 	// see if any solid entities are inside the final position
 	for ( e = 0 ; e < listedEntities ; e++ ) {
 		check = &g_entities[ entityList[ e ] ];

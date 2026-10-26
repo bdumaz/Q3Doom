@@ -49,6 +49,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "ai_cmd.h"
 #include "ai_dmnet.h"
 #include "ai_vcmd.h"
+#include "ai_goap.h"
 
 //
 #include "chars.h"
@@ -764,6 +765,9 @@ void BotChangeViewAngles(bot_state_t *bs, float thinktime) {
 	float omega, damping, follow, maxspeed, idealspeed, step, t;
 	int i;
 
+	// Q3Doom: the first frame after a map_restart (a Doom Duel round) spans the
+	// previous level's time
+	if (thinktime > 0.5f) thinktime = 0.5f;
 	if (bs->ideal_viewangles[PITCH] > 180) bs->ideal_viewangles[PITCH] -= 360;
 	//
 	if (bs->enemy >= 0) {
@@ -1057,7 +1061,7 @@ int BotAI(int client, float thinktime) {
 	BotDeathmatchAI(bs, thinktime);
 	BotStats_Frame(bs, thinktime);
 	//set the weapon selection every AI frame
-	trap_EA_SelectWeapon(bs->client, bs->weaponnum);
+	trap_EA_SelectWeapon(bs->client, BotSelectWeapon(bs, bs->weaponnum));
 	//subtract the delta angles
 	for (j = 0; j < 3; j++) {
 		bs->viewangles[j] = AngleMod(bs->viewangles[j] - SHORT2ANGLE(bs->cur_ps.delta_angles[j]));
@@ -1671,6 +1675,8 @@ typedef struct {
 	qboolean	dead;
 	float	aliveTime, distance;
 	float	enemyTime, stareTime, backpedalTime;
+	float	fireTime, strafeFireTime;
+	int		missileThreats, missileHits;
 	float	traceTime;
 } botStats_t;
 
@@ -1684,6 +1690,14 @@ void BotStats_Fire(gentity_t *ent) {
 	if (ent->client && (ent->r.svFlags & SVF_BOT)) {
 		botStats[ent - g_entities].shots++;
 	}
+}
+
+void BotStats_MissileThreat(int client) {
+	botStats[client].missileThreats++;
+}
+
+void BotStats_MissileHit(int client) {
+	botStats[client].missileHits++;
 }
 
 void BotStats_Damage(gentity_t *targ, gentity_t *attacker, vec3_t point, int dflags) {
@@ -1720,6 +1734,10 @@ void BotStats_Frame(bot_state_t *bs, float thinktime) {
 	qboolean firing;
 	char name[MAX_NETNAME];
 
+	//the first frame after a map_restart spans the previous level's time
+	if (thinktime <= 0 || thinktime > 0.5f) {
+		return;
+	}
 	//bot_stats 2: what the bot is up to, every second
 	if (bot_stats.integer >= 2 && st->traceTime < FloatTime()) {
 		st->traceTime = FloatTime() + 1;
@@ -1727,6 +1745,10 @@ void BotStats_Frame(bot_state_t *bs, float thinktime) {
 		BotAI_Print(PRT_MESSAGE, "%s %1.1f at (%1.0f %1.0f %1.0f) ltg %d: enemy %d (aim %d, seen %1.1f s ago) weapon %d fired %1.1f s ago (no fire: %d)\n",
 				name, FloatTime(), bs->origin[0], bs->origin[1], bs->origin[2], bs->ltgtype, bs->enemy, bs->aim_enemy, FloatTime() - bs->enemyvisible_time,
 				bs->weaponnum, FloatTime() - bs->lastattack_time, bs->noattack);
+		BotAI_Print(PRT_MESSAGE, "%s %1.1f moving: yaw %1.0f, keys %d %d %d, speed %1.0f, plan %d\n",
+				name, FloatTime(), bs->viewangles[YAW], g_entities[bs->client].client->pers.cmd.forwardmove,
+				g_entities[bs->client].client->pers.cmd.rightmove, g_entities[bs->client].client->pers.cmd.upmove,
+				VectorLength(bs->cur_ps.velocity), bs->goap.planLength ? bs->goap.plan[0] : 0);
 	}
 
 	if (BotIsDead(bs) || BotIsObserver(bs)) {
@@ -1744,8 +1766,20 @@ void BotStats_Frame(bot_state_t *bs, float thinktime) {
 		return;
 	}
 	st->enemyTime += thinktime;
-	firing = bs->lastattack_time > FloatTime() - 0.5f;
+	//fired lately, or the weapon is still cycling from the last shot (a rocket launcher's 0.8 s)
+	firing = bs->lastattack_time > FloatTime() - 0.5f || bs->cur_ps.weaponTime > 0;
 	if (firing) {
+		vec3_t todir, sideward, up = {0, 0, 1};
+
+		//firing while moving sideways to the target (M19)
+		st->fireTime += thinktime;
+		VectorSubtract(g_entities[bs->enemy].r.currentOrigin, bs->origin, todir);
+		todir[2] = 0;
+		VectorNormalize(todir);
+		CrossProduct(todir, up, sideward);
+		if (fabs(DotProduct(velocity, sideward)) > 150) {
+			st->strafeFireTime += thinktime;
+		}
 		return;
 	}
 	AngleVectors(bs->viewangles, forward, NULL, NULL);
@@ -1768,18 +1802,20 @@ void BotStats_Report(void) {
 	botStats_t *st;
 	char name[MAX_NETNAME];
 
-	G_Printf("bot stats:          shots  hit%%  feet%% body%% head%%  deaths  speed  enemy(s)  stare%%  backpedal%%\n");
+	G_Printf("bot stats:          shots  hit%%  feet%% body%% head%%  deaths  speed  enemy(s)  stare%%  backpedal%%  strafefire%%  dodged\n");
 	for (i = 0; i < level.maxclients; i++) {
 		if (!botstates[i] || !botstates[i]->inuse) continue;
 		st = &botStats[i];
 		located = st->hitFeet + st->hitBody + st->hitHead;
 		ClientName(i, name, sizeof(name));
-		G_Printf("bot stats: %-12s %5d  %4.0f  %5.0f %5.0f %5.0f  %6d  %5.0f  %8.1f  %6.0f  %10.0f\n",
+		G_Printf("bot stats: %-12s %5d  %4.0f  %5.0f %5.0f %5.0f  %6d  %5.0f  %8.1f  %6.0f  %10.0f  %11.0f  %3d/%d\n",
 				name, st->shots, BotStats_Percent(st->hits, st->shots),
 				BotStats_Percent(st->hitFeet, located), BotStats_Percent(st->hitBody, located),
 				BotStats_Percent(st->hitHead, located), st->deaths,
 				st->aliveTime > 0 ? st->distance / st->aliveTime : 0, st->enemyTime,
-				BotStats_Percent(st->stareTime, st->enemyTime), BotStats_Percent(st->backpedalTime, st->enemyTime));
+				BotStats_Percent(st->stareTime, st->enemyTime), BotStats_Percent(st->backpedalTime, st->enemyTime),
+				BotStats_Percent(st->strafeFireTime, st->fireTime),
+				st->missileThreats - st->missileHits > 0 ? st->missileThreats - st->missileHits : 0, st->missileThreats);
 	}
 }
 
@@ -1797,6 +1833,7 @@ int BotAISetup( int restart ) {
 	trap_Cvar_Register(&bot_pause, "bot_pause", "0", CVAR_CHEAT);
 	trap_Cvar_Register(&bot_report, "bot_report", "0", CVAR_CHEAT);
 	trap_Cvar_Register(&bot_stats, "bot_stats", "0", 0);
+	BotGoapInit();
 	trap_Cvar_Register(&bot_testsolid, "bot_testsolid", "0", CVAR_CHEAT);
 	trap_Cvar_Register(&bot_testclusters, "bot_testclusters", "0", CVAR_CHEAT);
 	trap_Cvar_Register(&bot_developer, "bot_developer", "0", CVAR_CHEAT);
