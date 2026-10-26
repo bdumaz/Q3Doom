@@ -1572,7 +1572,7 @@ BotDoomInventory): the number to select for the Quake 3 weapon the bot chose
 ==================
 */
 int BotSelectWeapon(bot_state_t *bs, int weapon) {
-	if (!DOOM_LEVEL() || DOOM_WEAPONSET(&bs->cur_ps) != DOOM_WEAPONS_DOOM) {
+	if (DOOM_WEAPONSET(&bs->cur_ps) != DOOM_WEAPONS_DOOM) {
 		return weapon;
 	}
 	switch (weapon) {
@@ -1818,7 +1818,7 @@ void BotUpdateInventory(bot_state_t *bs) {
 	bs->inventory[INVENTORY_BELT] = bs->cur_ps.ammo[WP_CHAINGUN];
 #endif
 	// Q3Doom: Doom's weapons and ammo
-	if (DOOM_LEVEL() && DOOM_WEAPONSET(&bs->cur_ps) == DOOM_WEAPONS_DOOM) {
+	if (DOOM_WEAPONSET(&bs->cur_ps) == DOOM_WEAPONS_DOOM) {
 		BotDoomInventory(bs);
 	}
 	//powerups

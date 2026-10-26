@@ -186,6 +186,20 @@ typedef struct botGoap_s {
 	float		jumpTime;
 } botGoap_t;
 
+// Q3Doom: the bot's strafe-jumping (ai_strafe.c)
+typedef struct botStrafe_s {
+	bot_goal_t	goal;			// what the bot moves to, and how
+	float		goalTime;
+	int			moveFlags, travelType;
+	qboolean	allowed;		// a straight, open, safe stretch ahead
+	float		allowedTime;
+	vec3_t		target;			// where it goes
+	int			side;			// 1 strafing left, -1 right
+	float		noise;			// this jump's error on the angle, degrees
+	qboolean	wasOnGround;
+	float		speedPeak;
+} botStrafe_t;
+
 //bot state
 typedef struct bot_state_s
 {
@@ -300,6 +314,7 @@ typedef struct bot_state_s
 	int noattack;									//line where BotCheckAttack last gave up (bot_stats 2)
 	float runaway_time;								//retreating: face the way until then
 	botGoap_t goap;									// Q3Doom: the planner
+	botStrafe_t strafe;								// Q3Doom: strafe-jumping
 	//
 	int ltgtype;									//long term goal type
 	// team goals

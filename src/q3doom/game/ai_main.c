@@ -50,6 +50,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "ai_dmnet.h"
 #include "ai_vcmd.h"
 #include "ai_goap.h"
+#include "ai_strafe.h"
 
 //
 #include "chars.h"
@@ -932,6 +933,8 @@ void BotUpdateInput(bot_state_t *bs, int time, int elapsed_time) {
 	if (bi.actionflags & ACTION_RESPAWN) {
 		if (bs->lastucmd.buttons & BUTTON_ATTACK) bi.actionflags &= ~(ACTION_RESPAWN|ACTION_ATTACK);
 	}
+	// Q3Doom: strafe-jumping on a straight stretch
+	BotStrafeInput(bs, &bi, (float) elapsed_time / 1000);
 	//convert the bot input to a usercmd
 	BotInputToUserCommand(&bi, &bs->lastucmd, bs->cur_ps.delta_angles, time);
 	//subtract the delta angles
@@ -1059,6 +1062,7 @@ int BotAI(int client, float thinktime) {
 	bs->areanum = BotPointAreaNum(bs->origin);
 	//the real AI
 	BotDeathmatchAI(bs, thinktime);
+	BotStrafeThink(bs);
 	BotStats_Frame(bs, thinktime);
 	//set the weapon selection every AI frame
 	trap_EA_SelectWeapon(bs->client, BotSelectWeapon(bs, bs->weaponnum));
@@ -1676,6 +1680,7 @@ typedef struct {
 	float	aliveTime, distance;
 	float	enemyTime, stareTime, backpedalTime;
 	float	fireTime, strafeFireTime;
+	float	topSpeed, fastTime;
 	int		missileThreats, missileHits;
 	float	traceTime;
 } botStats_t;
@@ -1762,6 +1767,8 @@ void BotStats_Frame(bot_state_t *bs, float thinktime) {
 	speed = VectorLength(velocity);
 	st->aliveTime += thinktime;
 	st->distance += speed * thinktime;
+	if (speed > st->topSpeed) st->topSpeed = speed;
+	if (speed > 400) st->fastTime += thinktime;
 	if (bs->enemy < 0 || bs->enemyvisible_time < FloatTime() - 0.2f) {
 		return;
 	}
@@ -1801,21 +1808,26 @@ void BotStats_Report(void) {
 	int i, located;
 	botStats_t *st;
 	char name[MAX_NETNAME];
+	extern int strafeReasons[16];
 
-	G_Printf("bot stats:          shots  hit%%  feet%% body%% head%%  deaths  speed  enemy(s)  stare%%  backpedal%%  strafefire%%  dodged\n");
+	G_Printf("strafe stretches: ok %d, refused:", strafeReasons[0]);
+	for (i = 1; i < 16; i++) G_Printf(" %d", strafeReasons[i]);
+	G_Printf("\n");
+	G_Printf("bot stats:          shots  hit%%  feet%% body%% head%%  deaths  speed  enemy(s)  stare%%  backpedal%%  strafefire%%  dodged  top  fast%%\n");
 	for (i = 0; i < level.maxclients; i++) {
 		if (!botstates[i] || !botstates[i]->inuse) continue;
 		st = &botStats[i];
 		located = st->hitFeet + st->hitBody + st->hitHead;
 		ClientName(i, name, sizeof(name));
-		G_Printf("bot stats: %-12s %5d  %4.0f  %5.0f %5.0f %5.0f  %6d  %5.0f  %8.1f  %6.0f  %10.0f  %11.0f  %3d/%d\n",
+		G_Printf("bot stats: %-12s %5d  %4.0f  %5.0f %5.0f %5.0f  %6d  %5.0f  %8.1f  %6.0f  %10.0f  %11.0f  %3d/%d  %4.0f  %4.1f\n",
 				name, st->shots, BotStats_Percent(st->hits, st->shots),
 				BotStats_Percent(st->hitFeet, located), BotStats_Percent(st->hitBody, located),
 				BotStats_Percent(st->hitHead, located), st->deaths,
 				st->aliveTime > 0 ? st->distance / st->aliveTime : 0, st->enemyTime,
 				BotStats_Percent(st->stareTime, st->enemyTime), BotStats_Percent(st->backpedalTime, st->enemyTime),
 				BotStats_Percent(st->strafeFireTime, st->fireTime),
-				st->missileThreats - st->missileHits > 0 ? st->missileThreats - st->missileHits : 0, st->missileThreats);
+				st->missileThreats - st->missileHits > 0 ? st->missileThreats - st->missileHits : 0, st->missileThreats,
+				st->topSpeed, BotStats_Percent(st->fastTime, st->aliveTime));
 	}
 }
 
@@ -1834,6 +1846,7 @@ int BotAISetup( int restart ) {
 	trap_Cvar_Register(&bot_report, "bot_report", "0", CVAR_CHEAT);
 	trap_Cvar_Register(&bot_stats, "bot_stats", "0", 0);
 	BotGoapInit();
+	BotStrafeInit();
 	trap_Cvar_Register(&bot_testsolid, "bot_testsolid", "0", CVAR_CHEAT);
 	trap_Cvar_Register(&bot_testclusters, "bot_testclusters", "0", CVAR_CHEAT);
 	trap_Cvar_Register(&bot_developer, "bot_developer", "0", CVAR_CHEAT);

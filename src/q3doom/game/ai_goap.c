@@ -84,12 +84,13 @@ void BotGoapInit( void ) {
 ==================
 BotGoapActive
 
-The planner steers the bots on the Doom levels
+The planner steers the bots on the Doom levels (bot_goap 1), or on all
+maps (bot_goap 2, an experiment)
 ==================
 */
 qboolean BotGoapActive( bot_state_t *bs ) {
 	trap_Cvar_Update( &bot_goap );
-	return bot_goap.integer && DOOM_LEVEL();
+	return bot_goap.integer >= 2 || ( bot_goap.integer && DOOM_LEVEL() );
 }
 
 // the plan steers the nodes (no plan: Quake 3's own decisions)

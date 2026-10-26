@@ -847,6 +847,7 @@ int BotMovementViewTarget(int movestate, bot_goal_t *goal, int travelflags, floa
 	bot_movestate_t *ms;
 	vec3_t end;
 	float dist;
+	int steps;
 
 	ms = BotMoveStateFromHandle(movestate);
 	if (!ms) return qfalse;
@@ -858,7 +859,10 @@ int BotMovementViewTarget(int movestate, bot_goal_t *goal, int travelflags, floa
 	VectorCopy(ms->origin, end);
 	lastareanum = ms->lastareanum;
 	dist = 0;
-	while(reachnum && dist < lookahead)
+	// Q3Doom: a bounded walk: zero-length reachabilities that route back to
+	// each other would never add up to the lookahead
+	steps = 0;
+	while(reachnum && dist < lookahead && steps++ < 64)
 	{
 		AAS_ReachabilityFromNum(reachnum, &reach);
 		if (BotAddToTarget(end, reach.start, lookahead, &dist, target)) return qtrue;
