@@ -75,6 +75,7 @@ vmCvar_t bot_memorydump;
 vmCvar_t bot_saveroutingcache;
 vmCvar_t bot_pause;
 vmCvar_t bot_report;
+vmCvar_t bot_stats;
 vmCvar_t bot_testsolid;
 vmCvar_t bot_testclusters;
 vmCvar_t bot_developer;
@@ -759,7 +760,8 @@ BotChangeViewAngles
 ==============
 */
 void BotChangeViewAngles(bot_state_t *bs, float thinktime) {
-	float diff, factor, maxchange, anglespeed, disired_speed;
+	float diff, factor, maxchange, anglespeed;
+	float omega, damping, follow, maxspeed, idealspeed, step, t;
 	int i;
 
 	if (bs->ideal_viewangles[PITCH] > 180) bs->ideal_viewangles[PITCH] -= 360;
@@ -773,6 +775,19 @@ void BotChangeViewAngles(bot_state_t *bs, float thinktime) {
 		maxchange = 360;
 	}
 	if (maxchange < 240) maxchange = 240;
+	// Q3Doom: a hand on a mouse: the view accelerates towards the ideal angles,
+	// keeps up with a moving target, overshoots a little and settles back.
+	// It never snaps: skill only makes the hand quicker and steadier
+	if (bs->enemy >= 0) {
+		omega = 12 + 14 * factor;		// how fast the view closes in, 1/s
+		follow = 0.6 + 0.4 * factor;	// how much of the target's motion is followed
+	}
+	else {
+		omega = 9;
+		follow = 1;
+	}
+	damping = 0.62f;					// below 1: a slight overshoot
+	maxspeed = 300 + 2 * maxchange;		// a flick, in degrees per second
 	maxchange *= thinktime;
 	for (i = 0; i < 2; i++) {
 		//
@@ -784,28 +799,29 @@ void BotChangeViewAngles(bot_state_t *bs, float thinktime) {
 			bs->viewangles[i] = BotChangeViewAngle(bs->viewangles[i],
 											bs->ideal_viewangles[i], anglespeed);
 		}
-		else {
-			//over reaction view model
-			bs->viewangles[i] = AngleMod(bs->viewangles[i]);
-			bs->ideal_viewangles[i] = AngleMod(bs->ideal_viewangles[i]);
-			diff = AngleDifference(bs->viewangles[i], bs->ideal_viewangles[i]);
-			disired_speed = diff * factor;
-			bs->viewanglespeed[i] += (bs->viewanglespeed[i] - disired_speed);
-			if (bs->viewanglespeed[i] > 180) bs->viewanglespeed[i] = maxchange;
-			if (bs->viewanglespeed[i] < -180) bs->viewanglespeed[i] = -maxchange;
-			anglespeed = bs->viewanglespeed[i];
-			if (anglespeed > maxchange) anglespeed = maxchange;
-			if (anglespeed < -maxchange) anglespeed = -maxchange;
-			bs->viewangles[i] += anglespeed;
-			bs->viewangles[i] = AngleMod(bs->viewangles[i]);
-			//demping
-			bs->viewanglespeed[i] *= 0.45 * (1 - factor);
+		else if (thinktime > 0) {
+			//how fast the ideal angle moves: a tracked target's angular speed
+			idealspeed = AngleDifference(bs->ideal_viewangles[i], bs->aim_lastideal[i]) / thinktime;
+			if (fabs(idealspeed) > 400) idealspeed = 0;	//a new target, not a moving one
+			for (t = thinktime; t > 0; t -= step) {
+				step = t > 0.01f ? 0.01f : t;
+				diff = AngleDifference(bs->ideal_viewangles[i], bs->viewangles[i]);
+				bs->viewanglespeed[i] += (omega * omega * diff +
+						2 * damping * omega * (follow * idealspeed - bs->viewanglespeed[i])) * step;
+				if (bs->viewanglespeed[i] > maxspeed) bs->viewanglespeed[i] = maxspeed;
+				if (bs->viewanglespeed[i] < -maxspeed) bs->viewanglespeed[i] = -maxspeed;
+				bs->viewangles[i] = AngleMod(bs->viewangles[i] + bs->viewanglespeed[i] * step);
+			}
 		}
+		bs->aim_lastideal[i] = bs->ideal_viewangles[i];
 		//BotAI_Print(PRT_MESSAGE, "ideal_angles %f %f\n", bs->ideal_viewangles[0], bs->ideal_viewangles[1], bs->ideal_viewangles[2]);`
 		//bs->viewangles[i] = bs->ideal_viewangles[i];
 	}
 	//bs->viewangles[PITCH] = 0;
 	if (bs->viewangles[PITCH] > 180) bs->viewangles[PITCH] -= 360;
+	//an overshoot never looks past straight up or down
+	if (bs->viewangles[PITCH] > 89) bs->viewangles[PITCH] = 89;
+	if (bs->viewangles[PITCH] < -89) bs->viewangles[PITCH] = -89;
 	//elementary action: view
 	trap_EA_View(bs->client, bs->viewangles);
 }
@@ -1039,6 +1055,7 @@ int BotAI(int client, float thinktime) {
 	bs->areanum = BotPointAreaNum(bs->origin);
 	//the real AI
 	BotDeathmatchAI(bs, thinktime);
+	BotStats_Frame(bs, thinktime);
 	//set the weapon selection every AI frame
 	trap_EA_SelectWeapon(bs->client, bs->weaponnum);
 	//subtract the delta angles
@@ -1395,6 +1412,7 @@ int BotAIStartFrame(int time) {
 	trap_Cvar_Update(&bot_saveroutingcache);
 	trap_Cvar_Update(&bot_pause);
 	trap_Cvar_Update(&bot_report);
+	trap_Cvar_Update(&bot_stats);
 
 	if (bot_report.integer) {
 //		BotTeamplayReport();
@@ -1636,6 +1654,137 @@ int BotInitLibrary(void) {
 
 /*
 ==============
+Bot statistics
+
+Q3Doom: what a bot does in a match, to measure how believable it plays:
+how often it hits and where, how long it looks at an enemy without firing,
+how long it backs away from one without firing, how fast it moves.
+Kept across the rounds of a Doom Duel (map_restart); "botstats" prints them,
+and so does the end of a match with bot_stats 1
+==============
+*/
+typedef struct {
+	int		shots, hits;
+	int		hitFeet, hitBody, hitHead;
+	int		deaths;
+	int		lastHitShot;
+	qboolean	dead;
+	float	aliveTime, distance;
+	float	enemyTime, stareTime, backpedalTime;
+	float	traceTime;
+} botStats_t;
+
+static botStats_t botStats[MAX_CLIENTS];
+
+void BotStats_Clear(void) {
+	memset(botStats, 0, sizeof(botStats));
+}
+
+void BotStats_Fire(gentity_t *ent) {
+	if (ent->client && (ent->r.svFlags & SVF_BOT)) {
+		botStats[ent - g_entities].shots++;
+	}
+}
+
+void BotStats_Damage(gentity_t *targ, gentity_t *attacker, vec3_t point, int dflags) {
+	botStats_t *st;
+	float height, z;
+
+	if (!attacker || !attacker->client || !(attacker->r.svFlags & SVF_BOT) || targ == attacker) {
+		return;
+	}
+	st = &botStats[attacker - g_entities];
+	//one hit per shot: a shotgun's pellets or a rocket's splash count once
+	if (st->lastHitShot == st->shots) {
+		return;
+	}
+	st->lastHitShot = st->shots;
+	st->hits++;
+	if (!point || (dflags & DAMAGE_RADIUS)) {
+		return;
+	}
+	height = targ->r.absmax[2] - targ->r.absmin[2];
+	if (height <= 0) {
+		return;
+	}
+	z = (point[2] - targ->r.absmin[2]) / height;
+	if (z < 0.3f) st->hitFeet++;
+	else if (z > 0.8f) st->hitHead++;
+	else st->hitBody++;
+}
+
+void BotStats_Frame(bot_state_t *bs, float thinktime) {
+	botStats_t *st = &botStats[bs->client];
+	vec3_t forward, velocity;
+	float speed;
+	qboolean firing;
+	char name[MAX_NETNAME];
+
+	//bot_stats 2: what the bot is up to, every second
+	if (bot_stats.integer >= 2 && st->traceTime < FloatTime()) {
+		st->traceTime = FloatTime() + 1;
+		ClientName(bs->client, name, sizeof(name));
+		BotAI_Print(PRT_MESSAGE, "%s %1.1f at (%1.0f %1.0f %1.0f) ltg %d: enemy %d (aim %d, seen %1.1f s ago) weapon %d fired %1.1f s ago (no fire: %d)\n",
+				name, FloatTime(), bs->origin[0], bs->origin[1], bs->origin[2], bs->ltgtype, bs->enemy, bs->aim_enemy, FloatTime() - bs->enemyvisible_time,
+				bs->weaponnum, FloatTime() - bs->lastattack_time, bs->noattack);
+	}
+
+	if (BotIsDead(bs) || BotIsObserver(bs)) {
+		if (!st->dead && BotIsDead(bs)) st->deaths++;
+		st->dead = qtrue;
+		return;
+	}
+	st->dead = qfalse;
+	VectorCopy(bs->cur_ps.velocity, velocity);
+	velocity[2] = 0;
+	speed = VectorLength(velocity);
+	st->aliveTime += thinktime;
+	st->distance += speed * thinktime;
+	if (bs->enemy < 0 || bs->enemyvisible_time < FloatTime() - 0.2f) {
+		return;
+	}
+	st->enemyTime += thinktime;
+	firing = bs->lastattack_time > FloatTime() - 0.5f;
+	if (firing) {
+		return;
+	}
+	AngleVectors(bs->viewangles, forward, NULL, NULL);
+	forward[2] = 0;
+	VectorNormalize(forward);
+	if (bs->aim_enemy == bs->enemy && bs->aim_update_time > FloatTime() - 0.2f) {
+		st->stareTime += thinktime;
+	}
+	if (DotProduct(velocity, forward) < -100) {
+		st->backpedalTime += thinktime;
+	}
+}
+
+static float BotStats_Percent(float part, float whole) {
+	return whole > 0 ? 100 * part / whole : 0;
+}
+
+void BotStats_Report(void) {
+	int i, located;
+	botStats_t *st;
+	char name[MAX_NETNAME];
+
+	G_Printf("bot stats:          shots  hit%%  feet%% body%% head%%  deaths  speed  enemy(s)  stare%%  backpedal%%\n");
+	for (i = 0; i < level.maxclients; i++) {
+		if (!botstates[i] || !botstates[i]->inuse) continue;
+		st = &botStats[i];
+		located = st->hitFeet + st->hitBody + st->hitHead;
+		ClientName(i, name, sizeof(name));
+		G_Printf("bot stats: %-12s %5d  %4.0f  %5.0f %5.0f %5.0f  %6d  %5.0f  %8.1f  %6.0f  %10.0f\n",
+				name, st->shots, BotStats_Percent(st->hits, st->shots),
+				BotStats_Percent(st->hitFeet, located), BotStats_Percent(st->hitBody, located),
+				BotStats_Percent(st->hitHead, located), st->deaths,
+				st->aliveTime > 0 ? st->distance / st->aliveTime : 0, st->enemyTime,
+				BotStats_Percent(st->stareTime, st->enemyTime), BotStats_Percent(st->backpedalTime, st->enemyTime));
+	}
+}
+
+/*
+==============
 BotAISetup
 ==============
 */
@@ -1647,6 +1796,7 @@ int BotAISetup( int restart ) {
 	trap_Cvar_Register(&bot_saveroutingcache, "bot_saveroutingcache", "0", CVAR_CHEAT);
 	trap_Cvar_Register(&bot_pause, "bot_pause", "0", CVAR_CHEAT);
 	trap_Cvar_Register(&bot_report, "bot_report", "0", CVAR_CHEAT);
+	trap_Cvar_Register(&bot_stats, "bot_stats", "0", 0);
 	trap_Cvar_Register(&bot_testsolid, "bot_testsolid", "0", CVAR_CHEAT);
 	trap_Cvar_Register(&bot_testclusters, "bot_testclusters", "0", CVAR_CHEAT);
 	trap_Cvar_Register(&bot_developer, "bot_developer", "0", CVAR_CHEAT);
@@ -1662,6 +1812,7 @@ int BotAISetup( int restart ) {
 
 	//initialize the bot states
 	memset( botstates, 0, sizeof(botstates) );
+	BotStats_Clear();
 
 	errnum = BotInitLibrary();
 	if (errnum != BLERR_NOERROR) return qfalse;

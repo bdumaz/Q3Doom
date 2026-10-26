@@ -247,6 +247,8 @@ static void TouchGoal( gentity_t *ent, gentity_t *other, trace_t *trace ) {
 	}
 	duel.finished[num] = qtrue;
 	trap_SendServerCommand( -1, va( "print \"%s" S_COLOR_WHITE " reached the goal.\n\"", other->client->pers.netname ) );
+	G_Printf( "Doom Duel: %s reached the goal after %.1f s\n", other->client->pers.netname,
+		( level.time - duel.stateTime ) / 1000.0f );
 	if ( FinishedPlayers( team ) >= NeededPlayers( team ) ) {
 		RoundWon( team );
 		return;

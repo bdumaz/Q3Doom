@@ -716,6 +716,11 @@ int BotAISetupClient(int client, struct bot_settings_s *settings, qboolean resta
 int BotAIShutdownClient( int client, qboolean restart );
 int BotAIStartFrame( int time );
 void BotTestAAS(vec3_t origin);
+// Q3Doom: bot statistics (ai_main.c)
+void BotStats_Clear(void);
+void BotStats_Fire(gentity_t *ent);
+void BotStats_Damage(gentity_t *targ, gentity_t *attacker, vec3_t point, int dflags);
+void BotStats_Report(void);
 
 #include "g_team.h" // teamplay specific stuff
 

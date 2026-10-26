@@ -98,6 +98,8 @@ On Doom levels, these settings change the rules:
 
 **Bots** play on the Doom levels too. The first time a level is played with bots, the game makes their navigation file (`maps/<level>.aas` in your settings folder) with `bspc`, which is built and copied next to the game. That takes about a second. `doom_botnav all` makes them all at once; `doom_botnav <level>` remakes one. `bspc` is TTimo's maintained copy of id's GPL tool, in `tools/bspc`.
 
+To measure how the bots play, set `bot_stats 1` on the server. At the end of a match it prints, for each bot: shots, hit rate, where hits landed (feet, body, head), deaths, average speed, time with an enemy in sight, and how much of that time the bot spent aiming without firing or backing away without firing. `botstats` prints the same report at any time. `bot_stats 2` also traces each bot once a second.
+
 Q3Doom uses its own network protocol (1068). It doesn't see or join Quake 3 servers, and Quake 3 can't join it.
 
 ## Tests

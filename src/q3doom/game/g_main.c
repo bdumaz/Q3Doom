@@ -1063,6 +1063,11 @@ void BeginIntermission( void ) {
 	level.intermissiontime = level.time;
 	FindIntermissionPoint();
 
+	// Q3Doom: the bots' statistics of the match
+	if ( trap_Cvar_VariableIntegerValue( "bot_stats" ) ) {
+		BotStats_Report();
+	}
+
 #ifdef MISSIONPACK
 	if (g_singlePlayer.integer) {
 		trap_Cvar_Set("ui_singlePlayerActive", "0");

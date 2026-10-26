@@ -221,6 +221,16 @@ typedef struct bot_state_s
 	vec3_t viewangles;								//current view angles
 	vec3_t ideal_viewangles;						//ideal view angles
 	vec3_t viewanglespeed;
+	// Q3Doom: human aim (see BotAimAtEnemy and BotChangeViewAngles)
+	int aim_enemy;									//enemy the aim is tracking
+	float aim_track_time;							//time the bot started tracking it
+	float aim_update_time;							//last time the aim was updated
+	vec3_t aim_error;								//angular error that shrinks while tracking
+	vec3_t aim_drift;								//slow wander of the aim around the target
+	vec3_t aim_lastideal;							//ideal view angles last frame
+	float lastattack_time;							//last time the bot pressed fire
+	int noattack;									//line where BotCheckAttack last gave up (bot_stats 2)
+	float runaway_time;								//retreating: face the way until then
 	//
 	int ltgtype;									//long term goal type
 	// team goals
@@ -297,3 +307,6 @@ int		BotAI_GetClientState( int clientNum, playerState_t *state );
 int		BotAI_GetEntityState( int entityNum, entityState_t *state );
 int		BotAI_GetSnapshotEntity( int clientNum, int sequence, entityState_t *state );
 int		BotTeamLeader(bot_state_t *bs);
+float	AngleDifference(float ang1, float ang2);
+// Q3Doom: bot statistics
+void	BotStats_Frame(bot_state_t *bs, float thinktime);

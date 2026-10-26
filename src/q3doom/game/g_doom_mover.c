@@ -277,6 +277,11 @@ void Doom_ManualDoor( gentity_t *activator, int line, qboolean proximity ) {
 	if ( !sp || sp->kind != DOOM_KIND_DOOR || ld->side[1] == DOOM_NO_SIDE ) {
 		return;
 	}
+	// a bot uses what is in front of it twice a second (Doom_BotUse): that
+	// must not close the door it is going through
+	if ( activator && ( activator->r.svFlags & SVF_BOT ) ) {
+		proximity = qtrue;
+	}
 	sector = doomLevel.map->sidedefs[ld->side[1]].sector;
 	ent = SectorPlane( sector, 1 );
 	if ( !ent ) {

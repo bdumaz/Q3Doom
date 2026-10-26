@@ -100,6 +100,10 @@ void BotRecordNodeSwitch(bot_state_t *bs, char *node, char *str, char *s) {
 
 	ClientName(bs->client, netname, sizeof(netname));
 	Com_sprintf(nodeswitch[numnodeswitches], 144, "%s at %2.1f entered %s: %s from %s\n", netname, FloatTime(), node, str, s);
+	// Q3Doom: bot_stats 2 traces what the bots do
+	if (trap_Cvar_VariableIntegerValue("bot_stats") >= 2) {
+		BotAI_Print(PRT_MESSAGE, "%s", nodeswitch[numnodeswitches]);
+	}
 #ifdef DEBUG
 	if (0) {
 		BotAI_Print(PRT_MESSAGE, nodeswitch[numnodeswitches]);
@@ -2453,7 +2457,7 @@ int AINode_Battle_Retreat(bot_state_t *bs) {
 				&& !(bs->flags & BFL_IDEALVIEWSET) ) {
 		attack_skill = trap_Characteristic_BFloat(bs->character, CHARACTERISTIC_ATTACK_SKILL, 0, 1);
 		//if the bot is skilled anough
-		if (attack_skill > 0.3) {
+		if (attack_skill > 0.3 && BotFaceEnemyWhileMoving(bs)) {
 			BotAimAtEnemy(bs);
 		}
 		else {
@@ -2599,8 +2603,7 @@ int AINode_Battle_NBG(bot_state_t *bs) {
 				&& !(bs->flags & BFL_IDEALVIEWSET)) {
 		attack_skill = trap_Characteristic_BFloat(bs->character, CHARACTERISTIC_ATTACK_SKILL, 0, 1);
 		//if the bot is skilled anough and the enemy is visible
-		if (attack_skill > 0.3) {
-			//&& BotEntityVisible(bs->entitynum, bs->eye, bs->viewangles, 360, bs->enemy)
+		if (attack_skill > 0.3 && BotFaceEnemyWhileMoving(bs)) {
 			BotAimAtEnemy(bs);
 		}
 		else {

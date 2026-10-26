@@ -2307,6 +2307,11 @@ int BotWantsToRetreat(bot_state_t *bs) {
 		BotEntityInfo(bs->enemy, &entinfo);
 		if (EntityCarriesFlag(&entinfo))
 			return qfalse;
+		// Q3Doom: a monster is only an enemy when it is in the way or hurting
+		// the bot: it is fought, not run from (in a Doom Duel the bot runs on
+		// to the goal, shooting)
+		if (bs->enemy >= MAX_CLIENTS && !Doom_DuelActive())
+			return qfalse;
 	}
 	//if the bot is getting the flag
 	if (bs->ltgtype == LTG_GETFLAG)
@@ -2936,7 +2941,7 @@ BotFindEnemy
 ==================
 */
 int BotFindEnemy(bot_state_t *bs, int curenemy) {
-	int i, healthdecrease;
+	int i, healthdecrease, noplayer;
 	float f, alertness, easyfragger, vis;
 	float squaredist, cursquaredist;
 	aas_entityinfo_t entinfo, curenemyinfo;
@@ -2958,6 +2963,9 @@ int BotFindEnemy(bot_state_t *bs, int curenemy) {
 	else {
 		cursquaredist = 0;
 	}
+	// Q3Doom: players come before monsters: fighting a monster is no reason to
+	// ignore a player, wherever he is
+	noplayer = curenemy < 0 || curenemy >= MAX_CLIENTS;
 #ifdef MISSIONPACK
 	if (gametype == GT_OBELISK) {
 		vec3_t target;
@@ -3015,14 +3023,14 @@ int BotFindEnemy(bot_state_t *bs, int curenemy) {
 		if (!EntityCarriesFlag(&entinfo))
 		{
 			//if this enemy is further away than the current one
-			if (curenemy >= 0 && squaredist > cursquaredist) continue;
+			if (!noplayer && squaredist > cursquaredist) continue;
 		} //end if
 		//if the bot has no
 		if (squaredist > Square(900.0 + alertness * 4000.0)) continue;
 		//if on the same team
 		if (BotSameTeam(bs, i)) continue;
 		//if the bot's health decreased or the enemy is shooting
-		if (curenemy < 0 && (healthdecrease || EntityIsShooting(&entinfo)))
+		if (noplayer && (healthdecrease || EntityIsShooting(&entinfo)))
 			f = 360;
 		else
 			f = 90 + 90 - (90 - (squaredist > Square(810) ? Square(810) : squaredist) / (810 * 9));
@@ -3030,7 +3038,7 @@ int BotFindEnemy(bot_state_t *bs, int curenemy) {
 		vis = BotEntityVisible(bs->entitynum, bs->eye, bs->viewangles, f, i);
 		if (vis <= 0) continue;
 		//if the enemy is quite far away, not shooting and the bot is not damaged
-		if (curenemy < 0 && squaredist > Square(100) && !healthdecrease && !EntityIsShooting(&entinfo))
+		if (noplayer && squaredist > Square(100) && !healthdecrease && !EntityIsShooting(&entinfo))
 		{
 			//check if we can avoid this enemy
 			VectorSubtract(bs->origin, entinfo.origin, dir);
@@ -3052,12 +3060,18 @@ int BotFindEnemy(bot_state_t *bs, int curenemy) {
 		bs->enemyvisible_time = FloatTime();
 		return qtrue;
 	}
-	// Q3Doom: no player to fight: the nearest Doom monster in sight, if close
-	// (farther ones are run past, as a player would in a race)
+	// Q3Doom: no player to fight: the nearest Doom monster in sight that is a
+	// danger: one in the way, one close, or one that is hurting the bot.
+	// The others are run past, as a player would
 	if (curenemy < 0) {
 		int		best = -1;
 		float	bestdist = Square(500);
+		vec3_t	heading;
+		float	speed;
 
+		VectorCopy(bs->cur_ps.velocity, heading);
+		heading[2] = 0;
+		speed = VectorNormalize(heading);
 		for (i = MAX_CLIENTS; i < level.num_entities; i++) {
 			gentity_t *ent = &g_entities[i];
 
@@ -3065,6 +3079,16 @@ int BotFindEnemy(bot_state_t *bs, int curenemy) {
 			VectorSubtract(ent->r.currentOrigin, bs->origin, dir);
 			squaredist = VectorLengthSquared(dir);
 			if (squaredist > bestdist) continue;
+			if (squaredist > Square(160)) {
+				qboolean hurting, inway;
+
+				hurting = ent->doomMobj->target == &g_entities[bs->entitynum] &&
+							(healthdecrease || squaredist < Square(300));
+				dir[2] = 0;
+				VectorNormalize(dir);
+				inway = speed > 100 && DotProduct(dir, heading) > 0.85f && squaredist < Square(400);
+				if (!hurting && !inway) continue;
+			}
 			if (BotEntityVisible(bs->entitynum, bs->eye, bs->viewangles, 360, i) <= 0) continue;
 			best = i;
 			bestdist = squaredist;
@@ -3290,12 +3314,68 @@ int BotEnemyCubeCarrierVisible(bot_state_t *bs) {
 
 /*
 ==================
+BotReactionTime
+
+Q3Doom: how long a bot takes to react to a new target, in seconds
+==================
+*/
+float BotReactionTime(bot_state_t *bs) {
+	return 0.15f + 0.25f * trap_Characteristic_BFloat(bs->character, CHARACTERISTIC_REACTIONTIME, 0, 1);
+}
+
+/*
+==================
+BotStartAimTracking
+
+Q3Doom: the first aim at a new target is off by a few degrees
+==================
+*/
+static void BotStartAimTracking(bot_state_t *bs, float aim_accuracy) {
+	float first;
+
+	bs->aim_enemy = bs->enemy;
+	bs->aim_track_time = FloatTime();
+	bs->aim_update_time = FloatTime();
+	first = 2 + 8 * (1 - aim_accuracy);
+	bs->aim_error[YAW] = (random() < 0.5f ? -1 : 1) * first * (0.6f + 0.4f * random());
+	bs->aim_error[PITCH] = crandom() * first * 0.4f;
+	VectorClear(bs->aim_drift);
+}
+
+/*
+==================
+BotUpdateAimError
+
+Q3Doom: the first error shrinks while the bot tracks the target; what stays
+is a slow wander around it, wider for a less accurate bot
+==================
+*/
+static void BotUpdateAimError(bot_state_t *bs, float aim_skill, float aim_accuracy) {
+	float dt, decay, wander;
+	int i;
+
+	dt = FloatTime() - bs->aim_update_time;
+	if (dt > 0.5f) dt = 0.5f;
+	if (dt < 0) dt = 0;
+	bs->aim_update_time = FloatTime();
+	decay = exp(-dt / (0.12f + 0.45f * (1 - aim_skill)));
+	wander = 0.4f + 5 * (1 - aim_accuracy);
+	for (i = 0; i < 2; i++) {
+		bs->aim_error[i] *= decay;
+		//a random walk pulled back to the target
+		bs->aim_drift[i] += wander * crandom() * sqrt(dt) * 2.5f - bs->aim_drift[i] * dt / 0.35f;
+	}
+	bs->aim_drift[PITCH] *= 0.5f;
+}
+
+/*
+==================
 BotAimAtEnemy
 ==================
 */
 void BotAimAtEnemy(bot_state_t *bs) {
 	int i, enemyvisible;
-	float dist, f, aim_skill, aim_accuracy, speed, reactiontime;
+	float dist, aim_skill, aim_accuracy, speed, reactiontime, aimheight, feetheight;
 	vec3_t dir, bestorigin, end, start, groundtarget, cmdmove, enemyvelocity;
 	vec3_t mins = {-4,-4,-4}, maxs = {4, 4, 4};
 	weaponinfo_t wi;
@@ -3311,7 +3391,8 @@ void BotAimAtEnemy(bot_state_t *bs) {
 	//get the enemy entity information
 	BotEntityInfo(bs->enemy, &entinfo);
 	//if this is not a player (should be an obelisk)
-	if (bs->enemy >= MAX_CLIENTS) {
+	// Q3Doom: a Doom monster is aimed at like a player
+	if (bs->enemy >= MAX_CLIENTS && !g_entities[bs->enemy].doomMobj) {
 		//if the obelisk is visible
 		VectorCopy(entinfo.origin, target);
 #ifdef MISSIONPACK
@@ -3334,13 +3415,6 @@ void BotAimAtEnemy(bot_state_t *bs) {
 	aim_skill = trap_Characteristic_BFloat(bs->character, CHARACTERISTIC_AIM_SKILL, 0, 1);
 	aim_accuracy = trap_Characteristic_BFloat(bs->character, CHARACTERISTIC_AIM_ACCURACY, 0, 1);
 	//
-	if (aim_skill > 0.95) {
-		//don't aim too early
-		reactiontime = 0.5 * trap_Characteristic_BFloat(bs->character, CHARACTERISTIC_REACTIONTIME, 0, 1);
-		if (bs->enemysight_time > FloatTime() - reactiontime) return;
-		if (bs->teleport_time > FloatTime() - reactiontime) return;
-	}
-
 	//get the weapon information
 	trap_BotGetWeaponInfo(bs->ws, bs->weaponnum, &wi);
 	//get the weapon specific aim accuracy and or aim skill
@@ -3374,6 +3448,14 @@ void BotAimAtEnemy(bot_state_t *bs) {
 	}
 	//
 	if (aim_accuracy <= 0) aim_accuracy = 0.0001f;
+	// Q3Doom: a new target, or one seen again after a while, is acquired as a
+	// player would: a moment to react, then a first aim that is off and improves
+	if (bs->aim_enemy != bs->enemy || bs->aim_update_time < FloatTime() - 1) {
+		BotStartAimTracking(bs, aim_accuracy);
+	}
+	reactiontime = BotReactionTime(bs);
+	if (bs->aim_track_time > FloatTime() - reactiontime) return;
+	if (bs->teleport_time > FloatTime() - reactiontime) return;
 	//get the enemy entity information
 	BotEntityInfo(bs->enemy, &entinfo);
 	//if the enemy is invisible then shoot crappy most of the time
@@ -3385,22 +3467,23 @@ void BotAimAtEnemy(bot_state_t *bs) {
 	VectorScale(enemyvelocity, 1 / entinfo.update_time, enemyvelocity);
 	//enemy origin and velocity is remembered every 0.5 seconds
 	if (bs->enemyposition_time < FloatTime()) {
-		//
+		// Q3Doom: a target that turns about throws the aim off for a moment
+		if (DotProduct(bs->enemyvelocity, enemyvelocity) < 0 && VectorLengthSquared(enemyvelocity) > Square(100)) {
+			bs->aim_error[YAW] += crandom() * (1.5f + 4 * (1 - aim_skill));
+		}
 		bs->enemyposition_time = FloatTime() + 0.5;
 		VectorCopy(enemyvelocity, bs->enemyvelocity);
 		VectorCopy(entinfo.origin, bs->enemyorigin);
 	}
-	//if not extremely skilled
-	if (aim_skill < 0.9) {
-		VectorSubtract(entinfo.origin, bs->enemyorigin, dir);
-		//if the enemy moved a bit
-		if (VectorLengthSquared(dir) > Square(48)) {
-			//if the enemy changed direction
-			if (DotProduct(bs->enemyvelocity, enemyvelocity) < 0) {
-				//aim accuracy should be worse now
-				aim_accuracy *= 0.7f;
-			}
-		}
+	// Q3Doom: aim at the middle of the body: a player's chest, a monster's
+	// centre (a Doom monster's origin is at its feet)
+	if (bs->enemy < MAX_CLIENTS) {
+		aimheight = 8;
+		feetheight = -24;
+	}
+	else {
+		aimheight = (g_entities[bs->enemy].r.mins[2] + g_entities[bs->enemy].r.maxs[2]) * 0.5f;
+		feetheight = g_entities[bs->enemy].r.mins[2];
 	}
 	//check visibility of enemy
 	enemyvisible = BotEntityVisible(bs->entitynum, bs->eye, bs->viewangles, 360, bs->enemy);
@@ -3408,7 +3491,7 @@ void BotAimAtEnemy(bot_state_t *bs) {
 	if (enemyvisible) {
 		//
 		VectorCopy(entinfo.origin, bestorigin);
-		bestorigin[2] += 8;
+		bestorigin[2] += aimheight;
 		//get the start point shooting from
 		//NOTE: the x and y projectile start offsets are ignored
 		VectorCopy(bs->origin, start);
@@ -3429,7 +3512,7 @@ void BotAimAtEnemy(bot_state_t *bs) {
 			//if the enemy is NOT pretty far away and strafing just small steps left and right
 			if (!(dist > 100 && VectorLengthSquared(dir) < Square(32))) {
 				//if skilled anough do exact prediction
-				if (aim_skill > 0.8 &&
+				if (aim_skill > 0.8 && bs->enemy < MAX_CLIENTS &&
 						//if the weapon is ready to fire
 						bs->cur_ps.weaponstate == WEAPON_READY) {
 					aas_clientmove_t move;
@@ -3453,6 +3536,7 @@ void BotAimAtEnemy(bot_state_t *bs) {
 														dir, cmdmove, 0,
 														dist * 10 / wi.speed, 0.1f, 0, 0, qfalse);
 					VectorCopy(move.endpos, bestorigin);
+					bestorigin[2] += aimheight;
 					//BotAI_Print(PRT_MESSAGE, "%1.1f predicted speed = %f, frames = %f\n", FloatTime(), VectorLength(dir), dist * 10 / wi.speed);
 				}
 				//if not that skilled do linear prediction
@@ -3468,20 +3552,24 @@ void BotAimAtEnemy(bot_state_t *bs) {
 					//botimport.Print(PRT_MESSAGE, "speed = %f, wi->speed = %f\n", speed, wi->speed);
 					//best spot to aim at
 					VectorMA(entinfo.origin, (dist / wi.speed) * speed, dir, bestorigin);
+					bestorigin[2] += aimheight;
 				}
 			}
 		}
 		//if the projectile does radial damage
 		if (aim_skill > 0.6 && wi.proj.damagetype & DAMAGETYPE_RADIAL) {
 			//if the enemy isn't standing significantly higher than the bot
-			if (entinfo.origin[2] < bs->origin[2] + 16) {
+			if (entinfo.origin[2] + feetheight < bs->origin[2] - 24 + 16) {
+				vec3_t centre;
 				//try to aim at the ground in front of the enemy
+				VectorCopy(entinfo.origin, centre);
+				centre[2] += aimheight;
 				VectorCopy(entinfo.origin, end);
-				end[2] -= 64;
-				BotAI_Trace(&trace, entinfo.origin, NULL, NULL, end, entinfo.number, MASK_SHOT);
+				end[2] += feetheight - 40;
+				BotAI_Trace(&trace, centre, NULL, NULL, end, entinfo.number, MASK_SHOT);
 				//
 				VectorCopy(bestorigin, groundtarget);
-				if (trace.startsolid) groundtarget[2] = entinfo.origin[2] - 16;
+				if (trace.startsolid) groundtarget[2] = entinfo.origin[2] + feetheight + 8;
 				else groundtarget[2] = trace.endpos[2] - 8;
 				//trace a line from projectile start to ground target
 				BotAI_Trace(&trace, start, NULL, NULL, groundtarget, bs->entitynum, MASK_SHOT);
@@ -3495,7 +3583,7 @@ void BotAimAtEnemy(bot_state_t *bs) {
 						if (VectorLengthSquared(dir) > Square(100)) {
 							//check if the bot is visible from the ground target
 							trace.endpos[2] += 1;
-							BotAI_Trace(&trace, trace.endpos, NULL, NULL, entinfo.origin, entinfo.number, MASK_SHOT);
+							BotAI_Trace(&trace, trace.endpos, NULL, NULL, centre, entinfo.number, MASK_SHOT);
 							if (trace.fraction >= 1) {
 								//botimport.Print(PRT_MESSAGE, "%1.1f aiming at ground\n", AAS_Time());
 								VectorCopy(groundtarget, bestorigin);
@@ -3505,14 +3593,11 @@ void BotAimAtEnemy(bot_state_t *bs) {
 				}
 			}
 		}
-		bestorigin[0] += 20 * crandom() * (1 - aim_accuracy);
-		bestorigin[1] += 20 * crandom() * (1 - aim_accuracy);
-		bestorigin[2] += 10 * crandom() * (1 - aim_accuracy);
 	}
 	else {
 		//
 		VectorCopy(bs->lastenemyorigin, bestorigin);
-		bestorigin[2] += 8;
+		bestorigin[2] += aimheight;
 		//if the bot is skilled anough
 		if (aim_skill > 0.5) {
 			//do prediction shots around corners
@@ -3547,29 +3632,13 @@ void BotAimAtEnemy(bot_state_t *bs) {
 	}
 	//get aim direction
 	VectorSubtract(bestorigin, bs->eye, dir);
-	//
-	if (wi.number == WP_MACHINEGUN ||
-		wi.number == WP_SHOTGUN ||
-		wi.number == WP_LIGHTNING ||
-		wi.number == WP_RAILGUN) {
-		//distance towards the enemy
-		dist = VectorLength(dir);
-		if (dist > 150) dist = 150;
-		f = 0.6 + dist / 150 * 0.4;
-		aim_accuracy *= f;
-	}
-	//add some random stuff to the aim direction depending on the aim accuracy
-	if (aim_accuracy < 0.8) {
-		VectorNormalize(dir);
-		for (i = 0; i < 3; i++) dir[i] += 0.3 * crandom() * (1 - aim_accuracy);
-	}
 	//set the ideal view angles
 	vectoangles(dir, bs->ideal_viewangles);
-	//take the weapon spread into account for lower skilled bots
-	bs->ideal_viewangles[PITCH] += 6 * wi.vspread * crandom() * (1 - aim_accuracy);
-	bs->ideal_viewangles[PITCH] = AngleMod(bs->ideal_viewangles[PITCH]);
-	bs->ideal_viewangles[YAW] += 6 * wi.hspread * crandom() * (1 - aim_accuracy);
-	bs->ideal_viewangles[YAW] = AngleMod(bs->ideal_viewangles[YAW]);
+	// Q3Doom: the hand's error, not a fresh random jitter every frame
+	BotUpdateAimError(bs, aim_skill, aim_accuracy);
+	for (i = 0; i < 2; i++) {
+		bs->ideal_viewangles[i] = AngleMod(bs->ideal_viewangles[i] + bs->aim_error[i] + bs->aim_drift[i]);
+	}
 	//if the bots should be really challenging
 	if (bot_challenge.integer) {
 		//if the bot is really accurate and has the enemy in view for some time
@@ -3580,6 +3649,25 @@ void BotAimAtEnemy(bot_state_t *bs) {
 			trap_EA_View(bs->client, bs->viewangles);
 		}
 	}
+}
+
+/*
+==================
+BotFaceEnemyWhileMoving
+
+Q3Doom: moving away from an enemy, a player looks back to shoot it, not to
+stare at it: out of sight, or not fired at for a while, he turns and runs
+==================
+*/
+qboolean BotFaceEnemyWhileMoving(bot_state_t *bs) {
+	if (bs->runaway_time > FloatTime()) return qfalse;
+	if (!BotEntityVisible(bs->entitynum, bs->eye, bs->viewangles, 360, bs->enemy)) return qfalse;
+	if (bs->aim_enemy == bs->enemy && bs->aim_track_time < FloatTime() - 1.5f &&
+		bs->lastattack_time < FloatTime() - 1.0f) {
+		bs->runaway_time = FloatTime() + 1.5f;
+		return qfalse;
+	}
+	return qtrue;
 }
 
 /*
@@ -3610,19 +3698,22 @@ void BotCheckAttack(bot_state_t *bs) {
 			// if obelisk is respawning return
 			if ( g_entities[entinfo.number].activator &&
 				g_entities[entinfo.number].activator->s.frame == 2 ) {
-				return;
+				{ bs->noattack = __LINE__; return; }
 			}
 		}
 #endif
 	}
 	//
-	reactiontime = trap_Characteristic_BFloat(bs->character, CHARACTERISTIC_REACTIONTIME, 0, 1);
-	if (bs->enemysight_time > FloatTime() - reactiontime) return;
-	if (bs->teleport_time > FloatTime() - reactiontime) return;
+	// Q3Doom: the same reaction time as the aim's, counted from when the aim
+	// started tracking this target
+	reactiontime = BotReactionTime(bs);
+	if (bs->aim_enemy != bs->enemy) { bs->noattack = __LINE__; return; }
+	if (bs->aim_track_time > FloatTime() - reactiontime) { bs->noattack = __LINE__; return; }
+	if (bs->teleport_time > FloatTime() - reactiontime) { bs->noattack = __LINE__; return; }
 	//if changing weapons
-	if (bs->weaponchange_time > FloatTime() - 0.1) return;
+	if (bs->weaponchange_time > FloatTime() - 0.1) { bs->noattack = __LINE__; return; }
 	//check fire throttle characteristic
-	if (bs->firethrottlewait_time > FloatTime()) return;
+	if (bs->firethrottlewait_time > FloatTime()) { bs->noattack = __LINE__; return; }
 	firethrottle = trap_Characteristic_BFloat(bs->character, CHARACTERISTIC_FIRETHROTTLE, 0, 1);
 	if (bs->firethrottleshoot_time < FloatTime()) {
 		if (random() > firethrottle) {
@@ -3640,7 +3731,7 @@ void BotCheckAttack(bot_state_t *bs) {
 	//
 	if (bs->weaponnum == WP_GAUNTLET) {
 		if (VectorLengthSquared(dir) > Square(60)) {
-			return;
+			{ bs->noattack = __LINE__; return; }
 		}
 	}
 	if (VectorLengthSquared(dir) < Square(100))
@@ -3650,10 +3741,24 @@ void BotCheckAttack(bot_state_t *bs) {
 	//
 	vectoangles(dir, angles);
 	if (!InFieldOfVision(bs->viewangles, fov, angles))
-		return;
+		{ bs->noattack = __LINE__; return; }
+	// Q3Doom: a player fires once the crosshair is on the target; a spraying
+	// weapon a little before, a splash weapon near enough
+	if (bs->weaponnum != WP_GAUNTLET) {
+		float tolerance, radius;
+
+		radius = 24;
+		if (bs->weaponnum == WP_ROCKET_LAUNCHER || bs->weaponnum == WP_GRENADE_LAUNCHER ||
+			bs->weaponnum == WP_BFG) radius += 40;
+		tolerance = RAD2DEG(atan2(radius, VectorLength(dir)));
+		if (bs->weaponnum == WP_MACHINEGUN || bs->weaponnum == WP_LIGHTNING ||
+			bs->weaponnum == WP_PLASMAGUN || bs->weaponnum == WP_SHOTGUN) tolerance += 3;
+		if (fabs(AngleDifference(bs->viewangles[YAW], angles[YAW])) > tolerance) { bs->noattack = __LINE__; return; }
+		if (fabs(AngleDifference(bs->viewangles[PITCH], angles[PITCH])) > tolerance) { bs->noattack = __LINE__; return; }
+	}
 	BotAI_Trace(&bsptrace, bs->eye, NULL, NULL, bs->aimtarget, bs->client, CONTENTS_SOLID|CONTENTS_PLAYERCLIP);
 	if (bsptrace.fraction < 1 && bsptrace.ent != attackentity)
-		return;
+		{ bs->noattack = __LINE__; return; }
 
 	//get the weapon info
 	trap_BotGetWeaponInfo(bs->ws, bs->weaponnum, &wi);
@@ -3674,7 +3779,7 @@ void BotCheckAttack(bot_state_t *bs) {
 		if (trace.ent != attackentity) {
 			//if a teammate is hit
 			if (BotSameTeam(bs, trace.ent))
-				return;
+				{ bs->noattack = __LINE__; return; }
 		}
 	}
 	//if won't hit the enemy or not attacking a player (obelisk)
@@ -3684,7 +3789,7 @@ void BotCheckAttack(bot_state_t *bs) {
 			if (trace.fraction * 1000 < wi.proj.radius) {
 				points = (wi.proj.damage - 0.5 * trace.fraction * 1000) * 0.5;
 				if (points > 0) {
-					return;
+					{ bs->noattack = __LINE__; return; }
 				}
 			}
 			//FIXME: check if a teammate gets radial damage
@@ -3700,6 +3805,8 @@ void BotCheckAttack(bot_state_t *bs) {
 		trap_EA_Attack(bs->client);
 	}
 	bs->flags ^= BFL_ATTACKED;
+	bs->lastattack_time = FloatTime();
+	bs->noattack = 0;
 }
 
 /*
