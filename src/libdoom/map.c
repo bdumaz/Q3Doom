@@ -198,24 +198,36 @@ void doom_map_free( doom_map_t *map ) {
 =================
 SectorIsEnclosed
 
-True if every two-sided line of the sector is flagged impassable: a Doom
-player can never stand in it (a window sill between two rooms).
+True if a Doom player can never walk into the sector (a window sill between
+two rooms, or above a lower yard): each of its two-sided lines is flagged
+impassable, or leads to a sector too low to step up from (more than a Doom
+step) or through an opening too low for a player
 =================
 */
+#define DOOM_PLAYER_HEIGHT	56
+
 static int SectorIsEnclosed( const doom_map_t *map, int sector ) {
-	int		i;
+	const doom_sector_t	*sec = &map->sectors[sector];
+	int					i;
 
 	for ( i = 0 ; i < map->num_linedefs ; i++ ) {
-		const doom_linedef_t *ld = &map->linedefs[i];
+		const doom_linedef_t	*ld = &map->linedefs[i];
+		const doom_sector_t		*other;
+		int						s0, s1, top, bottom;
 
-		if ( ld->side[1] == DOOM_NO_SIDE ) {
+		if ( ld->side[1] == DOOM_NO_SIDE || ( ld->flags & DOOM_ML_BLOCKING ) ) {
 			continue;
 		}
-		if ( map->sidedefs[ld->side[0]].sector != sector && map->sidedefs[ld->side[1]].sector != sector ) {
+		s0 = map->sidedefs[ld->side[0]].sector;
+		s1 = map->sidedefs[ld->side[1]].sector;
+		if ( ( s0 != sector && s1 != sector ) || s0 == s1 ) {
 			continue;
 		}
-		if ( !( ld->flags & DOOM_ML_BLOCKING ) ) {
-			return 0;
+		other = &map->sectors[s0 == sector ? s1 : s0];
+		top = sec->ceiling_height < other->ceiling_height ? sec->ceiling_height : other->ceiling_height;
+		bottom = sec->floor_height > other->floor_height ? sec->floor_height : other->floor_height;
+		if ( sec->floor_height - other->floor_height <= DOOM_MAX_STEP && top - bottom >= DOOM_PLAYER_HEIGHT ) {
+			return 0;		// a way in
 		}
 	}
 	return 1;
