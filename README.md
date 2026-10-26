@@ -11,6 +11,8 @@ An optional **Quake Visuals** mode redraws the maps with Quake 3 textures, item 
 
 **Multiplayer** plays Quake 3's Deathmatch, Team Deathmatch, Tournament and CTF with Doom's weapons and items, as Doom marines in five colours. It runs on Quake 3's maps and, for Deathmatch and Team Deathmatch, on all 36 Doom levels.
 
+Also includes a new multiplayer mode: **Doom Duel**. In teams or 1v1, test your Doom-fu and Quake 3 skills in a mode that blends running, PvE and deathmatch on Doom campaign maps.
+
 > Runs on 64-bit Windows and Linux.
 
 ## What you need
