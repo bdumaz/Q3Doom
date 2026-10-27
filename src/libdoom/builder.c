@@ -1397,6 +1397,57 @@ static void WallQuad( builder_t *b, int line, int side, const char *texture, int
 
 /*
 =================
+MissingWallQuad
+
+An upper or lower wall piece whose texture is missing ("-"). Doom draws
+nothing there and the nearer sector's ceiling or floor fills the gap, so
+it looks continuous; it is drawn with that flat instead of leaving a hole
+into the void (or the sky, for a sky ceiling).
+=================
+*/
+static void MissingWallQuad( builder_t *b, int sector, const char *flat, pt_t a, pt_t c, double z0, double z1 ) {
+	surfbuilder_t	*sb = NULL;
+	float			xyz[4][3], st[4][2], normal[3];
+	double			len;
+	line_t			l;
+	int				shader, i;
+
+	if ( z1 - z0 < 0.01 ) {
+		return;
+	}
+	len = sqrt( ( c.x - a.x ) * ( c.x - a.x ) + ( c.y - a.y ) * ( c.y - a.y ) );
+	l = LineFromPoints( a, c );
+	normal[0] = (float)l.nx;
+	normal[1] = (float)l.ny;
+	normal[2] = 0;
+
+	xyz[0][0] = (float)a.x; xyz[0][1] = (float)a.y; xyz[0][2] = (float)z1;
+	xyz[1][0] = (float)c.x; xyz[1][1] = (float)c.y; xyz[1][2] = (float)z1;
+	xyz[2][0] = (float)c.x; xyz[2][1] = (float)c.y; xyz[2][2] = (float)z0;
+	xyz[3][0] = (float)a.x; xyz[3][1] = (float)a.y; xyz[3][2] = (float)z0;
+	// the 64 x 64 flat along the wall
+	st[0][0] = st[3][0] = 0;
+	st[1][0] = st[2][0] = (float)( len / 64 );
+	st[0][1] = st[1][1] = (float)( -z1 / 64 );
+	st[2][1] = st[3][1] = (float)( -z0 / 64 );
+
+	shader = FlatShader( b, flat, 0 );
+	for ( i = 0 ; i < b->wallBuilders.count ; i++ ) {
+		surfbuilder_t *w = BufAt( &b->wallBuilders, surfbuilder_t, i );
+		if ( w->shader == shader && w->sector == sector && w->model == b->currentModel ) {
+			sb = w;
+			break;
+		}
+	}
+	if ( !sb ) {
+		sb = BufPush( &b->wallBuilders );
+		BeginSurface( b, sb, shader, sector );
+	}
+	SurfacePolygon( b, sb, 4, (const float (*)[3])xyz, (const float (*)[2])st, normal, sector, 0 );
+}
+
+/*
+=================
 BuildWalls
 
 Doom's wall rules (r_segs.c): one-sided middle, two-sided upper and lower,
@@ -1451,16 +1502,24 @@ static void BuildWalls( builder_t *b ) {
 
 			// upper: front ceiling above back ceiling, unless both are sky
 			if ( !( IsSky( front->ceiling_flat ) && IsSky( back->ceiling_flat ) ) ) {
-				TextureSize( b, sd->top, &tw, &th );
-				WallQuad( b, i, s, sd->top, sector, sector, contrast, a, c, rb->ceiling_max, rf->ceiling_max, 0,
-					( ld->flags & DOOM_ML_DONTPEGTOP ) ? front->ceiling_height : back->ceiling_height + th,
-					sd->x_offset, sd->y_offset, 0 );
+				if ( !strcmp( sd->top, "-" ) ) {
+					MissingWallQuad( b, sector, front->ceiling_flat, a, c, rb->ceiling_max, rf->ceiling_max );
+				} else {
+					TextureSize( b, sd->top, &tw, &th );
+					WallQuad( b, i, s, sd->top, sector, sector, contrast, a, c, rb->ceiling_max, rf->ceiling_max, 0,
+						( ld->flags & DOOM_ML_DONTPEGTOP ) ? front->ceiling_height : back->ceiling_height + th,
+						sd->x_offset, sd->y_offset, 0 );
+				}
 			}
 
 			// lower: back floor above front floor
-			WallQuad( b, i, s, sd->bottom, sector, sector, contrast, a, c, rf->floor_min, rb->floor_min, 0,
-				( ld->flags & DOOM_ML_DONTPEGBOTTOM ) ? front->ceiling_height : back->floor_height,
-				sd->x_offset, sd->y_offset, 0 );
+			if ( !strcmp( sd->bottom, "-" ) ) {
+				MissingWallQuad( b, sector, front->floor_flat, a, c, rf->floor_min, rb->floor_min );
+			} else {
+				WallQuad( b, i, s, sd->bottom, sector, sector, contrast, a, c, rf->floor_min, rb->floor_min, 0,
+					( ld->flags & DOOM_ML_DONTPEGBOTTOM ) ? front->ceiling_height : back->floor_height,
+					sd->x_offset, sd->y_offset, 0 );
+			}
 
 			// masked middle texture: one texture height, not tiled vertically
 			if ( strcmp( sd->mid, "-" ) ) {

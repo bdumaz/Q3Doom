@@ -226,6 +226,54 @@ qboolean	PM_SlideMove( qboolean gravity ) {
 
 /*
 ==================
+PM_StepAt
+
+Steps up 'height' from start_o, slides and comes back down. Returns the
+horizontal distance gained, or -1 (nothing moved) without room to step up.
+==================
+*/
+static float PM_StepAt( const vec3_t start_o, const vec3_t start_v, float height, qboolean gravity ) {
+	trace_t		trace;
+	vec3_t		up, down;
+	float		stepSize;
+
+	VectorCopy (start_o, up);
+	up[2] += height;
+
+	// test the player position if they were a stepheight higher
+	pm->trace (&trace, start_o, pm->mins, pm->maxs, up, pm->ps->clientNum, pm->tracemask);
+	if ( trace.allsolid ) {
+		if ( pm->debugLevel ) {
+			Com_Printf("%i:bend can't step\n", c_pmove);
+		}
+		return -1;		// can't step up
+	}
+
+	stepSize = trace.endpos[2] - start_o[2];
+	// try slidemove from this position
+	VectorCopy (trace.endpos, pm->ps->origin);
+	VectorCopy (start_v, pm->ps->velocity);
+
+	PM_SlideMove( gravity );
+
+	// push down the final amount
+	VectorCopy (pm->ps->origin, down);
+	down[2] -= stepSize;
+	pm->trace (&trace, pm->ps->origin, pm->mins, pm->maxs, down, pm->ps->clientNum, pm->tracemask);
+	if ( !trace.allsolid ) {
+		VectorCopy (trace.endpos, pm->ps->origin);
+	}
+	if ( trace.fraction < 1.0 ) {
+		PM_ClipVelocity( pm->ps->velocity, trace.plane.normal, pm->ps->velocity, OVERCLIP );
+	}
+
+	VectorSubtract( pm->ps->origin, start_o, up );
+	up[2] = 0;
+	return VectorLength( up );
+}
+
+/*
+==================
 PM_StepSlideMove
 
 ==================
@@ -236,8 +284,8 @@ void PM_StepSlideMove( qboolean gravity ) {
 	trace_t		trace;
 //	float		down_dist, up_dist;
 //	vec3_t		delta, delta2;
-	vec3_t		up, down;
-	float		stepSize;
+	vec3_t		up, down, moved;
+	float		slideDist, stepDist;
 	float		maxStep = pm->stepHeight > 0 ? pm->stepHeight : STEPSIZE;
 
 	VectorCopy (pm->ps->origin, start_o);
@@ -259,35 +307,34 @@ void PM_StepSlideMove( qboolean gravity ) {
 
 	VectorCopy (pm->ps->origin, down_o);
 	VectorCopy (pm->ps->velocity, down_v);
+	VectorSubtract( down_o, start_o, moved );
+	moved[2] = 0;
+	slideDist = VectorLength( moved );
 
-	VectorCopy (start_o, up);
-	up[2] += maxStep;
+	stepDist = PM_StepAt( start_o, start_v, maxStep, gravity );
+	if ( stepDist < 0 ) {
+		return;		// can't step up: keep the slide move
+	}
 
-	// test the player position if they were a stepheight higher
-	pm->trace (&trace, start_o, pm->mins, pm->maxs, up, pm->ps->clientNum, pm->tracemask);
-	if ( trace.allsolid ) {
-		if ( pm->debugLevel ) {
-			Com_Printf("%i:bend can't step\n", c_pmove);
+	// Q3Doom: stepping up first lifts the player a whole step height, where
+	// Doom only needs the player to fit after the step: a low ceiling past
+	// a low step (E1M4) blocks that, so lower steps are tried
+	if ( stepDist < slideDist + 1 ) {
+		vec3_t	step_o, step_v;
+		float	height;
+
+		VectorCopy (pm->ps->origin, step_o);
+		VectorCopy (pm->ps->velocity, step_v);
+		for ( height = maxStep - 2 ; height >= 2 ; height -= 2 ) {
+			if ( PM_StepAt( start_o, start_v, height, gravity ) >= slideDist + 1 ) {
+				break;
+			}
 		}
-		return;		// can't step up
-	}
-
-	stepSize = trace.endpos[2] - start_o[2];
-	// try slidemove from this position
-	VectorCopy (trace.endpos, pm->ps->origin);
-	VectorCopy (start_v, pm->ps->velocity);
-
-	PM_SlideMove( gravity );
-
-	// push down the final amount
-	VectorCopy (pm->ps->origin, down);
-	down[2] -= stepSize;
-	pm->trace (&trace, pm->ps->origin, pm->mins, pm->maxs, down, pm->ps->clientNum, pm->tracemask);
-	if ( !trace.allsolid ) {
-		VectorCopy (trace.endpos, pm->ps->origin);
-	}
-	if ( trace.fraction < 1.0 ) {
-		PM_ClipVelocity( pm->ps->velocity, trace.plane.normal, pm->ps->velocity, OVERCLIP );
+		if ( height < 2 ) {
+			// none got further: the full height step, as before
+			VectorCopy (step_o, pm->ps->origin);
+			VectorCopy (step_v, pm->ps->velocity);
+		}
 	}
 
 #if 0
