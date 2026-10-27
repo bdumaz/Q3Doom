@@ -180,7 +180,7 @@ gentity_t *Doom_DuelSpawnSpot( gentity_t *ent, vec3_t origin, vec3_t angles ) {
 		return NULL;
 	}
 	side = TeamSide( team );
-	maxs[2] = g_playerHeight.value > 0 ? g_playerHeight.value + MINS_Z : maxs[2];
+	maxs[2] = g_playerHeight.value > 0 ? PLAYER_TOP( g_playerHeight.value ) : maxs[2];
 	for ( i = 0 ; i < n ; i++ ) {
 		int sector;
 

@@ -1324,9 +1324,10 @@ static void PM_CheckDuck (void)
 	trace_t	trace;
 	// Q3Doom: g_playerHeight; the feet stay at MINS_Z, the eyes at most 4
 	// units under the top, the crouched box no taller than the standing one
-	float	standTop = ( pm->playerHeight > 0 ? pm->playerHeight : 56 ) + MINS_Z;
+	float	height = pm->playerHeight > 0 ? pm->playerHeight : 56;
+	float	standTop = pm->playerHeight > 0 ? PLAYER_TOP( height ) : height + MINS_Z;
 	float	crouchTop = standTop < 16 ? standTop : 16;
-	int		standView = standTop - 4 < DEFAULT_VIEWHEIGHT ? (int)( standTop - 4 ) : DEFAULT_VIEWHEIGHT;
+	int		standView = height + MINS_Z - 4 < DEFAULT_VIEWHEIGHT ? (int)( height + MINS_Z - 4 ) : DEFAULT_VIEWHEIGHT;
 
 	if ( pm->ps->powerups[PW_INVULNERABILITY] ) {
 		if ( pm->ps->pm_flags & PMF_INVULEXPAND ) {

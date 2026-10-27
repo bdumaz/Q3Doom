@@ -49,6 +49,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define	MINS_Z				-24
 #define	DEFAULT_VIEWHEIGHT	26
 #define CROUCH_VIEWHEIGHT	12
+
+// Q3Doom: the top of a g_playerHeight tall player box. Doom lets a thing
+// through an opening exactly its height, where traces keep a clip epsilon
+// off every surface: the box is a little shorter so such openings fit.
+#define	PLAYER_TOP( height )	( (height) + MINS_Z - 0.25f )
 #define	DEAD_VIEWHEIGHT		-16
 
 //
