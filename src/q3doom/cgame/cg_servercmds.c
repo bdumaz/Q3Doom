@@ -1073,6 +1073,17 @@ static void CG_ServerCommand( void ) {
 		return;
 	}
 
+	// Q3Doom: the campaign's tally, sent with the scores
+	if ( !strcmp( cmd, "doomstats" ) ) {
+		int i;
+
+		for ( i = 0 ; i < 8 ; i++ ) {
+			cgs.doomStats[i] = atoi( CG_Argv( i + 1 ) );
+		}
+		cgs.doomStatsValid = qtrue;
+		return;
+	}
+
 	if ( !strcmp( cmd, "tinfo" ) ) {
 		CG_ParseTeamInfo();
 		return;

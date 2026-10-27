@@ -581,6 +581,7 @@ extern void			UI_DrawTextBox (int x, int y, int width, int lines);
 extern qboolean		UI_IsFullscreen( void );
 extern void			UI_SetActiveMenu( uiMenuCommand_t menu );
 extern void			UI_PushMenu ( menuframework_s *menu );
+extern void			UI_StatusLine( int y, const char *text );	// Q3Doom: a line of help for the focused item
 extern void			UI_PopMenu (void);
 extern void			UI_ForceMenuOff (void);
 extern char			*UI_Argv( int arg );

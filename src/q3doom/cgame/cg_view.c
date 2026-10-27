@@ -207,8 +207,9 @@ static void CG_CalcVrect (void) {
 	cg.refdef.x = (cgs.glconfig.vidWidth - cg.refdef.width)/2;
 	cg.refdef.y = (cgs.glconfig.vidHeight - cg.refdef.height)/2;
 
-	// Q3Doom: the view stops above the Doom status bar (168 of 200 rows)
-	if ( CG_DoomHudActive() && !CG_DoomLevelShotFrame() ) {
+	// Q3Doom: the view stops above the Doom status bar (168 of 200 rows), on
+	// a 4:3 screen; a wider one shows the game either side of the bar
+	if ( CG_DoomHudActive() && !CG_DoomLevelShotFrame() && !CG_DoomHudWide() ) {
 		cg.refdef.x = 0;
 		cg.refdef.y = 0;
 		cg.refdef.width = cgs.glconfig.vidWidth;

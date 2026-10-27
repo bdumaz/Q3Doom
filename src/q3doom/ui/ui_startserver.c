@@ -103,6 +103,20 @@ static const char *gametype_items[] = {
 	0
 };
 
+// Q3Doom: what each game type is (the status line under it)
+static const char *gametype_help[] = {
+	"Every player for himself on Quake 3's maps, with Doom's weapons",
+	"Two teams on Quake 3's maps or Doom's levels",
+	"One on one on Quake 3's maps, the others waiting their turn",
+	"Bring the enemy's flag home, on Quake 3's maps",
+	"A race through a Doom level: reach your rival's start first",
+	"Every player for himself on Doom's levels, Doom's or Quake 3's weapons",
+};
+
+static void StartServer_GametypeStatusBar( void *self ) {
+	UI_StatusLine( 384, gametype_help[( (menulist_s *)self )->curvalue] );
+}
+
 // Q3Doom: Doom for All is the free for all on Quake 3's maps; Doom Duel is
 // Team Deathmatch with g_doomDuel on the Doom levels (their "duel" type);
 // Quake DoomMatch the free for all on the Doom levels ("doommatch"), with
@@ -453,6 +467,7 @@ static void StartServer_MenuInit( void ) {
 	s_startserver.gametype.generic.x		= 320 - 24;
 	s_startserver.gametype.generic.y		= 368;
 	s_startserver.gametype.itemnames		= gametype_items;
+	s_startserver.gametype.generic.statusbar = StartServer_GametypeStatusBar;
 
 	for (i=0; i<MAX_MAPSPERPAGE; i++)
 	{
@@ -741,7 +756,7 @@ static const char *playerTeam_list[] = {
 
 static const char *duelWeapons_list[] = {
 	"Doom",
-	"Quake",
+	"Quake 3",
 	0
 };
 
@@ -1418,11 +1433,11 @@ static void ServerOptions_MenuInit( qboolean multiplayer ) {
 		s_serveroptions.duelMonsters.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
 		s_serveroptions.duelMonsters.generic.x			= OPTIONS_X;
 		s_serveroptions.duelMonsters.generic.y			= y;
-		s_serveroptions.duelMonsters.generic.name		= "Enemies:";
+		s_serveroptions.duelMonsters.generic.name		= "Monsters:";
 
 		y += BIGCHAR_HEIGHT+2;
 		s_serveroptions.duelGoal.generic.type			= MTYPE_FIELD;
-		s_serveroptions.duelGoal.generic.name			= "To the Goal:";
+		s_serveroptions.duelGoal.generic.name			= "Players to Finish:";
 		s_serveroptions.duelGoal.generic.flags			= QMF_NUMBERSONLY|QMF_PULSEIFFOCUS|QMF_SMALLFONT;
 		s_serveroptions.duelGoal.generic.x				= OPTIONS_X;
 		s_serveroptions.duelGoal.generic.y				= y;
@@ -1491,7 +1506,6 @@ static void ServerOptions_MenuInit( qboolean multiplayer ) {
 		s_serveroptions.hostname.field.maxchars     = 64;
 	}
 
-	y += BIGCHAR_HEIGHT+2;
 	s_serveroptions.punkbuster.generic.type			= MTYPE_SPINCONTROL;
 	s_serveroptions.punkbuster.generic.name			= "Punkbuster:";
 	s_serveroptions.punkbuster.generic.flags			= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -1634,7 +1648,6 @@ static void ServerOptions_MenuInit( qboolean multiplayer ) {
 	Menu_AddItem( &s_serveroptions.menu, &s_serveroptions.next );
 	Menu_AddItem( &s_serveroptions.menu, &s_serveroptions.go );
 
-	Menu_AddItem( &s_serveroptions.menu, (void*) &s_serveroptions.punkbuster );
 	
 	ServerOptions_SetMenuItems();
 }

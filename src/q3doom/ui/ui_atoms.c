@@ -885,12 +885,13 @@ void UI_MouseEvent( int dx, int dy )
 	if (!uis.activemenu)
 		return;
 
-	// update mouse screen position
+	// update mouse screen position (Q3Doom: over the whole width of a wide
+	// screen, where the corner buttons are)
 	uis.cursorx += dx;
-	if (uis.cursorx < 0)
-		uis.cursorx = 0;
-	else if (uis.cursorx > SCREEN_WIDTH)
-		uis.cursorx = SCREEN_WIDTH;
+	if (uis.cursorx < -uis.bias / uis.scale)
+		uis.cursorx = -uis.bias / uis.scale;
+	else if (uis.cursorx > SCREEN_WIDTH + uis.bias / uis.scale)
+		uis.cursorx = SCREEN_WIDTH + uis.bias / uis.scale;
 
 	uis.cursory += dy;
 	if (uis.cursory < 0)
@@ -1000,6 +1001,20 @@ void UI_Cache_f( void ) {
 UI_ConsoleCommand
 =================
 */
+void UI_SystemConfigMenu( void );
+
+/*
+=================
+UI_StatusLine
+
+Q3Doom: a line of help about the focused item (an item's statusbar
+callback), in the small letters of Quake 3's own status lines
+=================
+*/
+void UI_StatusLine( int y, const char *text ) {
+	UI_DrawString( SCREEN_WIDTH / 2, y, text, UI_CENTER | UI_SMALLFONT, colorWhite );
+}	// ui_options.c
+
 qboolean UI_ConsoleCommand( int realTime ) {
 	char	*cmd;
 
@@ -1035,6 +1050,47 @@ qboolean UI_ConsoleCommand( int realTime ) {
 		UI_DoomFragMenu();
 		return qtrue;
 	}
+	// any menu by name, on top of the main menu (screenshots, reviews)
+	if ( !Q_stricmp( cmd, "ui_open" ) ) {
+		static const struct { const char *name; void (*open)( void ); } menus[] = {
+			{ "main", NULL }, { "singleplayer", UI_DoomSinglePlayerMenu }, { "campaign", UI_DoomCampaignMenu },
+			{ "doomfrag", UI_DoomFragMenu }, { "servers", UI_ArenaServersMenu }, { "specifyserver", UI_SpecifyServerMenu },
+			{ "player", UI_PlayerSettingsMenu }, { "model", UI_PlayerModelMenu }, { "setup", UI_SetupMenu },
+			{ "system", UI_SystemConfigMenu }, { "graphics", UI_GraphicsOptionsMenu }, { "display", UI_DisplayOptionsMenu },
+			{ "sound", UI_SoundOptionsMenu }, { "network", UI_NetworkOptionsMenu }, { "controls", UI_ControlsMenu },
+			{ "preferences", UI_PreferencesMenu }, { "demos", UI_DemosMenu }, { "cinematics", UI_CinematicsMenu },
+			{ "mods", UI_ModsMenu }, { "credits", UI_CreditMenu }, { "loadconfig", UI_LoadConfigMenu },
+			{ "saveconfig", UI_SaveConfigMenu }, { "ingame", UI_InGameMenu }, { "addbots", UI_AddBotsMenu },
+			{ "removebots", UI_RemoveBotsMenu }, { "team", UI_TeamMainMenu }, { "serverinfo", UI_ServerInfoMenu },
+		};
+		const char	*name = UI_Argv( 1 );
+		int			i;
+
+		trap_Cvar_Set( "cl_paused", "0" );
+		trap_Key_SetCatcher( KEYCATCH_UI );
+		uis.menusp = 0;
+		UI_MainMenu();
+		if ( !Q_stricmp( name, "host" ) ) {
+			UI_StartServerMenu( qtrue );
+			return qtrue;
+		}
+		if ( !Q_stricmp( name, "hostoptions" ) ) {
+			UI_StartServerMenu( qtrue );
+			UI_StartServerDuelMenu( qtrue, qfalse );
+			return qtrue;
+		}
+		for ( i = 0 ; i < (int)( sizeof( menus ) / sizeof( menus[0] ) ) ; i++ ) {
+			if ( !Q_stricmp( name, menus[i].name ) ) {
+				if ( menus[i].open ) {
+					menus[i].open();
+				}
+				return qtrue;
+			}
+		}
+		Com_Printf( "ui_open: main singleplayer campaign doomfrag servers specifyserver host hostoptions player model setup system graphics display sound network controls preferences demos cinematics mods credits loadconfig saveconfig ingame addbots removebots team serverinfo\n" );
+		return qtrue;
+	}
+
 	// the multiplayer screens: the server list, hosting, the player
 	if ( !Q_stricmp( cmd, "doom_servermenu" ) || !Q_stricmp( cmd, "doom_hostmenu" ) || !Q_stricmp( cmd, "doom_playermenu" ) ) {
 		trap_Cvar_Set( "cl_paused", "0" );

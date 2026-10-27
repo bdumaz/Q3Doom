@@ -21,6 +21,8 @@ Licensed under the GNU General Public License version 2 or later.
 #include "../../libdoom/doom.h"
 
 #define ART_BACK0			"menu/art/back_0"
+#define ART_FIGHT0			"menu/art/fight_0"
+#define ART_FIGHT1			"menu/art/fight_1"
 #define ART_BACK1			"menu/art/back_1"
 
 #define NUM_EPISODES		4
@@ -87,7 +89,7 @@ const char *UI_LevelShotName( const char *map ) {
 }
 
 static const char *skillNames[] = {
-	"I'm too young to die.", "Hey, not too rough.", "Hurt me plenty.", "Ultra-Violence.", "Nightmare!", NULL
+	"I'm too young to die", "Hey, not too rough", "Hurt me plenty", "Ultra-Violence", "Nightmare!", NULL
 };
 
 static const char *campaignWeaponNames[] = { "Doom", "Quake 3", NULL };
@@ -131,6 +133,20 @@ static void DoomSP_Event( void *ptr, int notification ) {
 	}
 }
 
+static void Campaign_StatusBar( void *self ) {
+	UI_StatusLine( 466, ( (menucommon_s *)self )->id == ID_CAMPAIGNWEAPONS
+		? "Doom's weapons, or Quake 3's in their places"
+		: "The difficulty: harder ones earn better medals" );
+}
+
+static void Frag_StatusBar( void *self );
+
+static void DoomSP_StatusBar( void *self ) {
+	UI_StatusLine( 380, ( (menucommon_s *)self )->id == ID_CAMPAIGN
+		? "Doom's four episodes, level by level: medals and best times"
+		: "Race through the levels against the par times, your way" );
+}
+
 void UI_DoomSinglePlayerMenu( void ) {
 	memset( &s_doomsp, 0, sizeof( s_doomsp ) );
 	s_doomsp.menu.fullscreen = qtrue;
@@ -150,6 +166,7 @@ void UI_DoomSinglePlayerMenu( void ) {
 	s_doomsp.campaign.generic.id = ID_CAMPAIGN;
 	s_doomsp.campaign.generic.callback = DoomSP_Event;
 	s_doomsp.campaign.string = "DOOM CAMPAIGN";
+	s_doomsp.campaign.generic.statusbar = DoomSP_StatusBar;
 	s_doomsp.campaign.color = color_red;
 	s_doomsp.campaign.style = UI_CENTER;
 
@@ -160,6 +177,7 @@ void UI_DoomSinglePlayerMenu( void ) {
 	s_doomsp.doomfrag.generic.id = ID_DOOMFRAG;
 	s_doomsp.doomfrag.generic.callback = DoomSP_Event;
 	s_doomsp.doomfrag.string = "DOOMFRAG";
+	s_doomsp.doomfrag.generic.statusbar = DoomSP_StatusBar;
 	s_doomsp.doomfrag.color = color_red;
 	s_doomsp.doomfrag.style = UI_CENTER;
 
@@ -195,7 +213,7 @@ static struct {
 	menubitmap_s	tiles[NUM_LEVELS];
 	menulist_s		skill;
 	menulist_s		weapons;
-	menutext_s		play;
+	menubitmap_s	play;
 	menubitmap_s	back;
 
 	doom_progress_t	progress;
@@ -361,6 +379,22 @@ static void Campaign_Draw( void ) {
 		DrawMedal( 320 - 120, y + 18, 18, l->medal );
 	}
 
+	// the medals: the difficulty a level was finished on
+	if ( Menu_ItemAtCursor( &s_campaign.menu ) != &s_campaign.weapons && Menu_ItemAtCursor( &s_campaign.menu ) != &s_campaign.skill ) {
+		static const char	*legend[4] = { "Easy", "Hurt me plenty", "Ultra-Violence", "Nightmare" };
+		int					m, x, width = 0;
+
+		for ( m = 0 ; m < 4 ; m++ ) {
+			width += 18 + ( strlen( legend[m] ) + 2 ) * SMALLCHAR_WIDTH;
+		}
+		x = 320 - width / 2;
+		for ( m = 0 ; m < 4 ; m++ ) {
+			DrawMedal( x, 466, 14, DOOM_MEDAL_BRONZE + m );
+			UI_DrawString( x + 18, 466, legend[m], UI_LEFT | UI_SMALLFONT, colorLtGrey );
+			x += 18 + ( strlen( legend[m] ) + 2 ) * SMALLCHAR_WIDTH;
+		}
+	}
+
 	Menu_Draw( &s_campaign.menu );
 }
 
@@ -418,6 +452,7 @@ void UI_DoomCampaignMenu( void ) {
 	s_campaign.skill.generic.x = 320;
 	s_campaign.skill.generic.y = TILE_Y + NUM_EPISODES * ROW_H + 40;
 	s_campaign.skill.itemnames = skillNames;
+	s_campaign.skill.generic.statusbar = Campaign_StatusBar;
 	s_campaign.skill.curvalue = (int)Com_Clamp( 0, 4, trap_Cvar_VariableValue( "g_doomSkill" ) );
 	Menu_AddItem( &s_campaign.menu, &s_campaign.skill );
 
@@ -430,18 +465,20 @@ void UI_DoomCampaignMenu( void ) {
 	s_campaign.weapons.generic.x = 320;
 	s_campaign.weapons.generic.y = s_campaign.skill.generic.y + 18;
 	s_campaign.weapons.itemnames = campaignWeaponNames;
+	s_campaign.weapons.generic.statusbar = Campaign_StatusBar;
 	s_campaign.weapons.curvalue = (int)Com_Clamp( 0, 1, trap_Cvar_VariableValue( "g_doomCampaignWeapons" ) );
 	Menu_AddItem( &s_campaign.menu, &s_campaign.weapons );
 
-	s_campaign.play.generic.type = MTYPE_PTEXT;
+	s_campaign.play.generic.type = MTYPE_BITMAP;
+	s_campaign.play.generic.name = ART_FIGHT0;
 	s_campaign.play.generic.flags = QMF_RIGHT_JUSTIFY | QMF_PULSEIFFOCUS;
 	s_campaign.play.generic.id = ID_PLAY;
 	s_campaign.play.generic.callback = Campaign_Event;
-	s_campaign.play.generic.x = 640 - 24;
-	s_campaign.play.generic.y = 480 - 48;
-	s_campaign.play.string = "PLAY";
-	s_campaign.play.color = color_red;
-	s_campaign.play.style = UI_RIGHT;
+	s_campaign.play.generic.x = 640;
+	s_campaign.play.generic.y = 480 - 64;
+	s_campaign.play.width = 128;
+	s_campaign.play.height = 64;
+	s_campaign.play.focuspic = ART_FIGHT1;
 	Menu_AddItem( &s_campaign.menu, &s_campaign.play );
 
 	s_campaign.back.generic.type = MTYPE_BITMAP;
@@ -476,7 +513,7 @@ static const char *physicsNames[] = { "VQ3", "CPM", NULL };
 static const char *weaponSetNames[] = { "Doom", "Quake 3", "None", NULL };
 static const char *loadoutNames[] = { "Pick up", "All from the start", NULL };
 static const char *monsterNames[] = {
-	"I'm too young to die.", "Hey, not too rough.", "Hurt me plenty.", "Ultra-Violence.", "Nightmare!", "No monsters", NULL
+	"I'm too young to die", "Hey, not too rough", "Hurt me plenty", "Ultra-Violence", "Nightmare!", "No monsters", NULL
 };
 static const char *finishNames[] = { "Exit", "100% kills, then exit", NULL };
 
@@ -489,7 +526,7 @@ static struct {
 	menulist_s		loadout;
 	menulist_s		monsters;
 	menulist_s		finish;
-	menutext_s		start;
+	menubitmap_s	start;
 	menubitmap_s	back;
 
 	doom_records_t	records;
@@ -632,6 +669,19 @@ static void Frag_Draw( void ) {
 	Menu_Draw( &s_frag.menu );
 }
 
+static void Frag_StatusBar( void *self ) {
+	const char *text = "";
+
+	switch ( ( (menucommon_s *)self )->id ) {
+	case ID_PHYSICS:	text = "VQ3: Quake 3's movement. CPM: with air control (Challenge ProMode)"; break;
+	case ID_WEAPONS:	text = "Doom's weapons, Quake 3's, or none at all"; break;
+	case ID_LOADOUT:	text = "Pick weapons up on the way, or have them all from the start"; break;
+	case ID_MONSTERS:	text = "The monsters' difficulty, or an empty level"; break;
+	case ID_FINISH:		text = "Reach the exit, or kill every monster first"; break;
+	}
+	UI_StatusLine( 466, text );
+}
+
 static void Frag_Spin( menulist_s *s, const char *name, int id, const char **items, int value, int y ) {
 	s->generic.type = MTYPE_SPINCONTROL;
 	s->generic.flags = QMF_PULSEIFFOCUS | QMF_SMALLFONT;
@@ -642,6 +692,7 @@ static void Frag_Spin( menulist_s *s, const char *name, int id, const char **ite
 	s->generic.y = y;
 	s->itemnames = items;
 	s->curvalue = value;
+	s->generic.statusbar = Frag_StatusBar;
 	Menu_AddItem( &s_frag.menu, s );
 }
 
@@ -686,15 +737,16 @@ void UI_DoomFragMenu( void ) {
 	s_frag.maps.curvalue = fragLastMap;
 	s_frag.maps.top = fragLastMap >= FRAG_ROWS ? fragLastMap - FRAG_ROWS + 1 : 0;
 
-	s_frag.start.generic.type = MTYPE_PTEXT;
+	s_frag.start.generic.type = MTYPE_BITMAP;
+	s_frag.start.generic.name = ART_FIGHT0;
 	s_frag.start.generic.flags = QMF_RIGHT_JUSTIFY | QMF_PULSEIFFOCUS;
 	s_frag.start.generic.id = ID_START;
 	s_frag.start.generic.callback = Frag_Event;
-	s_frag.start.generic.x = 640 - 24;
-	s_frag.start.generic.y = 480 - 48;
-	s_frag.start.string = "START";
-	s_frag.start.color = color_red;
-	s_frag.start.style = UI_RIGHT;
+	s_frag.start.generic.x = 640;
+	s_frag.start.generic.y = 480 - 64;
+	s_frag.start.width = 128;
+	s_frag.start.height = 64;
+	s_frag.start.focuspic = ART_FIGHT1;
 	Menu_AddItem( &s_frag.menu, &s_frag.start );
 
 	s_frag.back.generic.type = MTYPE_BITMAP;

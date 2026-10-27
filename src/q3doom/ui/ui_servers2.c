@@ -431,7 +431,8 @@ static void ArenaServers_UpdateMenu( void ) {
 		}
 		else {
 			if( g_arenaservers.numqueriedservers < 0 ) {
-				strcpy(g_arenaservers.status.string,"No Response From Master Server." );
+				// Q3Doom: id's master servers are long gone
+				strcpy(g_arenaservers.status.string,"No master server: use SPECIFY, or set sv_master1" );
 			}
 			else {
 				strcpy(g_arenaservers.status.string,"No Servers Found." );
@@ -1146,7 +1147,7 @@ void ArenaServers_SetType( int type )
 		g_arenaservers.numqueriedservers = *g_arenaservers.numservers; 
 		ArenaServers_UpdateMenu();
 	}
-	strcpy(g_arenaservers.status.string,"hit refresh to update");
+	strcpy(g_arenaservers.status.string,"Hit REFRESH to update");
 }
 
 /*
@@ -1570,7 +1571,6 @@ static void ArenaServers_MenuInit( void ) {
 	Menu_AddItem( &g_arenaservers.menu, (void*) &g_arenaservers.create );
 	Menu_AddItem( &g_arenaservers.menu, (void*) &g_arenaservers.go );
 
-	Menu_AddItem( &g_arenaservers.menu, (void*) &g_arenaservers.punkbuster );
 	Menu_AddItem( &g_arenaservers.menu, (void*) &g_arenaservers.pblogo );
 	
 	ArenaServers_LoadFavorites();

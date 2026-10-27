@@ -4,10 +4,12 @@ Q3Doom - the Doom status bar, messages, palette and automap (st_stuff.c,
 hu_stuff.c, am_map.c)
 
 Everything is drawn with Doom's own pictures in Doom's 320x200 layout,
-scaled into a 4:3 area of the screen (Doom's tall pixels); outside it the
-status bar row is filled with Doom's border flat. With the Doom HUD the
-3D view stops above the status bar, as in Doom. cg_hudStyle 1 keeps the
-Quake 3 status bar instead (the rest still applies).
+scaled into a 4:3 area of the screen (Doom's tall pixels). On a 4:3 screen
+the 3D view stops above the status bar, as in Doom; on a wider one the view
+fills the screen and the bar sits over it in the middle, the game showing
+on either side. cg_hudStyle: 0 the Doom status bar with Doom's weapons and
+Quake 3's HUD with Quake 3's, 1 always Quake 3's, 2 always Doom's (the rest
+still applies).
 
 Licensed under the GNU General Public License version 2 or later.
 ===========================================================================
@@ -380,8 +382,16 @@ The Doom status bar is up: the 3D view stops above it
 =================
 */
 qboolean CG_DoomHudActive( void ) {
-	return hud.active && !cg_hudStyle.integer && cg.snap && cg.snap->ps.pm_type != PM_INTERMISSION
+	qboolean doomBar = cg_hudStyle.integer == 2 || ( !cg_hudStyle.integer && cgs.doomWeapons != DOOM_WEAPONS_Q3 );
+
+	return hud.active && doomBar && cg.snap && cg.snap->ps.pm_type != PM_INTERMISSION
 		&& cg.snap->ps.persistant[PERS_TEAM] != TEAM_SPECTATOR;
+}
+
+// a screen wider than 4:3: the status bar sits over the view, which shows
+// on either side of it
+qboolean CG_DoomHudWide( void ) {
+	return cgs.glconfig.vidWidth > cgs.glconfig.vidHeight * 4 / 3 + 1;
 }
 
 /*
@@ -574,8 +584,8 @@ static void FillBorder( void ) {
 	float	x0, sx, sy, tw, th, y, x;
 
 	CG_DoomHudScale( &x0, &sx, &sy );
-	if ( x0 < 1 ) {
-		return;
+	if ( x0 < 1 || CG_DoomHudWide() ) {
+		return;		// widescreen: the game shows on either side
 	}
 	tw = 64 * sx;
 	th = 64 * sy;

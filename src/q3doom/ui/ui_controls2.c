@@ -112,15 +112,17 @@ typedef struct
 #define ID_CHAT3		32
 #define ID_CHAT4		33
 
+#define ID_USE			34		// Q3Doom: Doom's use (doors, switches, lifts)
+
 // all others
-#define ID_FREELOOK		34
-#define ID_INVERTMOUSE	35
-#define ID_ALWAYSRUN	36
-#define ID_AUTOSWITCH	37
-#define ID_MOUSESPEED	38
-#define ID_JOYENABLE	39
-#define ID_JOYTHRESHOLD	40
-#define ID_SMOOTHMOUSE	41
+#define ID_FREELOOK		35
+#define ID_INVERTMOUSE	36
+#define ID_ALWAYSRUN	37
+#define ID_AUTOSWITCH	38
+#define ID_MOUSESPEED	39
+#define ID_JOYENABLE	40
+#define ID_JOYTHRESHOLD	41
+#define ID_SMOOTHMOUSE	42
 
 #define ANIM_IDLE		0
 #define ANIM_RUN		1
@@ -169,6 +171,7 @@ typedef struct
 	menuaction_s		stepright;
 	menuaction_s		moveup;
 	menuaction_s		movedown;
+	menuaction_s		use;
 	menuaction_s		turnleft;
 	menuaction_s		turnright;
 	menuaction_s		sidestep;
@@ -261,6 +264,7 @@ static bind_t g_bindings[] =
 	{"messagemode2", 	"chat - team",		ID_CHAT2,		ANIM_CHAT,		-1,				-1,		-1, -1},
 	{"messagemode3", 	"chat - target",	ID_CHAT3,		ANIM_CHAT,		-1,				-1,		-1, -1},
 	{"messagemode4", 	"chat - attacker",	ID_CHAT4,		ANIM_CHAT,		-1,				-1,		-1, -1},
+	{"+use",			"use / open",		ID_USE,			ANIM_IDLE,		'e',			-1,		-1, -1},
 	{(char*)NULL,		(char*)NULL,		0,				0,				-1,				-1,		-1,	-1},
 };
 
@@ -287,6 +291,7 @@ static menucommon_s *g_movement_controls[] =
 	(menucommon_s *)&s_controls.stepright,     
 	(menucommon_s *)&s_controls.moveup,        
 	(menucommon_s *)&s_controls.movedown,      
+	(menucommon_s *)&s_controls.use,
 	(menucommon_s *)&s_controls.turnleft,      
 	(menucommon_s *)&s_controls.turnright,     
 	(menucommon_s *)&s_controls.sidestep,
@@ -423,7 +428,11 @@ static float Controls_GetCvarValue( char* name )
 Controls_UpdateModel
 =================
 */
+// Q3Doom: the action the marine shows (ANIM_*)
+static int controlsAnim;
+
 static void Controls_UpdateModel( int anim ) {
+	controlsAnim = anim;
 	VectorClear( s_controls.playerViewangles );
 	VectorClear( s_controls.playerMoveangles );
 	s_controls.playerViewangles[YAW] = 180 - 30;
@@ -733,21 +742,39 @@ static void Controls_StatusBar( void *self )
 /*
 =================
 Controls_DrawPlayer
+
+Q3Doom: Doom's marine in the player's colour (doomcolor), as everyone
+appears in the game: walking for the moves, firing for the attack
 =================
 */
 static void Controls_DrawPlayer( void *self ) {
-	menubitmap_s	*b;
-	char			buf[MAX_QPATH];
+	static const char	*walk[4] = { "PLAYA1", "PLAYB1", "PLAYC1", "PLAYD1" };
+	static const char	*fire[2] = { "PLAYE1", "PLAYF1" };
+	menubitmap_s		*b = (menubitmap_s *)self;
+	int					color = (int)trap_Cvar_VariableValue( "doomcolor" );
+	const char			*frame;
+	float				w, h;
 
-	trap_Cvar_VariableStringBuffer( "model", buf, sizeof( buf ) );
-	if ( strcmp( buf, s_controls.playerModel ) != 0 ) {
-		UI_PlayerInfo_SetModel( &s_controls.playerinfo, buf );
-		strcpy( s_controls.playerModel, buf );
-		Controls_UpdateModel( ANIM_IDLE );
+	switch ( controlsAnim ) {
+	case ANIM_RUN:
+	case ANIM_WALK:
+	case ANIM_BACK:
+	case ANIM_STEPLEFT:
+	case ANIM_STEPRIGHT:
+		frame = walk[( uis.realtime / ( controlsAnim == ANIM_RUN ? 110 : 180 ) ) & 3];
+		break;
+	case ANIM_ATTACK:
+		frame = fire[( uis.realtime / 150 ) & 1];
+		break;
+	default:
+		frame = walk[0];
+		break;
 	}
-
-	b = (menubitmap_s*) self;
-	UI_DrawPlayer( b->generic.x, b->generic.y, b->width, b->height, &s_controls.playerinfo, uis.realtime/2 );
+	// the marine is about 40 by 56 Doom pixels, which are 1.2 times taller
+	w = 160;
+	h = 56 * 4 * 1.2f;
+	UI_DrawHandlePic( b->generic.x + ( b->width - w ) / 2, b->generic.y + ( b->height - h ) / 2, w, h,
+		trap_R_RegisterShaderNoMip( color > 0 && color <= 4 ? va( "doom/sprite%d/%s", color, frame ) : va( "doom/sprite/%s", frame ) ) );
 }
 
 
@@ -1276,10 +1303,10 @@ static void Controls_MenuInit( void )
 	s_controls.player.generic.type      = MTYPE_BITMAP;
 	s_controls.player.generic.flags     = QMF_INACTIVE;
 	s_controls.player.generic.ownerdraw = Controls_DrawPlayer;
-	s_controls.player.generic.x	        = 400;
-	s_controls.player.generic.y	        = -40;
-	s_controls.player.width	            = 32*10;
-	s_controls.player.height            = 56*10;
+	s_controls.player.generic.x	        = 420;
+	s_controls.player.generic.y	        = 100;
+	s_controls.player.width	            = 200;
+	s_controls.player.height            = 300;
 
 	s_controls.walkforward.generic.type	     = MTYPE_ACTION;
 	s_controls.walkforward.generic.flags     = QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS|QMF_GRAYED|QMF_HIDDEN;
@@ -1316,6 +1343,12 @@ static void Controls_MenuInit( void )
 	s_controls.movedown.generic.callback  = Controls_ActionEvent;
 	s_controls.movedown.generic.ownerdraw = Controls_DrawKeyBinding;
 	s_controls.movedown.generic.id        = ID_MOVEDOWN;
+
+	s_controls.use.generic.type	     = MTYPE_ACTION;
+	s_controls.use.generic.flags     = QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS|QMF_GRAYED|QMF_HIDDEN;
+	s_controls.use.generic.callback  = Controls_ActionEvent;
+	s_controls.use.generic.ownerdraw = Controls_DrawKeyBinding;
+	s_controls.use.generic.id        = ID_USE;
 
 	s_controls.turnleft.generic.type	  = MTYPE_ACTION;
 	s_controls.turnleft.generic.flags     = QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS|QMF_GRAYED|QMF_HIDDEN;
@@ -1592,6 +1625,7 @@ static void Controls_MenuInit( void )
 	Menu_AddItem( &s_controls.menu, &s_controls.stepright );
 	Menu_AddItem( &s_controls.menu, &s_controls.moveup );
 	Menu_AddItem( &s_controls.menu, &s_controls.movedown );
+	Menu_AddItem( &s_controls.menu, &s_controls.use );
 	Menu_AddItem( &s_controls.menu, &s_controls.turnleft );
 	Menu_AddItem( &s_controls.menu, &s_controls.turnright );
 	Menu_AddItem( &s_controls.menu, &s_controls.sidestep );

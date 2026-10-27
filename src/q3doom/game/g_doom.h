@@ -155,7 +155,9 @@ qboolean	Doom_FragCommand( gentity_t *ent, const char *cmd );
 // g_doom_duel.c
 qboolean	Doom_DuelActive( void );
 qboolean	Doom_DuelNearSpawn( float x, float y );		// no monsters come to life there
-qboolean	Doom_DuelGoal( gentity_t *ent, vec3_t point );	// where a player must go (bots)
+qboolean	Doom_DuelGoal( gentity_t *ent, vec3_t point );
+qboolean	Doom_DuelFinished( int clientNum );		// reached the goal this round
+qboolean	Doom_DuelFinished( int clientNum );		// reached the goal this round	// where a player must go (bots)
 void		Doom_InitDuel( void );		// after the entities spawned
 void		Doom_DuelFrame( void );
 void		Doom_DuelThink( gentity_t *ent );

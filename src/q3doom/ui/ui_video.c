@@ -918,7 +918,6 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.driver.generic.y     = y;
 	s_graphicsoptions.driver.itemnames     = s_driver_names;
 	s_graphicsoptions.driver.curvalue      = (uis.glconfig.driverType == GLDRV_VOODOO);
-	y += BIGCHAR_HEIGHT+2;
 
 	// references/modifies "r_allowExtensions"
 	s_graphicsoptions.allow_extensions.generic.type     = MTYPE_SPINCONTROL;
@@ -927,7 +926,6 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.allow_extensions.generic.x	    = 400;
 	s_graphicsoptions.allow_extensions.generic.y	    = y;
 	s_graphicsoptions.allow_extensions.itemnames        = enabled_names;
-	y += BIGCHAR_HEIGHT+2;
 
 	// references/modifies "r_mode"
 	s_graphicsoptions.mode.generic.type     = MTYPE_SPINCONTROL;
@@ -947,7 +945,6 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.colordepth.generic.x        = 400;
 	s_graphicsoptions.colordepth.generic.y        = y;
 	s_graphicsoptions.colordepth.itemnames        = colordepth_names;
-	y += BIGCHAR_HEIGHT+2;
 
 	// references/modifies "r_fullscreen"
 	s_graphicsoptions.fs.generic.type     = MTYPE_SPINCONTROL;
@@ -1056,10 +1053,7 @@ void GraphicsOptions_MenuInit( void )
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.network );
 
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.list );
-	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.driver );
-	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.allow_extensions );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.mode );
-	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.colordepth );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.fs );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.lighting );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.geometry );

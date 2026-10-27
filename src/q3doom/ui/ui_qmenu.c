@@ -1277,6 +1277,21 @@ void Menu_AddItem( menuframework_s *menu, void *item )
 
 	// perform any item specific initializations
 	itemptr = (menucommon_s*)item;
+
+	// Q3Doom: on a wide screen, the buttons in the bottom corners (back,
+	// fight, next...) go to the screen's corners, not the 4:3 area's
+	if ( itemptr->type == MTYPE_BITMAP && itemptr->y >= 400 && uis.bias > 0 && uis.scale > 0 ) {
+		menubitmap_s	*b = (menubitmap_s *)item;
+		int				w = b->width < 0 ? -b->width : b->width;
+		int				left = ( itemptr->flags & QMF_RIGHT_JUSTIFY ) ? itemptr->x - w : itemptr->x;
+
+		if ( left <= 0 ) {
+			itemptr->x -= uis.bias / uis.scale;
+		} else if ( left + w >= SCREEN_WIDTH ) {
+			itemptr->x += uis.bias / uis.scale;
+		}
+	}
+
 	if (!(itemptr->flags & QMF_NODEFAULTINIT))
 	{
 		switch (itemptr->type)

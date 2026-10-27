@@ -1078,6 +1078,11 @@ static float CG_DrawScores( float y ) {
 	s1 = cgs.scores1;
 	s2 = cgs.scores2;
 
+	// Q3Doom: no scores to show in the campaign or a DoomFrag run
+	if ( !cgs.doomDeathmatch ) {
+		return y;
+	}
+
 	y -=  BIGCHAR_HEIGHT + 8;
 
 	y1 = y;
@@ -1149,6 +1154,8 @@ static float CG_DrawScores( float y ) {
 #endif
 		if ( cgs.gametype >= GT_CTF ) {
 			v = cgs.capturelimit;
+		} else if ( cgs.doomDuel ) {
+			v = cgs.doomDuelRounds;		// Q3Doom: rounds won, out of the rounds to win
 		} else {
 			v = cgs.fraglimit;
 		}
@@ -2366,6 +2373,10 @@ static void CG_DrawWarmup( void ) {
 
 	sec = cg.warmup;
 	if ( !sec ) {
+		return;
+	}
+	// Q3Doom: under the scoreboard it would only be in the way
+	if ( cg.showScores ) {
 		return;
 	}
 

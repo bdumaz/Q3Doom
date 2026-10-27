@@ -94,6 +94,15 @@ static void CG_DrawClientScore( int y, score_t *score, float *color, float fade,
 	iconx = SB_BOTICON_X + (SB_RATING_WIDTH / 2);
 	headx = SB_HEAD_X + (SB_RATING_WIDTH / 2);
 
+	// Q3Doom: in Doom Duel, the goal's flag by those who reached it this round
+	if ( cgs.doomDuel && score->captures && ( ci->team == TEAM_RED || ci->team == TEAM_BLUE ) ) {
+		if( largeFormat ) {
+			CG_DrawFlagModel( iconx, y - ( 32 - BIGCHAR_HEIGHT ) / 2, 32, 32, ci->team, qfalse );
+		}
+		else {
+			CG_DrawFlagModel( iconx, y, 16, 16, ci->team, qfalse );
+		}
+	} else
 	// draw the handicap or bot skill marker (unless player has flag)
 	if ( ci->powerups & ( 1 << PW_NEUTRALFLAG ) ) {
 		if( largeFormat ) {
@@ -263,6 +272,45 @@ CG_DrawScoreboard
 Draw the normal in-game scoreboard
 =================
 */
+/*
+=================
+CG_DrawDoomTally
+
+Q3Doom: the campaign's scoreboard: Doom's tally so far (kills, items,
+secrets, the time against the par), in the scoreboard's own letters
+=================
+*/
+static void CG_DrawDoomTally( float fade ) {
+	static const char	*labels[3] = { "Kills", "Items", "Secrets" };
+	int					*st = cgs.doomStats, i, y = 120, total;
+	const char			*s;
+	vec4_t				red = { 1, 0.2f, 0.2f, 1 }, white = { 1, 1, 1, 1 };
+
+	red[3] = white[3] = fade;
+	s = "Level";
+	CG_DrawBigStringColor( ( SCREEN_WIDTH - CG_DrawStrlen( s ) * BIGCHAR_WIDTH ) / 2, 60, s, red );
+	if ( !cgs.doomStatsValid ) {
+		return;
+	}
+	for ( i = 0 ; i < 3 ; i++, y += 40 ) {
+		total = st[i * 2 + 1];
+		CG_DrawBigStringColor( 160, y, labels[i], red );
+		CG_DrawBigStringColor( 320, y, va( "%i / %i", st[i * 2], total ), white );
+		if ( total ) {
+			// the percentages in a column of their own
+			s = va( "%i%%", st[i * 2] * 100 / total );
+			CG_DrawBigStringColor( 528 - CG_DrawStrlen( s ) * BIGCHAR_WIDTH, y, s, white );
+		}
+	}
+	CG_DrawBigStringColor( 160, y, "Time", red );
+	CG_DrawBigStringColor( 320, y, va( "%i:%02i", st[6] / 60, st[6] % 60 ), white );
+	if ( st[7] ) {
+		y += 40;
+		CG_DrawBigStringColor( 160, y, "Par", red );
+		CG_DrawBigStringColor( 320, y, va( "%i:%02i", st[7] / 60, st[7] % 60 ), white );
+	}
+}
+
 qboolean CG_DrawOldScoreboard( void ) {
 	int		x, y, w, i, n1, n2;
 	float	fade;
@@ -305,6 +353,12 @@ qboolean CG_DrawOldScoreboard( void ) {
 	}
 
 
+	// Q3Doom: the campaign has a tally, not scores
+	if ( CG_DoomMap() && !cgs.doomDeathmatch && !cgs.doomFrag ) {
+		CG_DrawDoomTally( fade );
+		return qtrue;
+	}
+
 	// fragged by ... line
 	if ( cg.killerName[0] ) {
 		s = va("Fragged by %s", cg.killerName );
@@ -326,7 +380,11 @@ qboolean CG_DrawOldScoreboard( void ) {
 			CG_DrawBigString( x, y, s, fade );
 		}
 	} else {
-		if ( cg.teamScores[0] == cg.teamScores[1] ) {
+		// Q3Doom: Doom Duel's rounds
+		if ( cgs.doomDuel ) {
+			s = va( "Round %i: Red %i, Blue %i (first to %i)", cgs.doomDuelRound,
+				cg.teamScores[0], cg.teamScores[1], cgs.doomDuelRounds );
+		} else if ( cg.teamScores[0] == cg.teamScores[1] ) {
 			s = va("Teams are tied at %i", cg.teamScores[0] );
 		} else if ( cg.teamScores[0] >= cg.teamScores[1] ) {
 			s = va("Red leads %i to %i",cg.teamScores[0], cg.teamScores[1] );

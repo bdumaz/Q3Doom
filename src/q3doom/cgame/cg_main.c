@@ -213,7 +213,7 @@ static cvarTable_t cvarTable[] = { // bk001129
 	{ &cg_ignore, "cg_ignore", "0", 0 },	// used for debugging
 	{ &cg_autoswitch, "cg_autoswitch", "1", CVAR_ARCHIVE },
 	{ &cg_drawGun, "cg_drawGun", "1", CVAR_ARCHIVE },
-	{ &cg_hudStyle, "cg_hudStyle", "0", CVAR_ARCHIVE },		// Q3Doom: 0 Doom status bar, 1 Quake 3 HUD
+	{ &cg_hudStyle, "cg_hudStyle", "0", CVAR_ARCHIVE },		// Q3Doom: 0 by the weapons (Doom's bar, Quake 3's HUD), 1 Quake 3 HUD, 2 Doom status bar
 	{ &cg_drawFollow, "cg_drawFollow", "1", 0 },		// Q3Doom: 0 hides the name of the player followed
 	{ &cg_doomAspect, "cg_doomAspect", "0", CVAR_ARCHIVE },	// Q3Doom: 1 stretches the view 1.2 times vertically, like Doom's 320x200 on a 4:3 screen
 	{ &r_doomLightFade, "r_doomLightFade", "0", CVAR_ARCHIVE },	// Q3Doom: the renderer's Doom light fading, for the sprites

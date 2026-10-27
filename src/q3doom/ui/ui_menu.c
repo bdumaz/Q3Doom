@@ -225,7 +225,10 @@ static void Main_MenuDraw( void ) {
 		UI_DrawProportionalString( 320, 372, "DEMO      FOR MATURE AUDIENCES      DEMO", UI_CENTER|UI_SMALLFONT, color );
 		UI_DrawString( 320, 400, "Quake III Arena(c) 1999-2000, Id Software, Inc.  All Rights Reserved", UI_CENTER|UI_SMALLFONT, color );
 	} else {
-		UI_DrawString( 320, 450, "Quake III Arena(c) 1999-2000, Id Software, Inc.  All Rights Reserved", UI_CENTER|UI_SMALLFONT, color );
+		// Q3Doom: its name over the copyrights, Doom's with Quake 3's
+		UI_DrawProportionalString( 320, 404, "Q3DOOM", UI_CENTER|UI_SMALLFONT, menu_text_color );
+		UI_DrawString( 320, 432, "github.com/bdumaz/Q3Doom", UI_CENTER|UI_SMALLFONT, color );
+		UI_DrawString( 320, 452, "DOOM(c) 1993, Quake III Arena(c) 1999-2000, Id Software, Inc.  All Rights Reserved", UI_CENTER|UI_SMALLFONT, color );
 	}
 }
 

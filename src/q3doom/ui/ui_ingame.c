@@ -184,7 +184,7 @@ void InGame_MenuInit( void ) {
 	s_ingame.team.generic.y				= y;
 	s_ingame.team.generic.id			= ID_TEAM;
 	s_ingame.team.generic.callback		= InGame_Event; 
-	s_ingame.team.string				= "START";
+	s_ingame.team.string				= "JOIN GAME";
 	s_ingame.team.color					= color_red;
 	s_ingame.team.style					= UI_CENTER|UI_SMALLFONT;
 
@@ -267,7 +267,7 @@ void InGame_MenuInit( void ) {
 	s_ingame.restart.generic.y			= y;
 	s_ingame.restart.generic.id			= ID_RESTART;
 	s_ingame.restart.generic.callback	= InGame_Event; 
-	s_ingame.restart.string				= "RESTART ARENA";
+	s_ingame.restart.string				= trap_Cvar_VariableValue( "g_doomCampaign" ) ? "RESTART LEVEL" : "RESTART MATCH";
 	s_ingame.restart.color				= color_red;
 	s_ingame.restart.style				= UI_CENTER|UI_SMALLFONT;
 	if( !trap_Cvar_VariableValue( "sv_running" ) ) {
@@ -292,7 +292,7 @@ void InGame_MenuInit( void ) {
 	s_ingame.leave.generic.y			= y;
 	s_ingame.leave.generic.id			= ID_LEAVEARENA;
 	s_ingame.leave.generic.callback		= InGame_Event; 
-	s_ingame.leave.string				= "LEAVE ARENA";
+	s_ingame.leave.string				= "LEAVE GAME";
 	s_ingame.leave.color				= color_red;
 	s_ingame.leave.style				= UI_CENTER|UI_SMALLFONT;
 

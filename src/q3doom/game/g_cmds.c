@@ -74,7 +74,8 @@ void DeathmatchScoreboardMessage( gentity_t *ent ) {
 			cl->ps.persistant[PERS_DEFEND_COUNT], 
 			cl->ps.persistant[PERS_ASSIST_COUNT], 
 			perfect,
-			cl->ps.persistant[PERS_CAPTURES]);
+			// Q3Doom: in Doom Duel, whether the player reached the goal this round
+			Doom_DuelActive() ? Doom_DuelFinished( level.sortedClients[i] ) : cl->ps.persistant[PERS_CAPTURES]);
 		j = strlen(entry);
 		if (stringlength + j > 1024)
 			break;
@@ -85,6 +86,21 @@ void DeathmatchScoreboardMessage( gentity_t *ent ) {
 	trap_SendServerCommand( ent-g_entities, va("scores %i %i %i%s", i, 
 		level.teamScores[TEAM_RED], level.teamScores[TEAM_BLUE],
 		string ) );
+
+	// Q3Doom: the campaign's tally, for its scoreboard: kills, items and
+	// secrets so far, the time and the par
+	if ( doomLevel.campaign ) {
+		char	map[MAX_QPATH];
+		int		par = 0;
+
+		trap_Cvar_VariableStringBuffer( "mapname", map, sizeof( map ) );
+		if ( ( map[0] == 'E' || map[0] == 'e' ) && ( map[2] == 'M' || map[2] == 'm' ) ) {
+			par = doom_par_time( map[1] - '0', map[3] - '0' );
+		}
+		trap_SendServerCommand( ent-g_entities, va( "doomstats %i %i %i %i %i %i %i %i",
+			doomLevel.kills, doomLevel.totalKills, doomLevel.items, doomLevel.totalItems,
+			doomLevel.secretsFound, doomLevel.totalSecrets, doomLevel.lastTic / DOOM_TICRATE, par ) );
+	}
 }
 
 

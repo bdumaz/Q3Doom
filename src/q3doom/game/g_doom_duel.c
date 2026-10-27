@@ -46,6 +46,11 @@ static struct {
 	qboolean	finished[MAX_CLIENTS];	// reached the goal this round
 } duel;
 
+// a player who reached the goal this round (the scoreboard marks them)
+qboolean Doom_DuelFinished( int clientNum ) {
+	return duel.active && clientNum >= 0 && clientNum < MAX_CLIENTS && duel.finished[clientNum];
+}
+
 qboolean Doom_DuelActive( void ) {
 	return g_doomDuel.integer && g_gametype.integer == GT_TEAM && DOOM_LEVEL();
 }

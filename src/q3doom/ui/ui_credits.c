@@ -34,6 +34,7 @@ CREDITS
 
 typedef struct {
 	menuframework_s	menu;
+	int				page;		// Q3Doom: its own page first, then Quake 3's
 } creditsmenu_t;
 
 static creditsmenu_t	s_credits;
@@ -49,8 +50,43 @@ static sfxHandle_t UI_CreditMenu_Key( int key ) {
 		return 0;
 	}
 
+	// Q3Doom: Quake 3's page after Q3Doom's
+	if ( s_credits.page == 0 ) {
+		s_credits.page = 1;
+		return 0;
+	}
 	trap_Cmd_ExecuteText( EXEC_APPEND, "quit\n" );
 	return 0;
+}
+
+/*
+===============
+Q3Doom_CreditsDraw
+
+Q3Doom's page: what it is made of
+===============
+*/
+static void Q3Doom_CreditsDraw( void ) {
+	int		y = 100;
+
+	UI_DrawProportionalString( 320, y, "Q3Doom", UI_CENTER, color_white );
+	y += 1.42 * PROP_HEIGHT;
+	UI_DrawProportionalString( 320, y, "The levels, monsters and weapons of Doom", UI_CENTER|UI_SMALLFONT, color_white );
+	y += PROP_HEIGHT;
+	UI_DrawProportionalString( 320, y, "in Quake III Arena", UI_CENTER|UI_SMALLFONT, color_white );
+	y += 2 * PROP_HEIGHT;
+	UI_DrawProportionalString( 320, y, "DOOM", UI_CENTER|UI_SMALLFONT, color_white );
+	y += PROP_HEIGHT;
+	UI_DrawProportionalString( 320, y, "id Software, 1993", UI_CENTER|UI_SMALLFONT, color_white );
+	y += 1.42 * PROP_HEIGHT;
+	UI_DrawProportionalString( 320, y, "Quake III Arena", UI_CENTER|UI_SMALLFONT, color_white );
+	y += PROP_HEIGHT;
+	UI_DrawProportionalString( 320, y, "id Software, 1999", UI_CENTER|UI_SMALLFONT, color_white );
+	y += 1.42 * PROP_HEIGHT;
+	UI_DrawProportionalString( 320, y, "Built on their GPL source releases", UI_CENTER|UI_SMALLFONT, color_white );
+	y += 2 * PROP_HEIGHT;
+	UI_DrawString( 320, y, "github.com/bdumaz/Q3Doom", UI_CENTER|UI_SMALLFONT, color_red );
+	UI_DrawString( 320, 448, "Press any key", UI_CENTER|UI_SMALLFONT, color_red );
 }
 
 
@@ -61,6 +97,11 @@ UI_CreditMenu_Draw
 */
 static void UI_CreditMenu_Draw( void ) {
 	int		y;
+
+	if ( s_credits.page == 0 ) {
+		Q3Doom_CreditsDraw();
+		return;
+	}
 
 	y = 12;
 	UI_DrawProportionalString( 320, y, "id Software is:", UI_CENTER|UI_SMALLFONT, color_white );

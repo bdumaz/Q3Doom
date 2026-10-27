@@ -1010,6 +1010,8 @@ typedef struct {
 	float			stepHeight;		// Q3Doom: g_stepHeight from the serverinfo
 	float			playerHeight;	// Q3Doom: g_playerHeight from the serverinfo
 	qboolean		doomFrag;		// Q3Doom: a DoomFrag run (g_doomFrag)
+	int				doomStats[8];	// Q3Doom: the campaign's tally (kills, items, secrets and their totals, time, par)
+	qboolean		doomStatsValid;
 	qboolean		doomDeathmatch;	// Q3Doom: neither the campaign nor DoomFrag
 	qboolean		doomLevelDeathmatch;	// Q3Doom: and g_doomDeathmatch (Doom levels)
 	qboolean		doomDuel;		// Q3Doom: Doom Duel (g_doomDuel, Team Deathmatch)
@@ -1733,6 +1735,7 @@ void		CG_DoomHudShutdown( void );
 void		CG_DoomHudScale( float *x0, float *sx, float *sy );
 qhandle_t	CG_DoomPatchShader( int lump );
 qboolean	CG_DoomHudActive( void );
+qboolean	CG_DoomHudWide( void );		// wider than 4:3: the bar sits over the view
 void		CG_DoomDraw2D( void );
 void		CG_DoomMessage( const char *text );
 void		CG_DoomBonus( void );
