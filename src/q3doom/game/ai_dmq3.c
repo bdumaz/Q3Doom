@@ -3775,8 +3775,30 @@ void BotAimAtEnemy(bot_state_t *bs) {
 				}
 			}
 		}
+		// Q3Doom: the rocket launcher at an enemy about level with the bot (or
+		// below it), not too close: at its feet, where it will be when the
+		// rocket gets there. A rocket that misses the body hits the floor
+		// beside it, and the splash does the damage
+		if (wi.number == WP_ROCKET_LAUNCHER && aim_skill > 0.3 &&
+			entinfo.origin[2] + feetheight < bs->origin[2] - 24 + 32 &&
+			entinfo.origin[2] + feetheight > bs->origin[2] - 24 - 128 &&
+			DistanceSquared(entinfo.origin, bs->origin) > Square(150)) {
+			//the floor under the spot aimed at
+			VectorCopy(bestorigin, end);
+			end[2] -= aimheight - feetheight + 64;
+			BotAI_Trace(&trace, bestorigin, NULL, NULL, end, entinfo.number, MASK_SHOT);
+			if (trace.fraction < 1 && !trace.startsolid) {
+				VectorCopy(trace.endpos, groundtarget);
+				groundtarget[2] += 4;
+				//a clear line to it from the launcher (or the enemy in the way)
+				BotAI_Trace(&trace, start, NULL, NULL, groundtarget, bs->entitynum, MASK_SHOT);
+				if (trace.fraction >= 0.97f || trace.ent == entinfo.number) {
+					VectorCopy(groundtarget, bestorigin);
+				}
+			}
+		}
 		//if the projectile does radial damage
-		if (aim_skill > 0.6 && wi.proj.damagetype & DAMAGETYPE_RADIAL) {
+		else if (aim_skill > 0.6 && wi.proj.damagetype & DAMAGETYPE_RADIAL) {
 			//if the enemy isn't standing significantly higher than the bot
 			if (entinfo.origin[2] + feetheight < bs->origin[2] - 24 + 16) {
 				vec3_t centre;
