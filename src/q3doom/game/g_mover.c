@@ -367,6 +367,10 @@ qboolean G_MoverPush( gentity_t *pusher, vec3_t move, vec3_t amove, gentity_t **
 		if ( check->s.eType != ET_ITEM && check->s.eType != ET_PLAYER && !check->physicsObject ) {
 			continue;
 		}
+		// Doom items rest on the floor plane itself and ride it (Doom_UpdateItems)
+		if ( check->doomItem ) {
+			continue;
+		}
 
 		// if the entity is standing on the pusher, it will definitely be moved
 		if ( check->s.groundEntityNum != pusher->s.number ) {

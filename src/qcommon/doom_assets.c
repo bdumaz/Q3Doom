@@ -131,16 +131,24 @@ Doom draws the sky as a cylinder: a 256 texel wide sky texture covers 90
 degrees, texel row 100 is on the horizon and a texel is one screen row
 of the 160 pixel focal length view. Each skybox side covers 90 degrees,
 so all four sides are the same image. Top and bottom are flat colors.
+
+The sides look further up and down than Doom ever did, beyond the top
+and bottom rows of the texture: its last SKY_FADE_ROWS rows fade into
+the flat colors, so nothing is stretched there and no edge of the box
+shows.
 =================
 */
 #define SKY_FOCAL		160.0
 #define SKY_HORIZON_ROW	100.0
+#define SKY_FADE_ROWS	32.0
 
 static byte *Doom_SkyboxImage( const char *name, int *width, int *height ) {
 	char			base[DOOM_LUMP_NAME_LEN + 1], *face;
 	doom_image_t	sky;
-	byte			*pic;
-	int				x, y, w, h, row, sum[3], k;
+	byte			*pic, *src, *dst;
+	int				x, y, w, h, row, edge[2][3], k;
+	double			dx, dy, u, t, f;
+	int				tu, tv;
 
 	Q_strncpyz( base, name, sizeof( base ) );
 	face = strrchr( base, '_' );
@@ -152,20 +160,27 @@ static byte *Doom_SkyboxImage( const char *name, int *width, int *height ) {
 		return NULL;
 	}
 
-	if ( !Q_stricmp( face, "UP" ) || !Q_stricmp( face, "DN" ) ) {
-		// average of the top or bottom row of the sky
-		row = !Q_stricmp( face, "UP" ) ? 0 : sky.height - 1;
-		sum[0] = sum[1] = sum[2] = 0;
+	// average colors of the top and bottom rows of the sky
+	for ( row = 0 ; row < 2 ; row++ ) {
+		y = row ? sky.height - 1 : 0;
+		edge[row][0] = edge[row][1] = edge[row][2] = 0;
 		for ( x = 0 ; x < sky.width ; x++ ) {
 			for ( k = 0 ; k < 3 ; k++ ) {
-				sum[k] += sky.rgba[( row * sky.width + x ) * 4 + k];
+				edge[row][k] += sky.rgba[( y * sky.width + x ) * 4 + k];
 			}
 		}
+		for ( k = 0 ; k < 3 ; k++ ) {
+			edge[row][k] /= sky.width;
+		}
+	}
+
+	if ( !Q_stricmp( face, "UP" ) || !Q_stricmp( face, "DN" ) ) {
+		row = !Q_stricmp( face, "UP" ) ? 0 : 1;
 		w = h = 8;
 		pic = Z_Malloc( w * h * 4 );
 		for ( x = 0 ; x < w * h ; x++ ) {
 			for ( k = 0 ; k < 3 ; k++ ) {
-				pic[x * 4 + k] = sum[k] / sky.width;
+				pic[x * 4 + k] = edge[row][k];
 			}
 			pic[x * 4 + 3] = 255;
 		}
@@ -175,18 +190,29 @@ static byte *Doom_SkyboxImage( const char *name, int *width, int *height ) {
 		for ( y = 0 ; y < h ; y++ ) {
 			for ( x = 0 ; x < w ; x++ ) {
 				// direction through this pixel of a 90 degree face at distance 1
-				double	dx = ( x + 0.5 ) / ( w * 0.5 ) - 1.0;
-				double	dy = 1.0 - ( y + 0.5 ) / ( h * 0.5 );
-				double	u = ( atan( dx ) / ( M_PI * 0.5 ) + 0.5 ) * sky.width;
-				double	t = SKY_HORIZON_ROW - SKY_FOCAL * dy / sqrt( 1.0 + dx * dx );
-				int		tu = (int)u, tv = (int)t;
+				dx = ( x + 0.5 ) / ( w * 0.5 ) - 1.0;
+				dy = 1.0 - ( y + 0.5 ) / ( h * 0.5 );
+				u = ( atan( dx ) / ( M_PI * 0.5 ) + 0.5 ) * sky.width;
+				t = SKY_HORIZON_ROW - SKY_FOCAL * dy / sqrt( 1.0 + dx * dx );
+				tu = (int)u;
+				tv = (int)t;
 
 				if ( tu < 0 ) tu = 0;
 				if ( tu >= sky.width ) tu = sky.width - 1;
 				if ( tv < 0 ) tv = 0;
 				if ( tv >= sky.height ) tv = sky.height - 1;
-				Com_Memcpy( pic + ( y * w + x ) * 4, sky.rgba + ( tv * sky.width + tu ) * 4, 4 );
-				pic[( y * w + x ) * 4 + 3] = 255;
+				src = sky.rgba + ( tv * sky.width + tu ) * 4;
+				dst = pic + ( y * w + x ) * 4;
+
+				// fade toward the top or the bottom color near the edge rows
+				row = t < sky.height * 0.5 ? 0 : 1;
+				f = row ? ( t - ( sky.height - SKY_FADE_ROWS ) ) / SKY_FADE_ROWS : ( SKY_FADE_ROWS - t ) / SKY_FADE_ROWS;
+				if ( f < 0 ) f = 0;
+				if ( f > 1 ) f = 1;
+				for ( k = 0 ; k < 3 ; k++ ) {
+					dst[k] = (byte)( src[k] + ( edge[row][k] - src[k] ) * f + 0.5 );
+				}
+				dst[3] = 255;
 			}
 		}
 	}

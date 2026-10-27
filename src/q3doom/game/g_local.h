@@ -185,6 +185,7 @@ struct gentity_s {
 	int			doomMissile;	// Doom missile: its mobj type + 1, 0 if not one
 	struct doomMobj_s	*doomMobj;	// monster or barrel: its Doom thing state (g_doom_mobj.c)
 	qboolean	doomDropped;	// item dropped (by a monster): half a clip (MF_DROPPED)
+	qboolean	doomItem;		// item standing on its Doom sector's floor: rides it (Doom_UpdateItems)
 };
 
 

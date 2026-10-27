@@ -464,6 +464,7 @@ gentity_t *Doom_SpawnItemAt( int itemNum, float x, float y, qboolean dropped ) {
 	ent->s.modelindex = itemNum;
 	ent->s.modelindex2 = dropped;
 	ent->doomDropped = dropped;
+	ent->doomItem = qtrue;
 	ent->doomSector = sector;
 	// only for finding it: BG_PlayerTouchesItem decides
 	VectorSet( ent->r.mins, -21, -21, 0 );
@@ -490,7 +491,7 @@ void Doom_UpdateItems( void ) {
 		gentity_t	*ent = &g_entities[i];
 		vec3_t		origin;
 
-		if ( !ent->inuse || ent->s.eType != ET_ITEM || !ent->item || ent->doomSector < 0 || ent->doomSector >= doomLevel.numSectors
+		if ( !ent->inuse || ent->s.eType != ET_ITEM || !ent->item || !ent->doomItem || ent->doomSector < 0 || ent->doomSector >= doomLevel.numSectors
 			|| !doomLevel.floorMover[ent->doomSector] ) {
 			continue;
 		}

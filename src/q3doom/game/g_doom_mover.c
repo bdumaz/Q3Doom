@@ -1026,15 +1026,39 @@ QUAKE 3 STYLE DOORS
 
 Manual doors (opened with "use" in Doom) also open when a player comes
 close, and when shot. Doors flagged secret (they look like walls) keep
-needing "use", so walking past a wall never reveals a secret.
+needing "use" from the flagged side, so walking past a wall never reveals
+a secret; their other side (the way out of a secret area) opens as usual.
 
 =====================================================================
 */
+
+#define DOOR_TRIGGER_SECRET		1	// spawnflags: open only from a side not flagged secret
+
+// a player in the sector in front of a door line that is not flagged secret
+static qboolean OnOpenSide( const gentity_t *self, const gentity_t *other ) {
+	const doom_map_t	*map = doomLevel.map;
+	int					sector = doom_map_sector_at( map, other->r.currentOrigin[0], other->r.currentOrigin[1] );
+	int					i;
+
+	for ( i = 0 ; i < map->num_linedefs ; i++ ) {
+		const doom_linedef_t	*ld = &map->linedefs[i];
+		const doom_special_t	*sp = doom_line_special( ld->special );
+
+		if ( sp && sp->trigger == DOOM_TRIG_MANUAL && ld->side[1] != DOOM_NO_SIDE && !( ld->flags & DOOM_ML_SECRET )
+			&& map->sidedefs[ld->side[1]].sector == self->doomSector && map->sidedefs[ld->side[0]].sector == sector ) {
+			return qtrue;
+		}
+	}
+	return qfalse;
+}
 
 static void DoorTrigger_Touch( gentity_t *self, gentity_t *other, trace_t *trace ) {
 	const doom_special_t *sp = doom_line_special( doomLevel.lineSpecial[self->doomLine] );
 
 	if ( !other->client || other->client->sess.sessionTeam == TEAM_SPECTATOR || other->health <= 0 ) {
+		return;
+	}
+	if ( ( self->spawnflags & DOOR_TRIGGER_SECRET ) && !OnOpenSide( self, other ) ) {
 		return;
 	}
 	// locked: tell the player now and then, not every frame
@@ -1050,11 +1074,13 @@ static void DoorTrigger_Touch( gentity_t *self, gentity_t *other, trace_t *trace
 
 void Doom_SpawnDoorTriggers( void ) {
 	const doom_map_t	*map = doomLevel.map;
-	qboolean			*done;
+	qboolean			*done, *secret;
 	int					i, j;
 
 	done = G_Alloc( sizeof( qboolean ) * doomLevel.numSectors );
 	memset( done, 0, sizeof( qboolean ) * doomLevel.numSectors );
+	secret = G_Alloc( sizeof( qboolean ) * doomLevel.numSectors );
+	memset( secret, 0, sizeof( qboolean ) * doomLevel.numSectors );
 
 	// a door is secret if any of its door lines is flagged secret (often only one is)
 	for ( i = 0 ; i < map->num_linedefs ; i++ ) {
@@ -1062,7 +1088,7 @@ void Doom_SpawnDoorTriggers( void ) {
 		const doom_special_t	*sp = doom_line_special( ld->special );
 
 		if ( sp && sp->trigger == DOOM_TRIG_MANUAL && ld->side[1] != DOOM_NO_SIDE && ( ld->flags & DOOM_ML_SECRET ) ) {
-			done[map->sidedefs[ld->side[1]].sector] = qtrue;
+			secret[map->sidedefs[ld->side[1]].sector] = qtrue;
 		}
 	}
 
@@ -1106,6 +1132,8 @@ void Doom_SpawnDoorTriggers( void ) {
 		trigger = G_Spawn();
 		trigger->classname = "doom_door_trigger";
 		trigger->doomLine = i;
+		trigger->doomSector = sector;
+		trigger->spawnflags = secret[sector] ? DOOR_TRIGGER_SECRET : 0;
 		trigger->touch = DoorTrigger_Touch;
 		trigger->r.contents = CONTENTS_TRIGGER;
 		trigger->r.svFlags = SVF_NOCLIENT;
@@ -1113,7 +1141,10 @@ void Doom_SpawnDoorTriggers( void ) {
 		VectorCopy( maxs, trigger->r.maxs );
 		trap_LinkEntity( trigger );
 
-		// and shootable
+		// and shootable, unless shooting a wall would find the secret
+		if ( secret[sector] ) {
+			continue;
+		}
 		door->doomLine = i;
 		door->takedamage = qtrue;
 		door->health = 100000;
