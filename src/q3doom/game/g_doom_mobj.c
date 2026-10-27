@@ -355,6 +355,10 @@ static qboolean CheckPosition( gentity_t *ent, float x, float y, int what ) {
 	return qtrue;
 }
 
+// the box starts a little above the feet: a thing resting on a rising floor
+// is not inside it, so the floor lifts it instead of being blocked by it
+#define MOBJ_FLOOR_GAP	0.25f
+
 static void LinkMobj( gentity_t *ent ) {
 	doomMobj_t	*mo = ent->doomMobj;
 
@@ -364,6 +368,7 @@ static void LinkMobj( gentity_t *ent ) {
 	ent->s.frame = mo->state;
 	// shootable: a body; solid only (dying): blocks players, not shots
 	ent->r.contents = ( mo->flags & MF_SHOOTABLE ) ? CONTENTS_BODY : ( mo->flags & MF_SOLID ) ? CONTENTS_PLAYERCLIP : 0;
+	ent->r.mins[2] = mo->height > MOBJ_FLOOR_GAP ? MOBJ_FLOOR_GAP : 0;
 	ent->r.maxs[2] = mo->height;
 	trap_LinkEntity( ent );
 }
@@ -646,7 +651,7 @@ gentity_t *Doom_SpawnMobj( int type, float x, float y, float angle ) {
 	ent->s.frame = mo->state;
 	ent->physicsObject = qtrue;		// movers push it and are blocked by it
 	ent->clipmask = MASK_SOLID;
-	VectorSet( ent->r.mins, -mo->radius, -mo->radius, 0 );
+	VectorSet( ent->r.mins, -mo->radius, -mo->radius, MOBJ_FLOOR_GAP );
 	VectorSet( ent->r.maxs, mo->radius, mo->radius, mo->height );
 
 	ent->r.currentOrigin[0] = x;
