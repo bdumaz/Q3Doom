@@ -1696,6 +1696,12 @@ void ClientCommand( int clientNum ) {
 			Doom_SpawnCommand( ent );
 		}
 	}
+	// the level's exit, as if its switch was used (testing the intermission)
+	else if (!Q_stricmp (cmd, "doom_exit")) {
+		if ( CheatsOk( ent ) ) {
+			Doom_ExitLevel( ent, qfalse );
+		}
+	}
 	else if (Q_stricmp (cmd, "god") == 0)
 		Cmd_God_f (ent);
 	else if (Q_stricmp (cmd, "notarget") == 0)

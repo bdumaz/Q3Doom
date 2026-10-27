@@ -1211,6 +1211,26 @@ void R_AddDrawSurf( surfaceType_t *surface, shader_t *shader,
 
 /*
 =================
+R_WarnBadSort
+
+Q3Doom: a draw surface whose sort names no shader (a slot past the last
+shader); said a few times, with what is needed to find where it came from
+=================
+*/
+void R_WarnBadSort( const char *where, unsigned sort, int index, int numDrawSurfs ) {
+	static int	warnings;
+
+	if ( warnings >= 8 ) {
+		return;
+	}
+	warnings++;
+	ri.Printf( PRINT_WARNING, "WARNING: %s: draw surface %d of %d has sort 0x%08x (shader %u of %d, entity %u, fog %u), skipped\n",
+		where, index, numDrawSurfs, sort, ( sort >> QSORT_SHADERNUM_SHIFT ) & ( MAX_SHADERS - 1 ), tr.numShaders,
+		( sort >> QSORT_ENTITYNUM_SHIFT ) & 1023, ( sort >> QSORT_FOGNUM_SHIFT ) & 31 );
+}
+
+/*
+=================
 R_DecomposeSort
 =================
 */
@@ -1251,11 +1271,23 @@ void R_SortDrawSurfs( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 	// sort the drawsurfs by sort type, then orientation, then shader
 	qsortFast (drawSurfs, numDrawSurfs, sizeof(drawSurf_t) );
 
+	// Q3Doom: a sort naming no shader sorts last; seen here, it came from the
+	// front end, seen only by the back end, it changed on the way
+	for ( i = numDrawSurfs - 1 ; i >= 0 ; i-- ) {
+		if ( ( ( drawSurfs[i].sort >> QSORT_SHADERNUM_SHIFT ) & ( MAX_SHADERS - 1 ) ) < tr.numShaders ) {
+			break;
+		}
+		R_WarnBadSort( "R_SortDrawSurfs", drawSurfs[i].sort, i, numDrawSurfs );
+	}
+
 	// check for any pass through drawing, which
 	// may cause another view to be rendered first
 	for ( i = 0 ; i < numDrawSurfs ; i++ ) {
 		R_DecomposeSort( (drawSurfs+i)->sort, &entityNum, &shader, &fogNum, &dlighted );
 
+		if ( !shader ) {
+			continue;		// warned about below
+		}
 		if ( shader->sort > SS_PORTAL ) {
 			break;
 		}

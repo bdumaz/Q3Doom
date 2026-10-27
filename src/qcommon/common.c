@@ -131,6 +131,10 @@ void Com_EndRedirect (void)
 	rd_flush = NULL;
 }
 
+// Q3Doom: a ring of what was printed last, written to crash.txt on a crash
+char			com_printTail[8192];		// a power of two
+unsigned int	com_printTailPos;
+
 /*
 =============
 Com_Printf
@@ -160,6 +164,15 @@ void QDECL Com_Printf( const char *fmt, ... ) {
 		//rd_flush(rd_buffer);			
 		//*rd_buffer = 0;
 		return;
+	}
+
+	// Q3Doom: the last lines printed, for the crash report (win_crash.c)
+	{
+		const char	*s;
+
+		for ( s = msg ; *s ; s++ ) {
+			com_printTail[com_printTailPos++ & ( sizeof( com_printTail ) - 1 )] = *s;
+		}
 	}
 
 	// echo to console if we're not a dedicated server

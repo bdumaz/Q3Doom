@@ -525,6 +525,7 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 	int				i;
 	drawSurf_t		*drawSurf;
 	int				oldSort;
+	qboolean		badSort = qfalse;
 	float			originalTime;
 #ifdef __MACOS__
 	int				macEventTime;
@@ -557,11 +558,20 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 	for (i = 0, drawSurf = drawSurfs ; i < numDrawSurfs ; i++, drawSurf++) {
 		if ( drawSurf->sort == oldSort ) {
 			// fast path, same as previous sort
-			rb_surfaceTable[ *drawSurf->surface ]( drawSurf->surface );
+			if ( !badSort ) {
+				rb_surfaceTable[ *drawSurf->surface ]( drawSurf->surface );
+			}
 			continue;
 		}
 		oldSort = drawSurf->sort;
 		R_DecomposeSort( drawSurf->sort, &entityNum, &shader, &fogNum, &dlighted );
+
+		// Q3Doom: a sort naming no shader is skipped (it crashed the back end)
+		badSort = !shader;
+		if ( badSort ) {
+			R_WarnBadSort( "RB_RenderDrawSurfList", drawSurf->sort, i, numDrawSurfs );
+			continue;
+		}
 
 		//
 		// change the tess parameters if needed

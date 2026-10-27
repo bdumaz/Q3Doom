@@ -6,6 +6,9 @@
 
 void GLimp_RestoreGamma(void);	// sdl_glimp.c
 
+extern char			com_printTail[8192];	// common.c: the last console output
+extern unsigned int	com_printTailPos;
+
 static char crashPath[MAX_PATH];	// crash.txt next to the executable
 
 // true if 'address' is in a module loaded from the executable's folder (or below)
@@ -96,6 +99,19 @@ static LONG WINAPI CrashFilter(EXCEPTION_POINTERS *ep)
 				fprintf(f, "  %s +0x%llx\n", sym->Name, disp);
 		} else {
 			fprintf(f, "  %p\n", (void *)frame.AddrPC.Offset);
+		}
+	}
+
+	// what the console printed last, oldest first
+	fprintf(f, "\nLast console output:\n");
+	{
+		unsigned int n = com_printTailPos < sizeof(com_printTail) ? com_printTailPos : sizeof(com_printTail);
+		unsigned int k;
+
+		for (k = com_printTailPos - n; k != com_printTailPos; k++) {
+			char c = com_printTail[k & (sizeof(com_printTail) - 1)];
+			// colour codes are left as they are
+			fputc(c ? c : ' ', f);
 		}
 	}
 	fclose(f);

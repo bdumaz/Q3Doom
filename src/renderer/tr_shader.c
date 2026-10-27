@@ -2036,7 +2036,10 @@ static void FixRenderCommandList( int newShader ) {
                     sortedIndex = (( drawSurf->sort >> QSORT_SHADERNUM_SHIFT ) & (MAX_SHADERS-1));
 					if( sortedIndex >= newShader ) {
 						sortedIndex++;
-						drawSurf->sort = (sortedIndex << QSORT_SHADERNUM_SHIFT) | entityNum | ( fogNum << QSORT_FOGNUM_SHIFT ) | (int)dlightMap;
+						// Q3Doom: the entity number shifted back in place (1.32 ORed it in
+						// unshifted, which garbled the entity and fog of every surface)
+						drawSurf->sort = (sortedIndex << QSORT_SHADERNUM_SHIFT) | ( entityNum << QSORT_ENTITYNUM_SHIFT )
+							| ( fogNum << QSORT_FOGNUM_SHIFT ) | (int)dlightMap;
 					}
 				}
 				curCmd = (const void *)(ds_cmd + 1);
@@ -2052,6 +2055,13 @@ static void FixRenderCommandList( int newShader ) {
 				{
 				const swapBuffersCommand_t *sb_cmd = (const swapBuffersCommand_t *)curCmd;
 				curCmd = (const void *)(sb_cmd + 1);
+				break;
+				}
+			// Q3Doom: a screenshot does not end the list (the surfaces after it were left unfixed)
+			case RC_SCREENSHOT:
+				{
+				const screenshotCommand_t *ss_cmd = (const screenshotCommand_t *)curCmd;
+				curCmd = (const void *)(ss_cmd + 1);
 				break;
 				}
 			case RC_END_OF_LIST:

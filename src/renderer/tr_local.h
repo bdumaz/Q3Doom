@@ -1118,6 +1118,7 @@ void R_AddLightningBoltSurfaces( trRefEntity_t *e );
 
 void R_AddPolygonSurfaces( void );
 
+void R_WarnBadSort( const char *where, unsigned sort, int index, int numDrawSurfs );
 void R_DecomposeSort( unsigned sort, int *entityNum, shader_t **shader, 
 					 int *fogNum, int *dlightMap );
 
