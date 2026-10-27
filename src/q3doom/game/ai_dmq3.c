@@ -1626,6 +1626,53 @@ static void BotDoomInventory(bot_state_t *bs) {
 
 /*
 ==================
+BotDoomFightWeapon
+
+Q3Doom: with Doom's weapons, the one for the range of the fight, as a player
+picks it: the shotgun up close, rockets at mid range (not point blank),
+the chaingun far; the BFG whenever there are cells for it. Quake 3 weapon
+numbers (see BotDoomInventory)
+==================
+*/
+static int BotDoomFightWeapon(bot_state_t *bs) {
+	static const int close[] = {WP_SHOTGUN, WP_PLASMAGUN, WP_LIGHTNING, WP_MACHINEGUN, 0};
+	static const int mid[] = {WP_ROCKET_LAUNCHER, WP_PLASMAGUN, WP_LIGHTNING, WP_SHOTGUN, WP_MACHINEGUN, 0};
+	static const int far[] = {WP_LIGHTNING, WP_PLASMAGUN, WP_ROCKET_LAUNCHER, WP_MACHINEGUN, WP_SHOTGUN, 0};
+	const int *order;
+	int *inv = bs->inventory, i;
+	float dist = 400;
+	vec3_t dir;
+
+	if (bs->enemy >= 0) {
+		VectorSubtract(g_entities[bs->enemy].r.currentOrigin, bs->origin, dir);
+		dist = VectorLength(dir);
+	}
+	if (inv[INVENTORY_BFG10K] && inv[INVENTORY_BFGAMMO] > 0 && dist > 200) return WP_BFG;
+	order = dist < 250 ? close : dist < 700 ? mid : far;
+	for (i = 0; order[i]; i++) {
+		switch (order[i]) {
+		case WP_SHOTGUN:
+			if (inv[INVENTORY_SHOTGUN] && inv[INVENTORY_SHELLS] > 0) return WP_SHOTGUN;
+			break;
+		case WP_PLASMAGUN:
+			if (inv[INVENTORY_PLASMAGUN] && inv[INVENTORY_CELLS] > 0) return WP_PLASMAGUN;
+			break;
+		case WP_LIGHTNING:
+			if (inv[INVENTORY_LIGHTNING] && inv[INVENTORY_LIGHTNINGAMMO] > 0) return WP_LIGHTNING;
+			break;
+		case WP_ROCKET_LAUNCHER:
+			if (inv[INVENTORY_ROCKETLAUNCHER] && inv[INVENTORY_ROCKETS] > 0 && dist > 160) return WP_ROCKET_LAUNCHER;
+			break;
+		case WP_MACHINEGUN:
+			if (inv[INVENTORY_MACHINEGUN] && inv[INVENTORY_BULLETS] > 0) return WP_MACHINEGUN;
+			break;
+		}
+	}
+	return WP_GAUNTLET;
+}
+
+/*
+==================
 BotChooseWeapon
 ==================
 */
@@ -1638,6 +1685,13 @@ void BotChooseWeapon(bot_state_t *bs) {
 	}
 	else {
 		newweaponnum = trap_BotChooseBestFightWeapon(bs->ws, bs->inventory);
+		// Q3Doom: with Doom's weapons, rather than the pistol or the fist, the
+		// weapon for the range of the fight (the bot's own choice favours
+		// rockets, which do best: it stays otherwise)
+		if (DOOM_WEAPONSET(&bs->cur_ps) == DOOM_WEAPONS_DOOM &&
+			(newweaponnum == WP_MACHINEGUN || newweaponnum == WP_GAUNTLET)) {
+			newweaponnum = BotDoomFightWeapon(bs);
+		}
 		if (bs->weaponnum != newweaponnum) bs->weaponchange_time = FloatTime();
 		bs->weaponnum = newweaponnum;
 		//BotAI_Print(PRT_MESSAGE, "bs->weaponnum = %d\n", bs->weaponnum);
@@ -2815,6 +2869,22 @@ bot_moveresult_t BotAttackMove(bot_state_t *bs, int tfl) {
 	croucher = trap_Characteristic_BFloat(bs->character, CHARACTERISTIC_CROUCHER, 0, 1);
 	//if the bot is really stupid
 	if (attack_skill < 0.2) return moveresult;
+	// Q3Doom: in a fast flight (a jump pad, a rocket's knockback) or over the
+	// void, the fight's strafing would spoil the arc: hands off. Ordinary
+	// jumps in a fight keep it
+	if (bs->cur_ps.groundEntityNum == ENTITYNUM_NONE && !(bs->cur_ps.pm_flags & PMF_TIME_WATERJUMP) &&
+		!trap_AAS_Swimming(bs->origin)) {
+		vec3_t below;
+		bsp_trace_t floortrace;
+
+		VectorCopy(bs->origin, below);
+		below[2] -= 512;
+		BotAI_Trace(&floortrace, bs->origin, NULL, NULL, below, bs->client, MASK_PLAYERSOLID);
+		if (floortrace.fraction >= 1 ||
+			bs->cur_ps.velocity[0] * bs->cur_ps.velocity[0] + bs->cur_ps.velocity[1] * bs->cur_ps.velocity[1] > Square(400)) {
+			return moveresult;
+		}
+	}
 	//initialize the movement state
 	BotSetupForMovement(bs);
 	//get the enemy entity info

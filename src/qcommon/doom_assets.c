@@ -680,8 +680,11 @@ qboolean Doom_BuildBotNavigation( const char *name, qboolean force ) {
 		*slash = 0;
 	}
 	code = Sys_RunProcess( exe, va( "-bsp2aas \"%s\" -output \"%s\"", bspPath, dir ), dir );
-	remove( bspPath );
-	remove( va( "%s%cbspc.log", dir, PATH_SEP ) );
+	// kept with developer 1, to look into
+	if ( !com_developer || !com_developer->integer ) {
+		remove( bspPath );
+		remove( va( "%s%cbspc.log", dir, PATH_SEP ) );
+	}
 
 	if ( code < 0 ) {
 		Com_Printf( S_COLOR_YELLOW "WARNING: %s did not start: no bot navigation for %s\n", exe, name );

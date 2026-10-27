@@ -11,6 +11,10 @@ the wish direction is 320 - accel, so
 
 	cos( angle ) = ( 320 - accel ) / speed
 
+Bots of skill 4 and up also do it while aiming, keeping their view on the
+target and pressing the keys (forward, forward and a side, a side) whose
+direction lies nearest the best one.
+
 It turns toward the route by strafing on that side, otherwise changes side
 on every jump. Both keys go full down (a part-pressed diagonal gets a lower
 wish speed) and the jump key only on the frame it lands: Pmove checks the
@@ -185,8 +189,9 @@ void BotStrafeThink( bot_state_t *bs ) {
 	if ( trap_AAS_Swimming( bs->origin ) ) {
 		{ strafeReasons[7]++; return; }
 	}
-	// aiming at an enemy: the view is busy
-	if ( bs->enemy >= 0 && bs->aim_update_time > FloatTime() - 0.3f ) {
+	// aiming at an enemy: the view is busy, but the most skilled bots strafe
+	// with the keys around it (BotStrafeInput)
+	if ( bs->enemy >= 0 && bs->aim_update_time > FloatTime() - 0.3f && bs->settings.skill < 4 ) {
 		{ strafeReasons[8]++; return; }
 	}
 	// a straight route ahead
@@ -216,6 +221,114 @@ void BotStrafeThink( bot_state_t *bs ) {
 
 /*
 ==================
+BotUnstick
+
+Every frame: a bot moving to a goal that has pressed its keys for a while
+without moving (into a corner of walls the route rounds too tightly) steps
+aside, the other way each time, with a jump, then goes on
+==================
+*/
+qboolean BotUnstick( bot_state_t *bs, bot_input_t *bi ) {
+	botStrafe_t		*sj = &bs->strafe;
+	playerState_t	ps;
+	vec3_t			vel, up = { 0, 0, 1 }, dir;
+
+	if ( sj->unstickUntil > FloatTime() && sj->unstickUntil < FloatTime() + 2 ) {
+		VectorCopy( sj->unstickDir, bi->dir );
+		bi->speed = 400;
+		return qtrue;
+	}
+	BotAI_GetClientState( bs->client, &ps );
+	VectorCopy( ps.velocity, vel );
+	vel[2] = 0;
+	// travelling, pressing on, not waiting for anything
+	if ( sj->goalTime < FloatTime() - 0.3f || bi->speed < 100 || ( sj->moveFlags & MOVERESULT_WAITING ) ||
+		VectorLength( vel ) > 30 || ps.groundEntityNum == ENTITYNUM_NONE || ps.pm_type != PM_NORMAL ) {
+		sj->stuckSince = 0;
+		return qfalse;
+	}
+	if ( !sj->stuckSince || sj->stuckSince > FloatTime() ) {
+		sj->stuckSince = FloatTime();
+		return qfalse;
+	}
+	if ( sj->stuckSince > FloatTime() - 1.5f ) {
+		return qfalse;
+	}
+	// square to where it pushes, the other way each time
+	VectorCopy( bi->dir, dir );
+	dir[2] = 0;
+	VectorNormalize( dir );
+	CrossProduct( dir, up, sj->unstickDir );
+	sj->unstickSide = sj->unstickSide > 0 ? -1 : 1;
+	VectorScale( sj->unstickDir, sj->unstickSide, sj->unstickDir );
+	sj->unstickUntil = FloatTime() + 0.6f;
+	sj->stuckSince = 0;
+	VectorCopy( sj->unstickDir, bi->dir );
+	bi->speed = 400;
+	bi->actionflags |= ACTION_JUMP;
+	BotStats_Unstick( bs->client );
+	return qtrue;
+}
+
+/*
+==================
+BotAirSafety
+
+Every frame: a bot falling with nothing under it (the void of a space map)
+steers back toward where it last stood, as a player would; Quake 3's air
+control is weak, but it is better than none. qtrue when it took over
+==================
+*/
+qboolean BotAirSafety( bot_state_t *bs, bot_input_t *bi ) {
+	botStrafe_t		*sj = &bs->strafe;
+	playerState_t	ps;
+	vec3_t			end, dir;
+	bsp_trace_t		trace;
+
+	BotAI_GetClientState( bs->client, &ps );
+	if ( ps.groundEntityNum != ENTITYNUM_NONE ) {
+		VectorCopy( ps.origin, sj->lastGround );
+		sj->hasGround = qtrue;
+		sj->falling = qfalse;
+		return qfalse;
+	}
+	if ( !sj->hasGround || ps.velocity[2] > -100 || ps.pm_type != PM_NORMAL ) {
+		return qfalse;
+	}
+	// a floor (or water) somewhere below: an ordinary fall
+	VectorCopy( ps.origin, end );
+	end[2] -= 2048;
+	BotAI_Trace( &trace, ps.origin, NULL, NULL, end, bs->client, MASK_PLAYERSOLID | CONTENTS_WATER );
+	if ( trace.fraction < 1 && !( trace.surface.flags & SURF_SKY ) ) {
+		return qfalse;
+	}
+	// nothing right below, but the flight may still end well (a jump pad's
+	// arc toward a platform): the fall, predicted for 3 seconds
+	if ( !sj->falling ) {
+		aas_clientmove_t	move;
+		vec3_t				cmdmove = { 0, 0, 0 };
+
+		trap_AAS_PredictClientMovement( &move, bs->client, ps.origin, PRESENCE_NORMAL, qfalse, ps.velocity,
+			cmdmove, 0, 30, 0.1f, SE_HITGROUND | SE_HITGROUNDDAMAGE | SE_ENTERWATER | SE_ENTERSLIME | SE_ENTERLAVA |
+			SE_TOUCHJUMPPAD | SE_TOUCHTELEPORTER, 0, qfalse );
+		if ( move.stopevent & ( SE_HITGROUND | SE_HITGROUNDDAMAGE | SE_ENTERWATER | SE_TOUCHJUMPPAD | SE_TOUCHTELEPORTER ) ) {
+			return qfalse;
+		}
+		sj->falling = qtrue;	// into the void: steer until something is under it
+	}
+	VectorSubtract( sj->lastGround, ps.origin, dir );
+	dir[2] = 0;
+	if ( VectorNormalize( dir ) < 1 ) {
+		return qfalse;
+	}
+	VectorCopy( dir, bi->dir );
+	bi->speed = 400;
+	bi->actionflags &= ~( ACTION_JUMP | ACTION_CROUCH | ACTION_MOVEFORWARD | ACTION_MOVEBACK | ACTION_MOVELEFT | ACTION_MOVERIGHT );
+	return qtrue;
+}
+
+/*
+==================
 BotStrafeInput
 
 Every frame, before the bot's input becomes a usercmd: the jump, the keys
@@ -226,15 +339,18 @@ qboolean BotStrafeInput( bot_state_t *bs, bot_input_t *bi, float frametime ) {
 	botStrafe_t		*sj = &bs->strafe;
 	playerState_t	ps;
 	vec3_t			vel, todir;
-	float			speed, velYaw, targetYaw, diff, accel, c, angle, wishYaw, viewYaw, step;
-	int				side;
+	float			speed, velYaw, targetYaw, diff, accel, c, angle, wishYaw, viewYaw, step, rel;
+	int				side, k;
+	qboolean		aiming;
 
 	if ( !sj->allowed || sj->allowedTime < FloatTime() - STRAFE_VALID || frametime <= 0 ) {
 		sj->wasOnGround = qtrue;
 		return qfalse;
 	}
 	// the bot wants something else from its keys
-	if ( bi->actionflags & ( ACTION_JUMP | ACTION_DELAYEDJUMP | ACTION_CROUCH | ACTION_ATTACK | ACTION_MOVEUP | ACTION_MOVEDOWN ) ) {
+	aiming = bs->enemy >= 0 && bs->aim_update_time > FloatTime() - 0.3f;
+	if ( bi->actionflags & ( ACTION_JUMP | ACTION_DELAYEDJUMP | ACTION_CROUCH | ACTION_MOVEUP | ACTION_MOVEDOWN ) ||
+		( ( bi->actionflags & ACTION_ATTACK ) && !aiming ) ) {
 		return qfalse;
 	}
 	BotAI_GetClientState( bs->client, &ps );
@@ -289,6 +405,23 @@ qboolean BotStrafeInput( bot_state_t *bs, bot_input_t *bi, float frametime ) {
 	angle += sj->noise;
 	if ( angle < 0 ) angle = 0;
 	wishYaw = velYaw + side * angle;
+	if ( aiming ) {
+		// the view stays on the target: of the keys around it (forward, forward
+		// and a side, a side alone) the ones nearest the wish direction, within
+		// 22.5 degrees; nothing if it lies behind
+		viewYaw = bs->viewangles[YAW];
+		rel = AngleDifference( wishYaw, viewYaw );
+		k = (int)floor( rel / 45 + 0.5f );
+		if ( k < -2 || k > 2 ) {
+			return qfalse;
+		}
+		wishYaw = viewYaw + k * 45;
+		bi->dir[0] = cos( DEG2RAD( wishYaw ) );
+		bi->dir[1] = sin( DEG2RAD( wishYaw ) );
+		bi->dir[2] = 0;
+		bi->speed = ( k & 1 ) ? 400 * 1.4143f : 400;
+		return qtrue;
+	}
 	// forward + left moves 45 degrees left of the view, forward + right 45 right
 	viewYaw = AngleMod( wishYaw - side * 45 );
 	bi->dir[0] = cos( DEG2RAD( wishYaw ) );

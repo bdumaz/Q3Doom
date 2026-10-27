@@ -128,6 +128,7 @@ typedef enum {
 	GA_ENGAGE_PLAYER,		// fight a player at the weapon's best range
 	GA_CLEAR_MONSTER,		// kill a monster before going on
 	GA_PICKUP,				// detour to an item
+	GA_EVADE,				// keep away from a player too strong for the weapon in hand, shooting back
 	GA_NUM_ACTIONS
 } goapAction_t;
 
@@ -148,8 +149,11 @@ typedef struct botFacts_s {
 	int			health, armor;
 	float		weaponPower;		// 0 to 1: the best weapon held, with ammo
 	float		dps;				// the damage per second the bot deals with it
+	float		weaponRange;		// and the distance up to which it does
 	int			playerThreat;		// an enemy player engaging the bot, -1 none
 	int			visiblePlayer;		// the nearest enemy player in sight, -1 none
+	float		threatDist, threatDps, threatRange;		// the threat's distance, and its weapon (as seen)
+	float		visibleDist, visibleDps, visibleRange;
 	int			monsterBlocking;	// a monster on the route, a few seconds ahead, -1 none
 	float		blockPenalty;		// seconds it costs to push past it
 	float		monsterCost;		// damage expected from the monsters if the bot goes on
@@ -198,6 +202,13 @@ typedef struct botStrafe_s {
 	float		noise;			// this jump's error on the angle, degrees
 	qboolean	wasOnGround;
 	float		speedPeak;
+	vec3_t		lastGround;		// where the bot last stood (air safety)
+	qboolean	hasGround;
+	qboolean	falling;		// falling into the void
+	float		stuckSince;		// pressing on without moving since then, 0 moving
+	float		unstickUntil;	// stepping aside until then
+	vec3_t		unstickDir;
+	int			unstickSide;
 } botStrafe_t;
 
 //bot state
@@ -393,6 +404,7 @@ int		BotAI_GetSnapshotEntity( int clientNum, int sequence, entityState_t *state 
 int		BotTeamLeader(bot_state_t *bs);
 void	BotStats_MissileThreat(int client);
 void	BotStats_MissileHit(int client);
+void	BotStats_Unstick(int client);
 float	AngleDifference(float ang1, float ang2);
 // Q3Doom: bot statistics
 void	BotStats_Frame(bot_state_t *bs, float thinktime);

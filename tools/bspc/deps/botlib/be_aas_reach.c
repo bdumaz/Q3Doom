@@ -2958,7 +2958,9 @@ void AAS_Reachability_Elevator(void)
 	for (ent = AAS_NextBSPEntity(0); ent; ent = AAS_NextBSPEntity(ent))
 	{
 		if (!AAS_ValueForBSPEpairKey(ent, "classname", classname, MAX_EPAIRKEY)) continue;
-		if (!strcmp(classname, "func_plat"))
+		// Q3Doom: a Doom lift ("aas_plat", built at its top like a func_plat)
+		if (!strcmp(classname, "func_plat") ||
+			(!strcmp(classname, "func_doom_plane") && AAS_ValueForBSPEpairKey(ent, "aas_plat", model, MAX_EPAIRKEY)))
 		{
 #ifdef REACH_DEBUG
 			Log_Write("found func plat\r\n");

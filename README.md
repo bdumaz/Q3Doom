@@ -102,14 +102,16 @@ On Doom levels, these settings change the rules:
 
 On the Doom levels the bots plan (`bot_goap 1`, the default). Several times a second each bot sizes up what it sees and hears: how far its objective is, a monster in its way, the damage the monsters around would do if it went on, a player shooting at it, an item worth a detour. It then picks the goal that pays most (stay alive, stop the rival, reach the objective, stock up) and the cheapest way there: run on while shooting, fight a player, clear a monster, or pick something up. In a fight they circle-strafe at their weapon's best range and step aside from fireballs and rockets coming at them. On the Doom levels they don't chat. `bot_plan 1` prints each bot's plan as it changes, and `bot_debug 1` what it knows. `bot_goap 2` lets them plan on Quake 3's maps too (an experiment: for now they do worse there).
 
-Bots of skill 3 and up strafe-jump (Quake 3's VQ3 way) where their route runs straight, open and safe for a while, with nothing to aim at: no ledges, hazards, low ceilings or doors ahead. `bot_strafejump 0` turns it off.
+Bots of skill 3 and up strafe-jump (Quake 3's VQ3 way) where their route runs straight, open and safe for a while: no ledges, hazards, low ceilings or doors ahead. The most skilled keep aiming while they do. `bot_strafejump 0` turns it off. Bots falling into the void steer back toward where they stood, ride Doom's lifts, step aside when stuck against a wall, and kill themselves if they end up somewhere they can't get out of.
 
 To measure how the bots play, set `bot_stats 1` on the server. At the end of a match it prints, for each bot:
 - shots, hit rate, and where hits landed (feet, body, head);
 - deaths and average speed;
 - time with an enemy in sight, and how much of it the bot spent aiming without firing or backing away without firing;
 - how much of its firing was done moving sideways;
-- how many of the missiles that came at it it dodged.
+- how many of the missiles that came at it it dodged;
+- its top speed and time above 400 units a second;
+- frags, deaths to the level (falls, the void, hazards), items picked up, and the weapons it held most.
 
 `botstats` prints the same report at any time. `bot_stats 2` also traces each bot once a second.
 

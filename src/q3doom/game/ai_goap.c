@@ -68,7 +68,7 @@ vmCvar_t	bot_plan;
 #define WS_CLEARED			32		// the worst monster is dead
 
 static const char *goapActionNames[GA_NUM_ACTIONS] = {
-	"none", "travel", "engage player", "clear monster", "pick up"
+	"none", "travel", "engage player", "clear monster", "pick up", "keep distance"
 };
 static const char *goapGoalNames[GG_NUM_GOALS] = {
 	"none", "stay alive", "stop rival", "reach objective", "stock up"
@@ -164,39 +164,108 @@ static qboolean MonsterIsMelee( gentity_t *ent ) {
 ==================
 BotWeaponPower
 
-The best weapon the bot holds with ammo: how strong (0 to 1) and how much
-damage per second it deals in the hands of a bot
+The best weapon the bot holds with ammo: how strong (0 to 1), how much
+damage per second it deals in the hands of a bot, and up to what distance
+(farther, hitscan spreads and missiles can be dodged)
 ==================
 */
-static float BotWeaponPower( bot_state_t *bs, float *dps ) {
+static float BotWeaponPower( bot_state_t *bs, float *dps, float *range ) {
 	int *inv = bs->inventory;
 
+	// Doom's weapons in their Quake 3 places (BotDoomInventory)
+	if ( DOOM_WEAPONSET( &bs->cur_ps ) == DOOM_WEAPONS_DOOM ) {
+		if ( inv[INVENTORY_BFG10K] > 0 && inv[INVENTORY_BFGAMMO] > 0 ) {
+			*dps = 150; *range = 1000; return 1;
+		}
+		if ( inv[INVENTORY_PLASMAGUN] > 0 && inv[INVENTORY_CELLS] > 20 ) {
+			*dps = 90; *range = 800; return 0.95f;
+		}
+		if ( inv[INVENTORY_ROCKETLAUNCHER] > 0 && inv[INVENTORY_ROCKETS] > 2 ) {
+			*dps = 70; *range = 900; return 0.9f;
+		}
+		if ( inv[INVENTORY_LIGHTNING] > 0 && inv[INVENTORY_LIGHTNINGAMMO] > 20 ) {
+			*dps = 60; *range = 600; return 0.75f;
+		}
+		if ( inv[INVENTORY_SHOTGUN] > 0 && inv[INVENTORY_SHELLS] > 4 ) {
+			*dps = 45; *range = 250; return 0.6f;
+		}
+		if ( inv[INVENTORY_MACHINEGUN] > 0 && inv[INVENTORY_BULLETS] > 10 ) {
+			*dps = 25; *range = 500; return 0.3f;
+		}
+		*dps = 15; *range = 64;
+		return 0.1f;
+	}
 	if ( inv[INVENTORY_BFG10K] > 0 && inv[INVENTORY_BFGAMMO] > 7 ) {
-		*dps = 120; return 1;
+		*dps = 120; *range = 1000; return 1;
 	}
 	if ( inv[INVENTORY_ROCKETLAUNCHER] > 0 && inv[INVENTORY_ROCKETS] > 5 ) {
-		*dps = 80; return 0.95f;
+		*dps = 80; *range = 900; return 0.95f;
 	}
 	if ( inv[INVENTORY_LIGHTNING] > 0 && inv[INVENTORY_LIGHTNINGAMMO] > 50 ) {
-		*dps = 70; return 0.9f;
+		*dps = 70; *range = 700; return 0.9f;
 	}
 	if ( inv[INVENTORY_PLASMAGUN] > 0 && inv[INVENTORY_CELLS] > 40 ) {
-		*dps = 70; return 0.85f;
+		*dps = 70; *range = 800; return 0.85f;
 	}
 	if ( inv[INVENTORY_RAILGUN] > 0 && inv[INVENTORY_SLUGS] > 5 ) {
-		*dps = 55; return 0.85f;
+		*dps = 55; *range = 3000; return 0.85f;
 	}
 	if ( inv[INVENTORY_SHOTGUN] > 0 && inv[INVENTORY_SHELLS] > 10 ) {
-		*dps = 55; return 0.6f;
+		*dps = 55; *range = 300; return 0.6f;
 	}
 	if ( inv[INVENTORY_GRENADELAUNCHER] > 0 && inv[INVENTORY_GRENADES] > 10 ) {
-		*dps = 40; return 0.55f;
+		*dps = 40; *range = 500; return 0.55f;
 	}
 	if ( inv[INVENTORY_MACHINEGUN] > 0 && inv[INVENTORY_BULLETS] > 20 ) {
-		*dps = 35; return 0.35f;
+		*dps = 35; *range = 700; return 0.35f;
 	}
-	*dps = 20;
+	*dps = 20; *range = 64;
 	return 0.1f;
+}
+
+/*
+==================
+WeaponInHand
+
+What a weapon seen in a player's hands deals per second, and up to what
+distance (Doom's weapon numbers with Doom's weapons)
+==================
+*/
+static void WeaponInHand( int weapon, float *dps, float *range ) {
+	if ( g_doomWeaponSet.integer == DOOM_WEAPONS_DOOM ) {
+		switch ( weapon - 1 ) {
+		case DWP_FIST:		*dps = 10; *range = 64; return;
+		case DWP_CHAINSAW:	*dps = 30; *range = 64; return;
+		case DWP_PISTOL:	*dps = 25; *range = 500; return;
+		case DWP_SHOTGUN:	*dps = 45; *range = 250; return;
+		case DWP_CHAINGUN:	*dps = 60; *range = 600; return;
+		case DWP_MISSILE:	*dps = 70; *range = 900; return;
+		case DWP_PLASMA:	*dps = 90; *range = 800; return;
+		case DWP_BFG:		*dps = 150; *range = 1000; return;
+		}
+		*dps = 25; *range = 500;
+		return;
+	}
+	switch ( weapon ) {
+	case WP_GAUNTLET:			*dps = 30; *range = 64; return;
+	case WP_MACHINEGUN:			*dps = 35; *range = 700; return;
+	case WP_SHOTGUN:			*dps = 55; *range = 300; return;
+	case WP_GRENADE_LAUNCHER:	*dps = 40; *range = 500; return;
+	case WP_ROCKET_LAUNCHER:	*dps = 80; *range = 900; return;
+	case WP_LIGHTNING:			*dps = 70; *range = 700; return;
+	case WP_RAILGUN:			*dps = 55; *range = 3000; return;
+	case WP_PLASMAGUN:			*dps = 70; *range = 800; return;
+	case WP_BFG:				*dps = 120; *range = 1000; return;
+	}
+	*dps = 40; *range = 700;
+}
+
+// the share of a weapon's damage still dealt from this far
+static float RangeFactor( float range, float dist ) {
+	if ( dist <= range ) {
+		return 1;
+	}
+	return range / dist > 0.25f ? range / dist : 0.25f;
 }
 
 // seconds of travel from the bot to an area, -1 when it can't get there
@@ -320,7 +389,7 @@ at it or hurting it), or, in Doom Duel, close to its own objective
 */
 static void FactsPlayers( bot_state_t *bs, botFacts_t *f ) {
 	int					i, area;
-	float				dist, bestdist = 1e9f, t;
+	float				dist, bestdist = 1e9f, t, dps, range;
 	vec3_t				dir, angles, goal;
 	aas_entityinfo_t	entinfo;
 
@@ -341,9 +410,13 @@ static void FactsPlayers( bot_state_t *bs, botFacts_t *f ) {
 		}
 		VectorSubtract( entinfo.origin, bs->origin, dir );
 		dist = VectorLength( dir );
+		WeaponInHand( entinfo.weapon, &dps, &range );
 		if ( dist < bestdist ) {
 			bestdist = dist;
 			f->visiblePlayer = i;
+			f->visibleDist = dist;
+			f->visibleDps = dps;
+			f->visibleRange = range;
 		}
 		// shooting my way, or hurting me
 		VectorNegate( dir, dir );
@@ -351,6 +424,9 @@ static void FactsPlayers( bot_state_t *bs, botFacts_t *f ) {
 		if ( ( bs->goap.hurtBy == i && bs->goap.hurtTime > FloatTime() - 2 ) ||
 			( EntityIsShooting( &entinfo ) && dist < 1500 && InFieldOfVision( entinfo.angles, 30, angles ) ) ) {
 			f->playerThreat = i;
+			f->threatDist = dist;
+			f->threatDps = dps;
+			f->threatRange = range;
 			continue;
 		}
 		// in a race: about to reach its objective
@@ -360,6 +436,9 @@ static void FactsPlayers( bot_state_t *bs, botFacts_t *f ) {
 				t = trap_AAS_AreaTravelTimeToGoalArea( BotPointAreaNum( entinfo.origin ), entinfo.origin, area, TFL_DEFAULT );
 				if ( t > 0 && t < 400 ) {
 					f->playerThreat = i;
+					f->threatDist = dist;
+					f->threatDps = dps;
+					f->threatRange = range;
 				}
 			}
 		}
@@ -389,10 +468,8 @@ static void FactsResource( bot_state_t *bs, botFacts_t *f ) {
 	wneed = 1 - f->weaponPower;
 	if ( wneed > need ) need = wneed;
 	if ( need > 1 ) need = 1;
-	if ( need < 0.1f ) {
-		return;
-	}
-	range = 100 + need * 400;		// 1/100 s
+	// needing nothing: only a powerup (quad, ...) close by is worth it
+	range = need < 0.1f ? 300 : 100 + need * 400;		// 1/100 s
 	if ( !trap_BotChooseNBGItem( bs->gs, bs->origin, bs->inventory, TFL_DEFAULT, NULL, range ) ) {
 		return;
 	}
@@ -425,7 +502,12 @@ static void FactsResource( bot_state_t *bs, botFacts_t *f ) {
 			f->resourceTime = 0.1f;
 		}
 	}
+	if ( need < 0.1f && f->resourceType != IT_POWERUP ) {
+		f->resourceType = 0;
+		return;
+	}
 	switch ( f->resourceType ) {
+	case IT_POWERUP:	f->resourceNeed = 0.8f; break;
 	case IT_HEALTH:		f->resourceNeed = ( 100 - f->health ) / 80.0f; break;
 	case IT_ARMOR:		f->resourceNeed = 0.5f * ( 100 - f->armor ) / 100.0f; break;
 	case IT_WEAPON:
@@ -450,7 +532,7 @@ static void BotGoapFacts( bot_state_t *bs ) {
 	f->time = FloatTime();
 	f->health = bs->inventory[INVENTORY_HEALTH];
 	f->armor = bs->inventory[INVENTORY_ARMOR];
-	f->weaponPower = BotWeaponPower( bs, &f->dps );
+	f->weaponPower = BotWeaponPower( bs, &f->dps, &f->weaponRange );
 	f->hasObjective = qfalse;
 	f->objectiveTime = 0;
 	if ( Doom_DuelGoal( &g_entities[bs->client], goal ) ) {
@@ -504,6 +586,17 @@ static int RivalTarget( bot_state_t *bs ) {
 	return -1;
 }
 
+// how far the rival is, what it deals per second and up to what distance
+static void RivalWeapon( bot_state_t *bs, float *dist, float *dps, float *range ) {
+	botFacts_t *f = &bs->goap.facts;
+
+	if ( f->playerThreat >= 0 ) {
+		*dist = f->threatDist; *dps = f->threatDps; *range = f->threatRange;
+	} else {
+		*dist = f->visibleDist; *dps = f->visibleDps; *range = f->visibleRange;
+	}
+}
+
 static int MonsterTarget( bot_state_t *bs ) {
 	botFacts_t *f = &bs->goap.facts;
 
@@ -520,7 +613,7 @@ its cost
 */
 static qboolean ActionApply( bot_state_t *bs, int action, int state, int *next, float *cost ) {
 	botFacts_t	*f = &bs->goap.facts;
-	float		damage, ttk, others;
+	float		damage, ttk, others, dist, rivalDps, rivalRange, myDps;
 
 	*next = state;
 	switch ( action ) {
@@ -534,10 +627,22 @@ static qboolean ActionApply( bot_state_t *bs, int action, int state, int *next, 
 		*cost = f->objectiveTime + ( ( state & WS_ROUTE_CLEAR ) ? 0 : f->blockPenalty ) + DamageCost( f, damage );
 		return qtrue;
 	case GA_ENGAGE_PLAYER:
+		// as long as it takes to kill it with the weapon in hand from this far,
+		// and the damage its own weapon deals meanwhile (it misses some)
 		if ( RivalTarget( bs ) < 0 || ( state & WS_RIVAL_STOPPED ) ) return qfalse;
 		*next |= WS_RIVAL_STOPPED;
-		ttk = 125 / ( f->dps > 10 ? f->dps : 10 ) + 0.5f;
-		*cost = ttk + DamageCost( f, ( 40 + f->monsterDps * 0.5f ) * ttk );
+		RivalWeapon( bs, &dist, &rivalDps, &rivalRange );
+		myDps = f->dps * RangeFactor( f->weaponRange, dist );
+		ttk = 125 / ( myDps > 5 ? myDps : 5 ) + 0.5f;
+		*cost = ttk + DamageCost( f, ( rivalDps * RangeFactor( rivalRange, dist ) * 0.6f + f->monsterDps * 0.5f ) * ttk );
+		return qtrue;
+	case GA_EVADE:
+		// keep away, shooting back, on to items: the fight is left for later
+		// (not in a race, where moving on is the travel itself)
+		if ( RivalTarget( bs ) < 0 || ( state & WS_RIVAL_STOPPED ) || f->hasObjective ) return qfalse;
+		*next |= WS_RIVAL_STOPPED;
+		RivalWeapon( bs, &dist, &rivalDps, &rivalRange );
+		*cost = 4 + DamageCost( f, rivalDps * RangeFactor( rivalRange, dist ) * 0.6f * 1.5f );
 		return qtrue;
 	case GA_CLEAR_MONSTER:
 		if ( MonsterTarget( bs ) < 0 || ( ( state & WS_ROUTE_CLEAR ) && ( state & WS_CLEARED ) ) ) return qfalse;
@@ -558,7 +663,10 @@ static qboolean ActionApply( bot_state_t *bs, int action, int state, int *next, 
 		return qtrue;
 	case GA_PICKUP:
 		if ( !f->resourceType ) return qfalse;
-		if ( f->resourceType == IT_HEALTH || f->resourceType == IT_ARMOR ) {
+		if ( f->resourceType == IT_POWERUP ) {
+			if ( ( state & WS_SAFE ) && ( state & WS_ARMED ) ) return qfalse;
+			*next |= WS_SAFE | WS_ARMED;
+		} else if ( f->resourceType == IT_HEALTH || f->resourceType == IT_ARMOR ) {
 			if ( state & WS_SAFE ) return qfalse;
 			*next |= WS_SAFE;
 		} else {
@@ -682,6 +790,7 @@ static int ActionTarget( bot_state_t *bs, int action ) {
 
 	switch ( action ) {
 	case GA_ENGAGE_PLAYER:
+	case GA_EVADE:
 		return RivalTarget( bs );
 	case GA_CLEAR_MONSTER:
 		return MonsterTarget( bs );

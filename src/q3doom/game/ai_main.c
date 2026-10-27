@@ -933,8 +933,11 @@ void BotUpdateInput(bot_state_t *bs, int time, int elapsed_time) {
 	if (bi.actionflags & ACTION_RESPAWN) {
 		if (bs->lastucmd.buttons & BUTTON_ATTACK) bi.actionflags &= ~(ACTION_RESPAWN|ACTION_ATTACK);
 	}
-	// Q3Doom: strafe-jumping on a straight stretch
-	BotStrafeInput(bs, &bi, (float) elapsed_time / 1000);
+	// Q3Doom: back toward the ground when falling into the void, else
+	// strafe-jumping on a straight stretch
+	if (!BotAirSafety(bs, &bi) && !BotUnstick(bs, &bi)) {
+		BotStrafeInput(bs, &bi, (float) elapsed_time / 1000);
+	}
 	//convert the bot input to a usercmd
 	BotInputToUserCommand(&bi, &bs->lastucmd, bs->cur_ps.delta_angles, time);
 	//subtract the delta angles
@@ -1682,6 +1685,8 @@ typedef struct {
 	float	fireTime, strafeFireTime;
 	float	topSpeed, fastTime;
 	int		missileThreats, missileHits;
+	int		frags, envDeaths, items, unsticks;
+	float	weaponTime[16];		// alive with each weapon in hand (Quake 3 numbers)
 	float	traceTime;
 } botStats_t;
 
@@ -1694,6 +1699,29 @@ void BotStats_Clear(void) {
 void BotStats_Fire(gentity_t *ent) {
 	if (ent->client && (ent->r.svFlags & SVF_BOT)) {
 		botStats[ent - g_entities].shots++;
+	}
+}
+
+// a kill: a frag for a bot that killed someone else, a death to the
+// level (a fall, the void, a hazard) for a bot that died with no killer
+void BotStats_Kill(int killer, int victim, int mod) {
+	if (killer >= 0 && killer < MAX_CLIENTS && killer != victim && botstates[killer] && botstates[killer]->inuse) {
+		botStats[killer].frags++;
+	}
+	if (victim >= 0 && victim < MAX_CLIENTS && botstates[victim] && botstates[victim]->inuse &&
+		(killer == victim || killer < 0 || killer >= MAX_CLIENTS) &&
+		(mod == MOD_FALLING || mod == MOD_TRIGGER_HURT || mod == MOD_LAVA || mod == MOD_SLIME || mod == MOD_WATER || mod == MOD_CRUSH)) {
+		botStats[victim].envDeaths++;
+	}
+}
+
+void BotStats_Unstick(int client) {
+	botStats[client].unsticks++;
+}
+
+void BotStats_Item(int client) {
+	if (client >= 0 && client < MAX_CLIENTS && botstates[client] && botstates[client]->inuse) {
+		botStats[client].items++;
 	}
 }
 
@@ -1768,6 +1796,7 @@ void BotStats_Frame(bot_state_t *bs, float thinktime) {
 	st->aliveTime += thinktime;
 	st->distance += speed * thinktime;
 	if (speed > st->topSpeed) st->topSpeed = speed;
+	if (bs->weaponnum > 0 && bs->weaponnum < 16) st->weaponTime[bs->weaponnum] += thinktime;
 	if (speed > 400) st->fastTime += thinktime;
 	if (bs->enemy < 0 || bs->enemyvisible_time < FloatTime() - 0.2f) {
 		return;
@@ -1810,6 +1839,29 @@ void BotStats_Report(void) {
 	char name[MAX_NETNAME];
 	extern int strafeReasons[16];
 
+	G_Printf("bot play:           frags  level deaths  items  unsticks  weapons (time in hand)\n");
+	for (i = 0; i < level.maxclients; i++) {
+		int w, best[3] = {0, 0, 0};
+		float total = 0;
+		char weapons[64];
+
+		if (!botstates[i] || !botstates[i]->inuse) continue;
+		st = &botStats[i];
+		for (w = 1; w < 16; w++) {
+			total += st->weaponTime[w];
+			if (st->weaponTime[w] > st->weaponTime[best[0]]) { best[2] = best[1]; best[1] = best[0]; best[0] = w; }
+			else if (st->weaponTime[w] > st->weaponTime[best[1]]) { best[2] = best[1]; best[1] = w; }
+			else if (st->weaponTime[w] > st->weaponTime[best[2]]) best[2] = w;
+		}
+		weapons[0] = 0;
+		for (w = 0; w < 3; w++) {
+			if (best[w] && st->weaponTime[best[w]] > 0) {
+				Q_strcat(weapons, sizeof(weapons), va("w%d %.0f%%  ", best[w], BotStats_Percent(st->weaponTime[best[w]], total)));
+			}
+		}
+		ClientName(i, name, sizeof(name));
+		G_Printf("bot play: %-12s %5d  %12d  %5d  %8d  %s\n", name, st->frags, st->envDeaths, st->items, st->unsticks, weapons);
+	}
 	G_Printf("strafe stretches: ok %d, refused:", strafeReasons[0]);
 	for (i = 1; i < 16; i++) G_Printf(" %d", strafeReasons[i]);
 	G_Printf("\n");

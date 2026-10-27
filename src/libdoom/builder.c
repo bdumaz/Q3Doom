@@ -1880,6 +1880,42 @@ static int ShutRemoteDoor( const doom_map_t *map, int sector ) {
 
 /*
 =================
+LiftHeight
+
+A Doom lift (a down-wait-up-stay plat, started by a line tagged like the
+sector) goes down from its floor to the lowest floor around it and back:
+how far, 0 when the sector is no lift. Quake 3's func_plat works the same
+way (it is built at the top), which the bots' navigation knows (bspc)
+=================
+*/
+static int LiftHeight( const doom_map_t *map, int sector ) {
+	const doom_sector_t	*sec = &map->sectors[sector];
+	int					i, lowest = sec->floor_height, lift = 0;
+
+	if ( !sec->tag ) {
+		return 0;
+	}
+	for ( i = 0 ; i < map->num_linedefs ; i++ ) {
+		const doom_linedef_t	*ld = &map->linedefs[i];
+		const doom_special_t	*sp = doom_line_special( ld->special );
+
+		if ( sp && sp->kind == DOOM_KIND_PLAT && ld->tag == sec->tag &&
+			( sp->type == DOOM_PLAT_DOWNWAITUPSTAY || sp->type == DOOM_PLAT_BLAZEDWUS ) ) {
+			lift = 1;
+		}
+		// the floors around (P_FindLowestFloorSurrounding)
+		if ( ld->side[1] != DOOM_NO_SIDE ) {
+			int a = map->sidedefs[ld->side[0]].sector, b = map->sidedefs[ld->side[1]].sector;
+
+			if ( a == sector && map->sectors[b].floor_height < lowest ) lowest = map->sectors[b].floor_height;
+			if ( b == sector && map->sectors[a].floor_height < lowest ) lowest = map->sectors[a].floor_height;
+		}
+	}
+	return lift ? sec->floor_height - lowest : 0;
+}
+
+/*
+=================
 BuildEntities
 
 worldspawn plus player starts (1-4 coop, 11 deathmatch). Other things
@@ -1909,14 +1945,22 @@ static void BuildEntities( builder_t *b ) {
 
 	// moving floors and ceilings; the game positions them from the sector heights
 	for ( i = 0 ; i < b->movers.count ; i++ ) {
-		const mover_t *m = BufAt( &b->movers, mover_t, i );
+		const mover_t	*m = BufAt( &b->movers, mover_t, i );
+		char			keys[64];
+		int				lift = m->ceiling ? 0 : LiftHeight( b->map, m->sector );
 
 		// "aas_solid": a door shut at the start that its own lines do not
 		// open (a switch or a trigger elsewhere does): a wall for the bots'
-		// navigation (bspc), which otherwise sees every mover open
+		// navigation (bspc), which otherwise sees every mover open.
+		// "aas_plat" and "height": a lift, for the bots to ride (bspc, botlib)
+		keys[0] = 0;
+		if ( m->ceiling && ShutRemoteDoor( b->map, m->sector ) ) {
+			snprintf( keys, sizeof( keys ), "\"aas_solid\" \"1\"\n" );
+		} else if ( lift > 0 ) {
+			snprintf( keys, sizeof( keys ), "\"aas_plat\" \"1\"\n\"height\" \"%d\"\n", lift );
+		}
 		EntPrintf( b, "{\n\"classname\" \"func_doom_plane\"\n\"model\" \"*%d\"\n\"doom_sector\" \"%d\"\n\"doom_plane\" \"%s\"\n%s}\n",
-			m->model, m->sector, m->ceiling ? "ceiling" : "floor",
-			m->ceiling && ShutRemoteDoor( b->map, m->sector ) ? "\"aas_solid\" \"1\"\n" : "" );
+			m->model, m->sector, m->ceiling ? "ceiling" : "floor", keys );
 	}
 	*(char *)BufPush( &b->entities ) = 0;
 }

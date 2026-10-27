@@ -534,6 +534,9 @@ void BotSetBrushModelTypes(void)
 			modeltypes[modelnum] = MODELTYPE_FUNC_BOB;
 		else if (!Q_stricmp(classname, "func_plat"))
 			modeltypes[modelnum] = MODELTYPE_FUNC_PLAT;
+		// Q3Doom: a Doom lift (marked by the map builder)
+		else if (!Q_stricmp(classname, "func_doom_plane") && AAS_ValueForBSPEpairKey(ent, "aas_plat", model, MAX_EPAIRKEY))
+			modeltypes[modelnum] = MODELTYPE_FUNC_PLAT;
 		else if (!Q_stricmp(classname, "func_door"))
 			modeltypes[modelnum] = MODELTYPE_FUNC_DOOR;
 		else if (!Q_stricmp(classname, "func_static"))

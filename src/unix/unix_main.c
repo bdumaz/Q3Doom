@@ -183,6 +183,16 @@ static void Sys_CrashHandler( int sig ) {
 	raise( sig );
 }
 
+// SIGTERM (kill, timeout, a service manager), SIGINT and SIGHUP quit
+// cleanly at the next frame. Set before SDL starts, which then leaves them
+// alone (SDL's own handlers only post a quit event, that a dedicated server
+// never reads: it ignored the signal)
+static volatile sig_atomic_t	sys_quitSignal;
+
+static void Sys_QuitSignalHandler( int sig ) {
+	sys_quitSignal = sig;
+}
+
 static void Sys_InitCrashHandler( void ) {
 	const char	*home = Sys_DefaultHomePath();
 
@@ -194,6 +204,9 @@ static void Sys_InitCrashHandler( void ) {
 	signal( SIGFPE, Sys_CrashHandler );
 	signal( SIGILL, Sys_CrashHandler );
 	signal( SIGABRT, Sys_CrashHandler );
+	signal( SIGTERM, Sys_QuitSignalHandler );
+	signal( SIGINT, Sys_QuitSignalHandler );
+	signal( SIGHUP, Sys_QuitSignalHandler );
 }
 
 /*
@@ -723,6 +736,11 @@ int main( int argc, char **argv ) {
 		if ( ( SDL_window && ( SDL_GetWindowFlags( SDL_window ) & SDL_WINDOW_MINIMIZED ) )
 			|| ( com_dedicated && com_dedicated->integer ) ) {
 			usleep( 5000 );
+		}
+
+		if ( sys_quitSignal ) {
+			Com_Printf( "Signal %d: quitting\n", (int)sys_quitSignal );
+			Com_Quit_f();
 		}
 
 		// make sure mouse and joystick are only called once a frame

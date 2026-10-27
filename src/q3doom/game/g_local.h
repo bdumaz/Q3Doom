@@ -721,6 +721,8 @@ void BotStats_Clear(void);
 void BotStats_Fire(gentity_t *ent);
 void BotStats_Damage(gentity_t *targ, gentity_t *attacker, vec3_t point, int dflags);
 void BotStats_Report(void);
+void BotStats_Kill(int killer, int victim, int mod);
+void BotStats_Item(int client);
 void BotGoapDamaged(gentity_t *targ, gentity_t *inflictor, gentity_t *attacker);
 
 #include "g_team.h" // teamplay specific stuff

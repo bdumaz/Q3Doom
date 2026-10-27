@@ -462,6 +462,7 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 	}
 
 	G_LogPrintf( "Item: %i %s\n", other->s.number, ent->item->classname );
+	BotStats_Item( other->s.number );	// Q3Doom: the bots' statistics
 	if ( ent->item->doomednum && ( doom_mobjinfo[doom_mobjtype_for_ednum( ent->item->doomednum )].flags & MF_COUNTITEM ) ) {
 		doomLevel.items++;
 	}
