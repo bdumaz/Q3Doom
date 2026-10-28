@@ -100,6 +100,7 @@ static const char *gametype_items[] = {
 	"Capture the Flag",
 	"Doom Duel",
 	"Quake DoomMatch",
+	"QuakeDoom Duel",
 	0
 };
 
@@ -111,6 +112,7 @@ static const char *gametype_help[] = {
 	"Bring the enemy's flag home, on Quake 3's maps",
 	"A race through a Doom level: reach your rival's start first",
 	"Every player for himself on Doom's levels, Doom's or Quake 3's weapons",
+	"A race between the flags of a Quake 3 CTF map, through Doom's monsters",
 };
 
 static void StartServer_GametypeStatusBar( void *self ) {
@@ -120,13 +122,15 @@ static void StartServer_GametypeStatusBar( void *self ) {
 // Q3Doom: Doom for All is the free for all on Quake 3's maps; Doom Duel is
 // Team Deathmatch with g_doomDuel on the Doom levels (their "duel" type);
 // Quake DoomMatch the free for all on the Doom levels ("doommatch"), with
-// Doom's or Quake 3's weapons
+// Doom's or Quake 3's weapons; QuakeDoom Duel is Doom Duel on the Quake 3
+// CTF maps (ui_quakeDuel tells the options which of the two it is)
 #define GAMETYPE_DUEL		4
 #define GAMETYPE_DOOMMATCH	5
+#define GAMETYPE_QUAKEDUEL	6
 #define DUEL_BIT			( 1 << 16 )
 #define DOOMMATCH_BIT		( 1 << 17 )
 
-static int gametype_remap[] = {GT_FFA, GT_TEAM, GT_TOURNAMENT, GT_CTF, GT_TEAM, GT_FFA};
+static int gametype_remap[] = {GT_FFA, GT_TEAM, GT_TOURNAMENT, GT_CTF, GT_TEAM, GT_FFA, GT_TEAM};
 static int gametype_remap2[] = {0, 2, 0, 1, 3};
 
 // use ui_servers2.c definition
@@ -295,6 +299,9 @@ static void StartServer_GametypeEvent( void* ptr, int event ) {
 	if( s_startserver.gametype.curvalue == GAMETYPE_DUEL ) {
 		matchbits = DUEL_BIT;
 	}
+	if( s_startserver.gametype.curvalue == GAMETYPE_QUAKEDUEL ) {
+		matchbits = 1 << GT_CTF;
+	}
 	if( s_startserver.gametype.curvalue == GAMETYPE_DOOMMATCH ) {
 		matchbits = DOOMMATCH_BIT;
 	} else if( gametype_remap[s_startserver.gametype.curvalue] == GT_FFA ) {
@@ -348,8 +355,9 @@ static void StartServer_MenuEvent( void* ptr, int event ) {
 
 	case ID_STARTSERVERNEXT:
 		trap_Cvar_SetValue( "g_gameType", gametype_remap[s_startserver.gametype.curvalue] );
-		trap_Cvar_SetValue( "g_doomDuel", s_startserver.gametype.curvalue == GAMETYPE_DUEL );
+		trap_Cvar_SetValue( "g_doomDuel", s_startserver.gametype.curvalue == GAMETYPE_DUEL || s_startserver.gametype.curvalue == GAMETYPE_QUAKEDUEL );
 		trap_Cvar_SetValue( "ui_doomMatch", s_startserver.gametype.curvalue == GAMETYPE_DOOMMATCH );
+		trap_Cvar_SetValue( "ui_quakeDuel", s_startserver.gametype.curvalue == GAMETYPE_QUAKEDUEL );
 		UI_ServerOptionsMenu( s_startserver.multiplayer );
 		break;
 
@@ -661,6 +669,7 @@ void UI_StartServerDuelMenu( qboolean options, qboolean doomMatch ) {
 		trap_Cvar_SetValue( "g_gameType", gametype_remap[s_startserver.gametype.curvalue] );
 		trap_Cvar_SetValue( "g_doomDuel", !doomMatch );
 		trap_Cvar_SetValue( "ui_doomMatch", doomMatch );
+		trap_Cvar_SetValue( "ui_quakeDuel", 0 );
 		UI_ServerOptionsMenu( qtrue );
 	}
 }
@@ -1128,7 +1137,8 @@ static void ServerOptions_LevelshotDraw( void *self ) {
 	UI_DrawString( x, y, s_serveroptions.mapnamebuffer, UI_CENTER|UI_SMALLFONT, color_orange );
 
 	y += SMALLCHAR_HEIGHT;
-	UI_DrawString( x, y, gametype_items[s_serveroptions.duel ? GAMETYPE_DUEL : s_serveroptions.doomMatch ? GAMETYPE_DOOMMATCH
+	UI_DrawString( x, y, gametype_items[s_serveroptions.duel ? ( trap_Cvar_VariableValue( "ui_quakeDuel" ) ? GAMETYPE_QUAKEDUEL : GAMETYPE_DUEL )
+		: s_serveroptions.doomMatch ? GAMETYPE_DOOMMATCH
 		: gametype_remap2[s_serveroptions.gametype]], UI_CENTER|UI_SMALLFONT, color_orange );
 }
 

@@ -243,6 +243,7 @@ void UI_RegisterCvars( void ) {
 	trap_Cvar_Register( NULL, "g_duelGoalPlayers", "1", CVAR_ARCHIVE );
 	trap_Cvar_Register( NULL, "g_doomMatchWeapons", "0", CVAR_ARCHIVE );
 	trap_Cvar_Register( NULL, "ui_doomMatch", "0", 0 );
+	trap_Cvar_Register( NULL, "ui_quakeDuel", "0", 0 );
 }
 
 /*
