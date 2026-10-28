@@ -1,6 +1,7 @@
 /*
 ===========================================================================
-libdoom - line specials, sector movement ranges, texture animations
+libdoom - line specials, sector movement ranges, texture animations, the
+monsters of QuakeDoom Duel's item spots
 
 The special table follows P_CrossSpecialLine, P_UseSpecialLine and
 P_ShootSpecialLine of the Doom 1.9 source (p_spec.c, p_switch.c), so
@@ -12,6 +13,7 @@ Licensed under the GNU General Public License version 2 or later.
 ===========================================================================
 */
 #include "doom_local.h"
+#include "doom_info.h"
 
 #define W	DOOM_TRIG_WALK
 #define S	DOOM_TRIG_SWITCH
@@ -735,4 +737,43 @@ int doom_map_raise_ceilings( const doom_wad_t *wad, doom_map_t *map, int clearan
 	}
 	free( ranges );
 	return count;
+}
+
+/*
+=================
+doom_quake_spot_monsters
+
+QuakeDoom Duel: the former humans and imps at the light weapons, the
+demons and cacodemons at the heavy ones, a cacodemon at the green armour,
+a baron at the blue armour and the BFG, two lost souls at a powerup
+=================
+*/
+const doom_spot_monsters_t *doom_quake_spot_monsters( const char *classname ) {
+	static const doom_spot_monsters_t spots[] = {
+		{ "weapon_gauntlet",		{ MT_POSSESSED, MT_SHOTGUY, MT_TROOP }, 3, 1 },
+		{ "weapon_shotgun",			{ MT_POSSESSED, MT_SHOTGUY, MT_TROOP }, 3, 1 },
+		{ "weapon_machinegun",		{ MT_POSSESSED, MT_SHOTGUY, MT_TROOP }, 3, 1 },
+		{ "weapon_grenadelauncher",	{ MT_SERGEANT, MT_SHADOWS, MT_HEAD }, 3, 1 },
+		{ "weapon_rocketlauncher",	{ MT_SERGEANT, MT_SHADOWS, MT_HEAD }, 3, 1 },
+		{ "weapon_lightning",		{ MT_SERGEANT, MT_SHADOWS, MT_HEAD }, 3, 1 },
+		{ "weapon_railgun",			{ MT_SERGEANT, MT_SHADOWS, MT_HEAD }, 3, 1 },
+		{ "weapon_plasmagun",		{ MT_SERGEANT, MT_SHADOWS, MT_HEAD }, 3, 1 },
+		{ "item_armor_combat",		{ MT_HEAD }, 1, 1 },
+		{ "item_armor_body",		{ MT_BRUISER }, 1, 1 },
+		{ "weapon_bfg",				{ MT_BRUISER }, 1, 1 },
+		{ "item_quad",				{ MT_SKULL }, 1, 2 },
+		{ "item_haste",				{ MT_SKULL }, 1, 2 },
+		{ "item_regen",				{ MT_SKULL }, 1, 2 },
+		{ "item_invis",				{ MT_SKULL }, 1, 2 },
+		{ "item_enviro",			{ MT_SKULL }, 1, 2 },
+		{ "item_flight",			{ MT_SKULL }, 1, 2 }
+	};
+	size_t	i;
+
+	for ( i = 0 ; i < sizeof( spots ) / sizeof( spots[0] ) ; i++ ) {
+		if ( !strcmp( classname, spots[i].classname ) ) {
+			return &spots[i];
+		}
+	}
+	return NULL;
 }

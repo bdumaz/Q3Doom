@@ -7,6 +7,7 @@ Part of Q3Doom. Licensed under the GNU General Public License version 2 or later
 ===========================================================================
 */
 #include "doom.h"
+#include "doom_info.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -302,6 +303,47 @@ static void TestRobustness( const doom_wad_t *wad ) {
 	CHECK( doom_map_load( wad, "E9M9", &map, err, sizeof( err ) ) == -1, "missing map should fail" );
 }
 
+// QuakeDoom Duel: the monsters at the Quake 3 item spots, by the prize they guard
+static void CheckSpot( const char *classname, int numTypes, int t0, int t1, int t2, int count ) {
+	const doom_spot_monsters_t	*s = doom_quake_spot_monsters( classname );
+	const int					types[3] = { t0, t1, t2 };
+	int							i;
+
+	CHECK( s != NULL, "%s should have monsters", classname );
+	if ( !s ) {
+		return;
+	}
+	CHECK( s->numTypes == numTypes && s->count == count, "%s: %d types, %d monsters", classname, s->numTypes, s->count );
+	for ( i = 0 ; i < numTypes && i < s->numTypes ; i++ ) {
+		CHECK( s->types[i] == types[i], "%s: type %d is %d", classname, i, s->types[i] );
+	}
+}
+
+static void TestQuakeSpots( void ) {
+	static const char	*light[] = { "weapon_gauntlet", "weapon_shotgun", "weapon_machinegun" };
+	static const char	*heavy[] = { "weapon_grenadelauncher", "weapon_rocketlauncher", "weapon_lightning", "weapon_railgun", "weapon_plasmagun" };
+	static const char	*powerups[] = { "item_quad", "item_haste", "item_regen", "item_invis", "item_enviro", "item_flight" };
+	static const char	*none[] = { "item_armor_shard", "item_health", "item_health_mega", "ammo_rockets", "holdable_medkit",
+		"team_CTF_redflag", "", "Weapon_Shotgun" };
+	int					i;
+
+	for ( i = 0 ; i < 3 ; i++ ) {
+		CheckSpot( light[i], 3, MT_POSSESSED, MT_SHOTGUY, MT_TROOP, 1 );
+	}
+	for ( i = 0 ; i < 5 ; i++ ) {
+		CheckSpot( heavy[i], 3, MT_SERGEANT, MT_SHADOWS, MT_HEAD, 1 );
+	}
+	CheckSpot( "item_armor_combat", 1, MT_HEAD, 0, 0, 1 );
+	CheckSpot( "item_armor_body", 1, MT_BRUISER, 0, 0, 1 );
+	CheckSpot( "weapon_bfg", 1, MT_BRUISER, 0, 0, 1 );
+	for ( i = 0 ; i < 6 ; i++ ) {
+		CheckSpot( powerups[i], 1, MT_SKULL, 0, 0, 2 );
+	}
+	for ( i = 0 ; i < (int)( sizeof( none ) / sizeof( none[0] ) ) ; i++ ) {
+		CHECK( doom_quake_spot_monsters( none[i] ) == NULL, "%s should have no monster", none[i] );
+	}
+}
+
 int main( int argc, char **argv ) {
 	void		*data;
 	size_t		size;
@@ -325,6 +367,7 @@ int main( int argc, char **argv ) {
 	TestSounds( wad );
 	TestMaps( wad );
 	TestFragCeilings( wad );
+	TestQuakeSpots();
 	TestBuilder( wad );
 	TestRobustness( wad );
 

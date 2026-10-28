@@ -356,6 +356,17 @@ void	doom_sector_ranges( const doom_wad_t *wad, const doom_map_t *map, doom_plan
 
 int		doom_map_raise_ceilings( const doom_wad_t *wad, doom_map_t *map, int clearance );
 
+// QuakeDoom Duel: the monsters guarding a Quake 3 item spot, by its prize
+// (the Quake 3 classname, before the swap to Doom's items); NULL: none
+typedef struct {
+	const char	*classname;
+	int			types[3];		// mobjtype_t choices, one picked per spot
+	int			numTypes;
+	int			count;			// monsters at the spot
+} doom_spot_monsters_t;
+
+const doom_spot_monsters_t	*doom_quake_spot_monsters( const char *classname );
+
 // Animated textures and flats: the cycle as seen from 'name' (0 if not animated).
 // Doom advances them every 8 tics.
 #define DOOM_ANIM_TICS		8
