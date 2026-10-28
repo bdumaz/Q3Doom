@@ -51,8 +51,9 @@ qboolean Doom_DuelFinished( int clientNum ) {
 	return duel.active && clientNum >= 0 && clientNum < MAX_CLIENTS && duel.finished[clientNum];
 }
 
+// on a Doom level, or a Quake 3 map with both CTF flags (QuakeDoom Duel, g_doom_quake.c)
 qboolean Doom_DuelActive( void ) {
-	return g_doomDuel.integer && g_gametype.integer == GT_TEAM && DOOM_LEVEL();
+	return g_doomDuel.integer && g_gametype.integer == GT_TEAM && ( DOOM_LEVEL() || doomLevel.quakeDuel );
 }
 
 /*
@@ -161,6 +162,90 @@ static qboolean FindExit( const vec3_t start, vec3_t point, float *yaw ) {
 
 /*
 =================
+SideFloor
+
+The floor at x, y: its sector's on a Doom level; on a Quake 3 map the
+first under zref + 64, within 512
+=================
+*/
+static qboolean SideFloor( float x, float y, float zref, float *z ) {
+	trace_t	tr;
+	vec3_t	start, end;
+	int		sector;
+
+	if ( DOOM_LEVEL() ) {
+		sector = doom_map_sector_at( doomLevel.map, x, y );
+		if ( sector < 0 ) {
+			return qfalse;
+		}
+		*z = doomLevel.floor[sector];
+		return qtrue;
+	}
+	VectorSet( start, x, y, zref + 64 );
+	VectorSet( end, x, y, zref - 512 );
+	trap_Trace( &tr, start, NULL, NULL, end, ENTITYNUM_NONE, MASK_PLAYERSOLID );
+	if ( tr.startsolid || tr.fraction == 1 ) {
+		return qfalse;
+	}
+	*z = tr.endpos[2];
+	return qtrue;
+}
+
+/*
+=================
+QuakeSides
+
+QuakeDoom Duel: the sides are the red and the blue flag bases, on the
+floor, each facing as its team's start spot nearest the flag does (else
+its spawn spot, else toward the other flag); the players appear a step
+ahead of the flag
+=================
+*/
+static qboolean QuakeSides( void ) {
+	static const char	*spawns[2][2] = { { "team_CTF_redplayer", "team_CTF_redspawn" }, { "team_CTF_blueplayer", "team_CTF_bluespawn" } };
+	char				mapname[MAX_QPATH];
+	int					side, k;
+
+	if ( !Doom_QuakeFlag( TEAM_RED, duel.sides[0] ) || !Doom_QuakeFlag( TEAM_BLUE, duel.sides[1] ) ) {
+		trap_Cvar_VariableStringBuffer( "mapname", mapname, sizeof( mapname ) );
+		G_Printf( "QuakeDoom Duel: %s has no CTF flags\n", mapname );
+		return qfalse;
+	}
+	for ( side = 0 ; side < 2 ; side++ ) {
+		float		*p = duel.sides[side], best = -1, z;
+		gentity_t	*spot = NULL;
+		vec3_t		ahead;
+
+		if ( SideFloor( p[0], p[1], p[2], &z ) ) {
+			p[2] = z;
+		}
+		duel.sideYaw[side] = RAD2DEG( atan2( duel.sides[side ^ 1][1] - p[1], duel.sides[side ^ 1][0] - p[0] ) );
+		for ( k = 0 ; k < 2 && best < 0 ; k++ ) {
+			while ( ( spot = G_Find( spot, FOFS( classname ), spawns[side][k] ) ) != NULL ) {
+				float d = Distance( spot->s.origin, p );
+
+				if ( best < 0 || d < best ) {
+					best = d;
+					duel.sideYaw[side] = spot->s.angles[YAW];
+				}
+			}
+		}
+
+		ahead[0] = p[0] + cos( DEG2RAD( duel.sideYaw[side] ) ) * 64;
+		ahead[1] = p[1] + sin( DEG2RAD( duel.sideYaw[side] ) ) * 64;
+		if ( SideFloor( ahead[0], ahead[1], p[2], &z ) && fabs( z - p[2] ) <= 64 ) {
+			duel.spawns[side][0] = ahead[0];
+			duel.spawns[side][1] = ahead[1];
+		} else {
+			duel.spawns[side][0] = p[0];
+			duel.spawns[side][1] = p[1];
+		}
+	}
+	return qtrue;
+}
+
+/*
+=================
 Doom_DuelSpawnSpot
 
 ClientSpawn: a free spot on the player's side, around its point; the
@@ -182,24 +267,22 @@ gentity_t *Doom_DuelSpawnSpot( gentity_t *ent, vec3_t origin, vec3_t angles ) {
 	side = TeamSide( team );
 	maxs[2] = g_playerHeight.value > 0 ? PLAYER_TOP( g_playerHeight.value ) : maxs[2];
 	for ( i = 0 ; i < n ; i++ ) {
-		int sector;
+		float floor;
 
 		VectorSet( p, duel.spawns[side][0] + offsets[i][0], duel.spawns[side][1] + offsets[i][1], 0 );
-		sector = doom_map_sector_at( doomLevel.map, p[0], p[1] );
-		if ( sector < 0 ) {
+		if ( !SideFloor( p[0], p[1], duel.sides[side][2], &floor ) ) {
 			continue;
 		}
 		// the player's box standing on the floor, clear of walls and players
-		p[2] = doomLevel.floor[sector] - MINS_Z + 1;
+		p[2] = floor - MINS_Z + 1;
 		trap_Trace( &tr, p, mins, maxs, p, ent->s.number, MASK_PLAYERSOLID );
 		if ( !tr.startsolid && !tr.allsolid ) {
+			p[2] = floor;
 			break;
 		}
 	}
 	if ( i == n ) {
 		VectorCopy( duel.sides[side], p );		// telefrags whoever is there
-	} else {
-		p[2] = doomLevel.floor[doom_map_sector_at( doomLevel.map, p[0], p[1] )];
 	}
 	p[2] += 9;		// as Doom's starts
 	VectorCopy( p, origin );
@@ -474,29 +557,36 @@ void Doom_InitDuel( void ) {
 	if ( !Doom_DuelActive() ) {
 		return;
 	}
-	if ( !FindStart( start, &yaw ) ) {
-		G_Printf( S_COLOR_YELLOW "Doom Duel: the level has no player start\n" );
-		return;
-	}
-	VectorCopy( start, duel.sides[0] );
-	duel.sideYaw[0] = yaw;
-	if ( !FindExit( start, duel.sides[1], &duel.sideYaw[1] ) ) {
-		G_Printf( S_COLOR_YELLOW "Doom Duel: the level has no exit\n" );
-		return;
-	}
-	for ( team = 0 ; team < 2 ; team++ ) {
-		int		sector = doom_map_sector_at( doomLevel.map, duel.sides[team][0], duel.sides[team][1] );
-		float	*spawn = duel.spawns[team];
-
-		if ( sector >= 0 ) {
-			duel.sides[team][2] = doomLevel.floor[sector];		// both on the floor
+	if ( !DOOM_LEVEL() ) {
+		if ( !QuakeSides() ) {
+			doomLevel.quakeDuel = qfalse;		// plain Team Deathmatch
+			return;
 		}
-		// a step ahead of the flag, which stands where the other side must get
-		spawn[0] = duel.sides[team][0] + cos( DEG2RAD( duel.sideYaw[team] ) ) * 64;
-		spawn[1] = duel.sides[team][1] + sin( DEG2RAD( duel.sideYaw[team] ) ) * 64;
-		if ( doom_map_sector_at( doomLevel.map, spawn[0], spawn[1] ) < 0 ) {
-			spawn[0] = duel.sides[team][0];
-			spawn[1] = duel.sides[team][1];
+	} else {
+		if ( !FindStart( start, &yaw ) ) {
+			G_Printf( S_COLOR_YELLOW "Doom Duel: the level has no player start\n" );
+			return;
+		}
+		VectorCopy( start, duel.sides[0] );
+		duel.sideYaw[0] = yaw;
+		if ( !FindExit( start, duel.sides[1], &duel.sideYaw[1] ) ) {
+			G_Printf( S_COLOR_YELLOW "Doom Duel: the level has no exit\n" );
+			return;
+		}
+		for ( team = 0 ; team < 2 ; team++ ) {
+			int		sector = doom_map_sector_at( doomLevel.map, duel.sides[team][0], duel.sides[team][1] );
+			float	*spawn = duel.spawns[team];
+
+			if ( sector >= 0 ) {
+				duel.sides[team][2] = doomLevel.floor[sector];		// both on the floor
+			}
+			// a step ahead of the flag, which stands where the other side must get
+			spawn[0] = duel.sides[team][0] + cos( DEG2RAD( duel.sideYaw[team] ) ) * 64;
+			spawn[1] = duel.sides[team][1] + sin( DEG2RAD( duel.sideYaw[team] ) ) * 64;
+			if ( doom_map_sector_at( doomLevel.map, spawn[0], spawn[1] ) < 0 ) {
+				spawn[0] = duel.sides[team][0];
+				spawn[1] = duel.sides[team][1];
+			}
 		}
 	}
 	duel.active = qtrue;

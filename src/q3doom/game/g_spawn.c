@@ -328,6 +328,11 @@ qboolean G_CallSpawn( gentity_t *ent ) {
 		return qfalse;
 	}
 
+	// Q3Doom: QuakeDoom Duel notes its monster spots and flag bases
+	if ( Doom_QuakeSpot( ent ) ) {
+		return qfalse;
+	}
+
 	for ( i = 0 ; i < (int)( sizeof( q3ItemsInDoom ) / sizeof( q3ItemsInDoom[0] ) ) ; i++ ) {
 		if ( !strcmp( ent->classname, q3ItemsInDoom[i][0] ) ) {
 			if ( !q3ItemsInDoom[i][1] ) {

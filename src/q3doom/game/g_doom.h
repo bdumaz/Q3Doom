@@ -115,6 +115,7 @@ typedef struct {
 
 	int					weaponSet;		// DOOM_WEAPONS_*: DoomFrag's or the campaign's option
 	qboolean			deathmatch;		// g_doomDeathmatch, outside the campaign and DoomFrag
+	qboolean			quakeDuel;		// QuakeDoom Duel: Doom Duel on a Quake 3 map with both CTF flags
 } doomLevel_t;
 
 extern doomLevel_t	doomLevel;
@@ -166,6 +167,12 @@ void		Doom_DuelFrame( void );
 void		Doom_DuelThink( gentity_t *ent );
 void		Doom_DuelPlayerDied( gentity_t *ent );
 gentity_t	*Doom_DuelSpawnSpot( gentity_t *ent, vec3_t origin, vec3_t angles );
+
+// g_doom_quake.c
+void		Doom_ClearQuakeSpots( void );
+qboolean	Doom_QuakeSpot( gentity_t *ent );		// G_CallSpawn, before the Doom swap; qtrue: don't spawn it
+qboolean	Doom_QuakeFlag( int team, vec3_t origin );	// the flag base of TEAM_RED / TEAM_BLUE
+void		Doom_SpawnQuakeMonsters( void );
 
 // g_doom_campaign.c
 void		Doom_InitCampaign( void );

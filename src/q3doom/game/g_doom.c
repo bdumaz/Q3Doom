@@ -833,6 +833,7 @@ void Doom_RunFrame( void ) {
 
 	// a Quake 3 map: only the monsters (QuakeDoom Duel's, or the doom_spawn cheat's)
 	if ( !DOOM_LEVEL() ) {
+		Doom_DuelFrame();
 		while ( doomLevel.lastTic < tic ) {
 			doomLevel.lastTic++;
 			Doom_RunMobjs();
@@ -971,7 +972,10 @@ void Doom_InitLevel( void ) {
 	memset( &doomLevel, 0, sizeof( doomLevel ) );
 	trap_Cvar_VariableStringBuffer( "mapname", mapname, sizeof( mapname ) );
 	doomLevel.map = trap_Doom_GetMap( mapname );
+	Doom_ClearQuakeSpots();
 	if ( !doomLevel.map ) {
+		// QuakeDoom Duel, if the map turns out to have both flags (Doom_InitDuel)
+		doomLevel.quakeDuel = g_doomDuel.integer && g_gametype.integer == GT_TEAM;
 		Doom_InitMobjs();
 		SetWeaponSet();		// a Quake 3 map: Doom's weapons all the same
 		return;
@@ -1034,6 +1038,10 @@ After the entities spawned (the movers exist)
 */
 void Doom_StartLevel( void ) {
 	if ( !DOOM_LEVEL() ) {
+		if ( doomLevel.quakeDuel ) {
+			Doom_InitDuel();
+			Doom_SpawnQuakeMonsters();
+		}
 		return;
 	}
 	Doom_SpawnSectorSpecials();
