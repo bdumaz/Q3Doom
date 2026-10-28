@@ -427,7 +427,7 @@ void Doom_SpawnItems( void ) {
 			|| ( !g_duelHealthPickups.integer && ( bg_itemlist[itemNum].giType == IT_HEALTH || bg_itemlist[itemNum].giType == IT_ARMOR ) ) ) ) {
 			continue;
 		}
-		ent = Doom_SpawnItemAt( itemNum, t->x + 0.25f, t->y + 0.25f, qfalse );
+		ent = Doom_SpawnItemAt( itemNum, t->x + 0.25f, t->y + 0.25f, 0, qfalse );
 		if ( !ent ) {
 			continue;
 		}
@@ -444,17 +444,31 @@ void Doom_SpawnItems( void ) {
 =================
 Doom_SpawnItemAt
 
-An item standing on the floor at x, y; 'dropped' by a monster (MF_DROPPED:
-half a clip, one clip with a weapon)
+An item standing on the floor at x, y (on a Quake 3 map, the floor under
+z); 'dropped' by a monster (MF_DROPPED: half a clip, one clip with a weapon)
 =================
 */
-gentity_t *Doom_SpawnItemAt( int itemNum, float x, float y, qboolean dropped ) {
-	int			sector = doom_map_sector_at( doomLevel.map, x, y );
+gentity_t *Doom_SpawnItemAt( int itemNum, float x, float y, float z, qboolean dropped ) {
+	int			sector = DOOM_LEVEL() ? doom_map_sector_at( doomLevel.map, x, y ) : -1;
 	gentity_t	*ent;
 	vec3_t		origin;
 
-	if ( itemNum <= 0 || itemNum >= bg_numItems || sector < 0 ) {
+	if ( itemNum <= 0 || itemNum >= bg_numItems || ( DOOM_LEVEL() && sector < 0 ) ) {
 		return NULL;
+	}
+	if ( DOOM_LEVEL() ) {
+		VectorSet( origin, x, y, doomLevel.floor[sector] );
+	} else {
+		trace_t	tr;
+		vec3_t	start, end;
+
+		VectorSet( start, x, y, z + 16 );
+		VectorSet( end, x, y, z - 512 );
+		trap_Trace( &tr, start, NULL, NULL, end, ENTITYNUM_NONE, MASK_SOLID );
+		if ( tr.startsolid || tr.fraction == 1 ) {
+			return NULL;
+		}
+		VectorCopy( tr.endpos, origin );
 	}
 	ent = G_Spawn();
 	ent->classname = bg_itemlist[itemNum].classname;
@@ -471,7 +485,6 @@ gentity_t *Doom_SpawnItemAt( int itemNum, float x, float y, qboolean dropped ) {
 	VectorSet( ent->r.maxs, 21, 21, 8 );
 	ent->r.contents = CONTENTS_TRIGGER;
 	ent->touch = Touch_Item;
-	VectorSet( origin, x, y, doomLevel.floor[sector] );
 	G_SetOrigin( ent, origin );
 	trap_LinkEntity( ent );
 	return ent;

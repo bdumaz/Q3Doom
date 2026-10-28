@@ -142,6 +142,9 @@ void Doom_InitMobjs( void ) {
 
 	memset( &mm, 0, sizeof( mm ) );
 	memset( mobjs, 0, sizeof( mobjs ) );
+	if ( !map ) {
+		return;		// a Quake 3 map: traces stand for the lines
+	}
 	for ( i = 0 ; i < map->num_vertexes ; i++ ) {
 		minx = MIN( minx, map->vertexes[i].x );
 		miny = MIN( miny, map->vertexes[i].y );
@@ -250,18 +253,85 @@ A flying lost soul hits the first thing in the way.
 #define CP_THINGS	1
 #define CP_LINES	2
 
+#define QUAKE_MASK		( CONTENTS_SOLID | CONTENTS_MONSTERCLIP )
+#define QUAKE_REACH		4096
+
+/*
+=================
+QuakeGeometry
+
+CheckPosition's floor, ceiling and drop-off on a Quake 3 map, from traces:
+the box above a step's height must be clear (else a wall, with CP_LINES);
+the floor is the highest under the box (none within reach: no room), the
+drop-off the lowest under its middle and corners
+=================
+*/
+static qboolean QuakeGeometry( gentity_t *ent, float x, float y, int what ) {
+	doomMobj_t	*mo = ent->doomMobj;
+	float		r = mo->radius, z = ent->r.currentOrigin[2] + MAXSTEP;
+	vec3_t		start, end, mins, maxs;
+	trace_t		tr;
+	int			i;
+
+	VectorSet( start, x, y, z );
+	VectorSet( mins, -r, -r, 0 );
+	VectorSet( maxs, r, r, mo->height - MAXSTEP > 1 ? mo->height - MAXSTEP : 1 );
+	trap_Trace( &tr, start, mins, maxs, start, ent->s.number, QUAKE_MASK );
+	if ( tr.startsolid ) {
+		if ( what & CP_LINES ) {
+			return qfalse;
+		}
+		tm.floorz = tm.dropoffz = ent->r.currentOrigin[2];
+		tm.ceilingz = ent->r.currentOrigin[2] + mo->height;
+		return qtrue;
+	}
+
+	VectorSet( end, x, y, z - QUAKE_REACH );
+	trap_Trace( &tr, start, mins, maxs, end, ent->s.number, QUAKE_MASK );
+	if ( tr.fraction == 1 ) {
+		return qfalse;		// no floor: out of the world, or over the void
+	}
+	tm.floorz = tr.endpos[2];
+
+	maxs[2] = 1;
+	VectorSet( end, x, y, z + QUAKE_REACH );
+	trap_Trace( &tr, start, mins, maxs, end, ent->s.number, QUAKE_MASK );
+	tm.ceilingz = tr.endpos[2] + 1;
+
+	tm.dropoffz = tm.floorz;
+	for ( i = 0 ; i < 5 ; i++ ) {
+		static const float	corners[5][2] = { { 0, 0 }, { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } };
+		float				in = r > 1 ? r - 1 : 0;
+
+		VectorSet( start, x + corners[i][0] * in, y + corners[i][1] * in, z );
+		VectorSet( end, start[0], start[1], z - QUAKE_REACH );
+		trap_Trace( &tr, start, NULL, NULL, end, ent->s.number, QUAKE_MASK );
+		if ( !tr.startsolid && tr.endpos[2] < tm.dropoffz ) {
+			tm.dropoffz = tr.endpos[2];
+		}
+	}
+	return qtrue;
+}
+
 static qboolean CheckPosition( gentity_t *ent, float x, float y, int what ) {
 	doomMobj_t			*mo = ent->doomMobj;
 	const doom_map_t	*map = doomLevel.map;
 	float				box[4];
-	int					sector = doom_map_sector_at( map, x, y ), bx0, bx1, by0, by1, bx, by, i;
+	int					sector, bx0, bx1, by0, by1, bx, by, i;
 
 	tm.numspechit = 0;
-	if ( sector < 0 ) {
-		return qfalse;
+	if ( !map ) {
+		if ( !QuakeGeometry( ent, x, y, what ) ) {
+			return qfalse;
+		}
+	} else {
+		sector = doom_map_sector_at( map, x, y );
+		if ( sector < 0 ) {
+			return qfalse;
+		}
+		tm.floorz = tm.dropoffz = doomLevel.floor[sector];
+		tm.ceilingz = doomLevel.ceiling[sector];
 	}
-	tm.floorz = tm.dropoffz = doomLevel.floor[sector];
-	tm.ceilingz = doomLevel.ceiling[sector];
 
 	if ( mo->flags & MF_NOCLIP ) {
 		return qtrue;
@@ -296,7 +366,7 @@ static qboolean CheckPosition( gentity_t *ent, float x, float y, int what ) {
 		}
 	}
 
-	if ( !( what & CP_LINES ) ) {
+	if ( !( what & CP_LINES ) || !map ) {
 		return qtrue;
 	}
 
@@ -617,10 +687,15 @@ static qboolean SetMobjState( gentity_t *ent, int state ) {
 =================
 Doom_SpawnMobj
 
-P_SpawnMobj: on the floor (or the ceiling for hanging things)
+P_SpawnMobj: on the floor (or the ceiling for hanging things); on a
+Quake 3 map, the floor and ceiling around fromZ
 =================
 */
 gentity_t *Doom_SpawnMobj( int type, float x, float y, float angle ) {
+	return Doom_SpawnMobjAt( type, x, y, 0, angle );
+}
+
+gentity_t *Doom_SpawnMobjAt( int type, float x, float y, float fromZ, float angle ) {
 	const doom_mobjinfo_t	*info = &doom_mobjinfo[type];
 	gentity_t				*ent = G_Spawn();
 	doomMobj_t				*mo = &mobjs[ent->s.number];
@@ -641,6 +716,7 @@ gentity_t *Doom_SpawnMobj( int type, float x, float y, float angle ) {
 	mo->spawnX = x;
 	mo->spawnY = y;
 	mo->spawnAngle = angle;
+	mo->spawnZ = fromZ;
 	mo->state = info->spawnstate;
 	mo->tics = doom_states[mo->state].tics;
 
@@ -656,7 +732,7 @@ gentity_t *Doom_SpawnMobj( int type, float x, float y, float angle ) {
 
 	ent->r.currentOrigin[0] = x;
 	ent->r.currentOrigin[1] = y;
-	ent->r.currentOrigin[2] = 0;
+	ent->r.currentOrigin[2] = fromZ;
 	CheckPosition( ent, x, y, CP_LINES );
 	mo->floorz = tm.floorz;
 	mo->ceilingz = tm.ceilingz;
@@ -736,7 +812,11 @@ static void NightmareRespawn( gentity_t *ent ) {
 	float		x = mo->spawnX, y = mo->spawnY;
 
 	// somthing is occupying its position?
-	{
+	if ( !DOOM_LEVEL() ) {
+		if ( !Doom_MobjFits( mo->type, x, y, mo->spawnZ ) ) {
+			return;
+		}
+	} else {
 		gentity_t	probe;
 		doomMobj_t	pm = *mo;
 
@@ -750,7 +830,7 @@ static void NightmareRespawn( gentity_t *ent ) {
 		}
 	}
 	SpawnTeleFog( ent->r.currentOrigin[0], ent->r.currentOrigin[1], ent->r.currentOrigin[2] );
-	fresh = Doom_SpawnMobj( mo->type, x, y, mo->spawnAngle );
+	fresh = Doom_SpawnMobjAt( mo->type, x, y, mo->spawnZ, mo->spawnAngle );
 	fresh->doomMobj->spawnFlags = mo->spawnFlags;
 	if ( mo->spawnFlags & DOOM_MTF_AMBUSH ) {
 		fresh->doomMobj->flags |= MF_AMBUSH;
@@ -893,7 +973,8 @@ static void KillMobj( gentity_t *source, gentity_t *target ) {
 	default:
 		return;
 	}
-	Doom_SpawnItemAt( BG_DoomItemForThing( doom_mobjinfo[item].doomednum ), target->r.currentOrigin[0], target->r.currentOrigin[1], qtrue );
+	Doom_SpawnItemAt( BG_DoomItemForThing( doom_mobjinfo[item].doomednum ), target->r.currentOrigin[0], target->r.currentOrigin[1],
+		target->r.currentOrigin[2], qtrue );
 }
 
 /*
@@ -1011,13 +1092,28 @@ static void RecursiveSound( int sector, int soundblocks, gentity_t *target ) {
 Doom_NoiseAlert
 
 A shot is heard through the open sectors around (two sound blocking
-lines stop it); the monsters there wake up and come
+lines stop it); the monsters there wake up and come. On a Quake 3 map, by
+the monsters within QUAKE_HEARING in the shooter's potentially visible set.
 =================
 */
-void Doom_NoiseAlert( gentity_t *emitter ) {
-	int		sector;
+#define QUAKE_HEARING	1500
 
-	if ( !DOOM_LEVEL() || ( emitter->flags & FL_NOTARGET ) ) {
+void Doom_NoiseAlert( gentity_t *emitter ) {
+	int		sector, i;
+
+	if ( emitter->flags & FL_NOTARGET ) {
+		return;
+	}
+	if ( !DOOM_LEVEL() ) {
+		for ( i = MAX_CLIENTS ; i < level.num_entities ; i++ ) {
+			gentity_t *ent = &g_entities[i];
+
+			if ( ent->inuse && ent->doomMobj && ent->health > 0
+				&& Distance( ent->r.currentOrigin, emitter->r.currentOrigin ) < QUAKE_HEARING
+				&& trap_InPVS( emitter->r.currentOrigin, ent->r.currentOrigin ) ) {
+				ent->doomMobj->soundTarget = emitter;
+			}
+		}
 		return;
 	}
 	sector = doom_map_sector_at( doomLevel.map, emitter->r.currentOrigin[0], emitter->r.currentOrigin[1] );
@@ -1398,7 +1494,10 @@ static void BossDeath( gentity_t *ent ) {
 	int			type = ent->doomMobj->type, i;
 	qboolean	e1m8, e2m8, e3m8, e4m6, e4m8;
 
-	e1m8 = !Q_stricmp( map, "E1M8" ) && type == MT_BRUISER;
+	if ( !DOOM_LEVEL() ) {
+		return;
+	}
+	e1m8 =!Q_stricmp( map, "E1M8" ) && type == MT_BRUISER;
 	e2m8 = !Q_stricmp( map, "E2M8" ) && type == MT_CYBORG;
 	e3m8 = !Q_stricmp( map, "E3M8" ) && type == MT_SPIDER;
 	e4m6 = !Q_stricmp( map, "E4M6" ) && type == MT_CYBORG;
@@ -1433,8 +1532,8 @@ static void BossDeath( gentity_t *ent ) {
 // A_Look
 static void Look( gentity_t *ent ) {
 	doomMobj_t	*mo = ent->doomMobj;
-	int			sector = doom_map_sector_at( doomLevel.map, ent->r.currentOrigin[0], ent->r.currentOrigin[1] );
-	gentity_t	*targ = sector >= 0 ? mm.soundTarget[sector] : NULL;
+	int			sector = DOOM_LEVEL() ? doom_map_sector_at( doomLevel.map, ent->r.currentOrigin[0], ent->r.currentOrigin[1] ) : -1;
+	gentity_t	*targ = sector >= 0 ? mm.soundTarget[sector] : DOOM_LEVEL() ? NULL : mo->soundTarget;
 	qboolean	seen = qfalse;
 
 	mo->threshold = 0;		// any shot will wake up
@@ -1724,7 +1823,7 @@ qboolean Doom_TeleportMobj( gentity_t *ent, int tag ) {
 	doomMobj_t			*mo = ent->doomMobj;
 	int					i;
 
-	if ( !mo ) {
+	if ( !mo || !map ) {
 		return qfalse;
 	}
 	for ( i = 0 ; i < map->num_things ; i++ ) {
@@ -1781,6 +1880,33 @@ void Doom_KillAllCommand( gentity_t *ent ) {
 
 /*
 =================
+Doom_MobjFits
+
+Room for a thing of that type standing on the floor at x, y (searched from
+z on a Quake 3 map), no wall and no thing in the way
+=================
+*/
+qboolean Doom_MobjFits( int type, float x, float y, float z ) {
+	gentity_t	probe;
+	doomMobj_t	pm;
+
+	memset( &probe, 0, sizeof( probe ) );
+	memset( &pm, 0, sizeof( pm ) );
+	probe.doomMobj = &pm;
+	pm.radius = (float)doom_mobjinfo[type].radius / DOOM_FRACUNIT;
+	pm.height = (float)doom_mobjinfo[type].height / DOOM_FRACUNIT;
+	probe.s.number = ENTITYNUM_NONE;
+	probe.r.currentOrigin[2] = DOOM_LEVEL() ? 0 : z;
+	if ( ( DOOM_LEVEL() && doom_map_sector_at( doomLevel.map, x, y ) < 0 ) || !CheckPosition( &probe, x, y, CP_LINES )
+		|| tm.ceilingz - tm.floorz < pm.height ) {
+		return qfalse;
+	}
+	probe.r.currentOrigin[2] = tm.floorz;
+	return CheckPosition( &probe, x, y, CP_THINGS );
+}
+
+/*
+=================
 Doom_SpawnCommand
 
 doom_spawn <thing number or mobj name>: a thing in front of the player
@@ -1793,7 +1919,7 @@ void Doom_SpawnCommand( gentity_t *ent ) {
 	vec3_t		forward;
 	gentity_t	*spawned;
 
-	if ( !DOOM_LEVEL() || !ent->client ) {
+	if ( !ent->client ) {
 		return;
 	}
 	trap_Argv( 1, arg, sizeof( arg ) );
@@ -1820,31 +1946,17 @@ void Doom_SpawnCommand( gentity_t *ent ) {
 	forward[2] = 0;
 	VectorNormalize( forward );
 	for ( i = 128 ; i >= 32 ; i -= 16 ) {
-		float		x = ent->client->ps.origin[0] + forward[0] * i, y = ent->client->ps.origin[1] + forward[1] * i;
-		gentity_t	probe;
-		doomMobj_t	pm;
-
-		memset( &probe, 0, sizeof( probe ) );
-		memset( &pm, 0, sizeof( pm ) );
-		probe.doomMobj = &pm;
-		pm.radius = (float)doom_mobjinfo[type].radius / DOOM_FRACUNIT;
-		pm.height = (float)doom_mobjinfo[type].height / DOOM_FRACUNIT;
-		probe.s.number = ENTITYNUM_NONE;
-		if ( doom_map_sector_at( doomLevel.map, x, y ) < 0 || !CheckPosition( &probe, x, y, CP_LINES ) || tm.ceilingz - tm.floorz < pm.height ) {
-			continue;
+		if ( Doom_MobjFits( type, ent->client->ps.origin[0] + forward[0] * i, ent->client->ps.origin[1] + forward[1] * i,
+			ent->client->ps.origin[2] ) ) {
+			break;
 		}
-		probe.r.currentOrigin[2] = tm.floorz;
-		if ( !CheckPosition( &probe, x, y, CP_THINGS ) ) {
-			continue;
-		}
-		break;
 	}
 	if ( i < 32 ) {
 		trap_SendServerCommand( ent - g_entities, "print \"doom_spawn: no room in front\n\"" );
 		return;
 	}
-	spawned = Doom_SpawnMobj( type, ent->client->ps.origin[0] + forward[0] * i, ent->client->ps.origin[1] + forward[1] * i,
-		AngleNormalize360( ent->client->ps.viewangles[YAW] + 180 ) );
+	spawned = Doom_SpawnMobjAt( type, ent->client->ps.origin[0] + forward[0] * i, ent->client->ps.origin[1] + forward[1] * i,
+		ent->client->ps.origin[2], AngleNormalize360( ent->client->ps.viewangles[YAW] + 180 ) );
 	if ( doom_mobjinfo[type].flags & MF_COUNTKILL ) {
 		doomLevel.totalKills++;
 	}

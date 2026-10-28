@@ -829,7 +829,14 @@ static void PlayerInSpecialSector( gentity_t *ent, int tic ) {
 void Doom_RunFrame( void ) {
 	int		tic, i;
 
+	tic = ( level.time - level.startTime ) * DOOM_TICRATE / 1000;
+
+	// a Quake 3 map: only the monsters (QuakeDoom Duel's, or the doom_spawn cheat's)
 	if ( !DOOM_LEVEL() ) {
+		while ( doomLevel.lastTic < tic ) {
+			doomLevel.lastTic++;
+			Doom_RunMobjs();
+		}
 		return;
 	}
 	Doom_UpdateHeights();
@@ -842,7 +849,6 @@ void Doom_RunFrame( void ) {
 		return;
 	}
 
-	tic = ( level.time - level.startTime ) * DOOM_TICRATE / 1000;
 	while ( doomLevel.lastTic < tic ) {
 		doomLevel.lastTic++;
 		// DoomFrag: the monsters wait for the run to start
@@ -966,6 +972,7 @@ void Doom_InitLevel( void ) {
 	trap_Cvar_VariableStringBuffer( "mapname", mapname, sizeof( mapname ) );
 	doomLevel.map = trap_Doom_GetMap( mapname );
 	if ( !doomLevel.map ) {
+		Doom_InitMobjs();
 		SetWeaponSet();		// a Quake 3 map: Doom's weapons all the same
 		return;
 	}

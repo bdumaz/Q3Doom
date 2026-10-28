@@ -73,7 +73,9 @@ typedef struct doomMobj_s {
 	int					reactiontime;	// tics before it may attack
 	int					lastlook;
 	float				spawnX, spawnY, spawnAngle;	// nightmare respawn
+	float				spawnZ;			// (on a Quake 3 map, where its floor was searched from)
 	int					spawnFlags;		// map thing flags
+	gentity_t			*soundTarget;	// the last shot heard, on a Quake 3 map (Doom maps keep it per sector)
 } doomMobj_t;
 
 typedef struct {
@@ -189,6 +191,9 @@ void		Doom_SpawnMobjs( void );
 void		Doom_RunMobjs( void );		// one Doom tic
 void		Doom_RespawnDeadMonsters( void );
 gentity_t	*Doom_SpawnMobj( int type, float x, float y, float angle );
+// z: on a Quake 3 map, the height its floor is searched from (ignored on a Doom map)
+gentity_t	*Doom_SpawnMobjAt( int type, float x, float y, float z, float angle );
+qboolean	Doom_MobjFits( int type, float x, float y, float z );
 void		Doom_DamageMobj( gentity_t *target, gentity_t *inflictor, gentity_t *source, vec3_t dir, int damage, int dflags );
 void		Doom_NoiseAlert( gentity_t *emitter );
 float		Doom_ThingZ( gentity_t *ent );
@@ -200,7 +205,7 @@ void		Doom_MissileImpact( gentity_t *ent, trace_t *trace );
 
 // g_doom_items.c
 void		Doom_SpawnItems( void );
-gentity_t	*Doom_SpawnItemAt( int itemNum, float x, float y, qboolean dropped );
+gentity_t	*Doom_SpawnItemAt( int itemNum, float x, float y, float z, qboolean dropped );	// z as Doom_SpawnMobjAt's
 void		Doom_UpdateItems( void );
 int			Doom_TouchItem( gentity_t *ent, gentity_t *other );
 void		Doom_GivePlayerStart( gclient_t *client );
