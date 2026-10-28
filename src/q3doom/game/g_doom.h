@@ -201,6 +201,7 @@ gentity_t	*Doom_SpawnMobj( int type, float x, float y, float angle );
 // z: on a Quake 3 map, the height its floor is searched from (ignored on a Doom map)
 gentity_t	*Doom_SpawnMobjAt( int type, float x, float y, float z, float angle );
 qboolean	Doom_MobjFits( int type, float x, float y, float z );
+void		Doom_CrushMobj( gentity_t *ent );		// a Quake 3 mover closing on a corpse
 void		Doom_DamageMobj( gentity_t *target, gentity_t *inflictor, gentity_t *source, vec3_t dir, int damage, int dflags );
 void		Doom_NoiseAlert( gentity_t *emitter );
 float		Doom_ThingZ( gentity_t *ent );

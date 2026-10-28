@@ -487,8 +487,9 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 	}
 
 	// a Doom map's items are used up out of deathmatch (single player and
-	// cooperative rules), so are dropped ones (by players or monsters)
-	if ( ( DOOM_LEVEL() && ( !doomLevel.deathmatch || ent->doomDropped ) )
+	// cooperative rules), so are dropped ones (by players, or by monsters on
+	// any map)
+	if ( ( DOOM_LEVEL() && !doomLevel.deathmatch ) || ent->doomDropped
 		|| ( ( ent->flags & FL_DROPPED_ITEM ) && ent->item->giType != IT_TEAM ) ) {
 		G_FreeEntity( ent );
 		return;

@@ -812,8 +812,15 @@ Blocked_Door
 ================
 */
 void Blocked_Door( gentity_t *ent, gentity_t *other ) {
-	// remove anything other than a client
-	if ( !other->client ) {
+	// Q3Doom: a Doom monster blocks it as a player does (hurt, the door goes
+	// back); its corpse is crushed to gibs, which the nightmare rule brings back
+	if ( other->doomMobj ) {
+		if ( other->health <= 0 ) {
+			Doom_CrushMobj( other );
+			return;
+		}
+	} else if ( !other->client ) {
+		// remove anything other than a client
 		// except CTF flags!!!!
 		if( other->s.eType == ET_ITEM && other->item->giType == IT_TEAM ) {
 			Team_DroppedFlagThink( other );

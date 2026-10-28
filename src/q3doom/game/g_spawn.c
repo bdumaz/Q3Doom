@@ -346,6 +346,11 @@ qboolean G_CallSpawn( gentity_t *ent ) {
 	// check item spawn functions
 	for ( item=bg_itemlist+1 ; item->classname ; item++ ) {
 		if ( !strcmp(item->classname, ent->classname) ) {
+			// Q3Doom: QuakeDoom Duel's pickup options, as Doom_SpawnItems' on a Doom level
+			if ( doomLevel.quakeDuel && ( ( !g_duelWeaponPickups.integer && ( item->giType == IT_WEAPON || item->giType == IT_AMMO ) )
+				|| ( !g_duelHealthPickups.integer && ( item->giType == IT_HEALTH || item->giType == IT_ARMOR ) ) ) ) {
+				return qfalse;
+			}
 			G_SpawnItem( ent, item );
 			return qtrue;
 		}

@@ -840,6 +840,25 @@ static void NightmareRespawn( gentity_t *ent ) {
 	G_FreeEntity( ent );
 }
 
+/*
+=================
+Doom_CrushMobj
+
+A Quake 3 door or plat closing on a corpse: crushed to gibs, which no
+mover pushes any more (still a corpse for the nightmare rule)
+=================
+*/
+void Doom_CrushMobj( gentity_t *ent ) {
+	doomMobj_t	*mo = ent->doomMobj;
+
+	SetMobjState( ent, S_GIBS );
+	mo->flags &= ~MF_SOLID;
+	mo->height = 0;
+	mo->radius = 0;
+	ent->physicsObject = qfalse;
+	LinkMobj( ent );
+}
+
 // P_MobjThinker
 static void MobjThinker( gentity_t *ent ) {
 	doomMobj_t	*mo = ent->doomMobj;
