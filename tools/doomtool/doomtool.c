@@ -7,7 +7,7 @@ doomtool - inspect and export Doom WAD contents with libdoom
   doomtool <wad> export <dir>         textures, flats, sprites, graphics as
                                       PNG, sounds as WAV, maps as SVG
   doomtool <wad> map <name> <out.svg> draw one map
-  doomtool <wad> build <name|all> [dir] build Quake 3 BSPs, print stats
+  doomtool <wad> build <name|all|all-frag> [dir] build Quake 3 BSPs (DoomFrag copies: DF_<name>, all-frag), print stats
   doomtool <wad> music <lump> <out.wav> [seconds]
                                       render MUS music with the OPL synthesizer
 
@@ -469,8 +469,15 @@ static int CmdBuild( const doom_wad_t *wad, const char *name, const char *outdir
 	char	maps[MAX_MAPS][DOOM_LUMP_NAME_LEN + 1];
 	int		i, n, failed = 0;
 
-	if ( !strcmp( name, "all" ) ) {
+	if ( !strcmp( name, "all" ) || !strcmp( name, "all-frag" ) ) {
 		n = doom_wad_list_maps( wad, maps, MAX_MAPS );
+		// every level's DoomFrag copy
+		for ( i = 0 ; name[3] && i < n && i < MAX_MAPS ; i++ ) {
+			char level[DOOM_LUMP_NAME_LEN + 1];
+
+			snprintf( level, sizeof( level ), "%s", maps[i] );
+			snprintf( maps[i], sizeof( maps[i] ), "%s%s", DOOM_FRAG_PREFIX, level );
+		}
 	} else {
 		snprintf( maps[0], sizeof( maps[0] ), "%s", name );
 		n = 1;
@@ -492,14 +499,14 @@ static int CmdBuild( const doom_wad_t *wad, const char *name, const char *outdir
 			failed++;
 			continue;
 		}
-		printf( "%-6s %7zu bytes  %5d nodes  %4d sector + %4d void + %3d sliver leafs  %5d brushes  %4d surfaces  %3d movers  coverage %.4f\n",
-			map.name, size, st.nodes, st.sector_leafs, st.void_leafs, st.degenerate_leafs, st.brushes,
+		printf( "%-8s %7zu bytes  %5d nodes  %4d sector + %4d void + %3d sliver leafs  %5d brushes  %4d surfaces  %3d movers  coverage %.4f\n",
+			maps[i], size, st.nodes, st.sector_leafs, st.void_leafs, st.degenerate_leafs, st.brushes,
 			st.surfaces, st.movers, st.covered_area / st.bounds_area );
 		if ( outdir ) {
 			char	path[1024];
 			FILE	*f;
 
-			FileName( path, sizeof( path ), outdir, map.name, "bsp" );
+			FileName( path, sizeof( path ), outdir, maps[i], "bsp" );
 			f = fopen( path, "wb" );
 			if ( f ) {
 				fwrite( data, 1, size, f );

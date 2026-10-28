@@ -86,7 +86,9 @@ static doomMapCache_t *Doom_CachedMap( const char *name ) {
 		doom_map_free( &c->map );
 		return NULL;
 	}
-	Q_strncpyz( c->name, c->map.name, sizeof( c->name ) );
+	// the name asked for: a DoomFrag copy (DF_E1M1) is its level (E1M1) inside
+	Q_strncpyz( c->name, name, sizeof( c->name ) );
+	Q_strupr( c->name );
 	c->lastUsed = ++mapCacheTime;
 	Com_Printf( "Built %s in %d msec: %d leafs, %d brushes, %d surfaces, %d bytes\n", c->name,
 		Sys_Milliseconds() - start, stats.sector_leafs + stats.void_leafs, stats.brushes, stats.surfaces, (int)c->bspSize );
