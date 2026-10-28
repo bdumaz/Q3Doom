@@ -1221,7 +1221,7 @@ HUD flickered.
 =================
 */
 void CG_DoomUpdateLevelShot( void ) {
-	char			name[MAX_QPATH], marker[MAX_QPATH];
+	char			map[MAX_QPATH], name[MAX_QPATH], marker[MAX_QPATH];
 	fileHandle_t	f;
 
 	if ( levelShotState == 1 ) {
@@ -1231,8 +1231,10 @@ void CG_DoomUpdateLevelShot( void ) {
 		|| cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR || cg.time < cgs.levelStartTime + 1500 ) {
 		return;
 	}
-	Com_sprintf( name, sizeof( name ), "levelshots/doom/%s.tga", cgDoom.map->name );
-	Com_sprintf( marker, sizeof( marker ), "levelshots/doom/%s.dat", cgDoom.map->name );
+	// the server's map name: a DoomFrag copy (DF_E1M1) must not take its level's picture
+	COM_StripExtension( COM_SkipPath( cgs.mapname ), map );
+	Com_sprintf( name, sizeof( name ), "levelshots/doom/%s.tga", map );
+	Com_sprintf( marker, sizeof( marker ), "levelshots/doom/%s.dat", map );
 	if ( trap_FS_FOpenFile( marker, &f, FS_READ ) >= 0 && f ) {
 		trap_FS_FCloseFile( f );
 		levelShotState = 2;
