@@ -577,11 +577,15 @@ static void Frag_BuildRows( void ) {
 
 	Frag_Options( options, sizeof( options ) );
 	for ( i = 0 ; i < NUM_LEVELS ; i++ ) {
-		int		best = doom_record_get( &s_frag.records, LevelMap( i ), options );
+		// DoomFrag plays the level's copy (DF_E1M1): its records
+		int		best = doom_record_get( &s_frag.records, va( "%s%s", DOOM_FRAG_PREFIX, LevelMap( i ) ), options );
 		int		par = doom_par_time( i / NUM_MAPS + 1, i % NUM_MAPS + 1 );
+		char	parText[16];
 
+		// va() keeps only two strings: the par goes in its own buffer
+		Com_sprintf( parText, sizeof( parText ), par ? "%d:%02d" : "-", par / 60, par % 60 );
 		Com_sprintf( s_frag.rows[i], sizeof( s_frag.rows[i] ), "%-5s %-21.21s %10s %6s", LevelMap( i ),
-			levelNames[i / NUM_MAPS][i % NUM_MAPS], best ? FragTime( best ) : "-", par ? va( "%d:%02d", par / 60, par % 60 ) : "-" );
+			levelNames[i / NUM_MAPS][i % NUM_MAPS], best ? FragTime( best ) : "-", parText );
 		s_frag.rowPtrs[i] = s_frag.rows[i];
 	}
 	s_frag.rowPtrs[NUM_LEVELS] = NULL;

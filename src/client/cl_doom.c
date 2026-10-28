@@ -236,13 +236,26 @@ static void CL_DoomCampaign_f( void ) {
 =================
 CL_DoomFrag_f
 
-doomfrag <map>: a DoomFrag run on any map, with the options in g_doomPhysics,
-g_doomWeapons, g_doomLoadout, g_doomSkill, g_doomMonsters and g_doomFinish
+doomfrag <level>: a DoomFrag run on the level's DoomFrag copy (DF_<level>,
+its low ceilings raised), with the options in g_doomPhysics, g_doomWeapons,
+g_doomLoadout, g_doomSkill, g_doomMonsters and g_doomFinish
 =================
 */
 static void CL_DoomFrag_f( void ) {
+	char	map[MAX_QPATH];
+
 	if ( Cmd_Argc() < 2 ) {
-		Com_Printf( "usage: doomfrag <map>\n" );
+		Com_Printf( "usage: doomfrag <level>\n" );
+		return;
+	}
+	Q_strncpyz( map, Cmd_Argv( 1 ), sizeof( map ) );
+	Q_strupr( map );
+	if ( Q_stricmpn( map, DOOM_FRAG_PREFIX, strlen( DOOM_FRAG_PREFIX ) ) ) {
+		Q_strncpyz( map, va( "%s%s", DOOM_FRAG_PREFIX, Cmd_Argv( 1 ) ), sizeof( map ) );
+		Q_strupr( map );
+	}
+	if ( !Doom_GetMap( map ) ) {
+		Com_Printf( "doomfrag: %s is not a Doom level\n", Cmd_Argv( 1 ) );
 		return;
 	}
 	Cvar_Set( "g_doomFrag", "1" );
@@ -251,7 +264,7 @@ static void CL_DoomFrag_f( void ) {
 	// single player: whatever a hosted match left (its game type, Doom Duel)
 	Cvar_Set( "g_gametype", "0" );
 	Cvar_Set( "g_doomDuel", "0" );
-	Cbuf_AddText( va( "map %s\n", Cmd_Argv( 1 ) ) );
+	Cbuf_AddText( va( "map %s\n", map ) );
 }
 
 /*
