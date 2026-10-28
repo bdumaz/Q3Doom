@@ -81,9 +81,10 @@ void Doom_InitFrag( void ) {
 			g_doomLoadout.integer != 0, g_doomMonsters.integer ? (int)Com_Clamp( 0, 4, g_doomSkill.integer ) : 5, g_doomFinish.integer != 0 );
 		LoadRecords( &records );
 		frag.best = doom_record_get( &records, frag.map, frag.options );
-		if ( frag.map[0] == 'E' && frag.map[2] == 'M' ) {
-			e = frag.map[1] - '0';
-			m = frag.map[3] - '0';
+		// the par of the level (a DoomFrag copy's records are its own, its par is the level's)
+		if ( Doom_LevelName()[0] == 'E' && Doom_LevelName()[2] == 'M' ) {
+			e = Doom_LevelName()[1] - '0';
+			m = Doom_LevelName()[3] - '0';
 			frag.par = doom_par_time( e, m ) * 1000;
 		}
 		G_Printf( "DoomFrag: %s, options %s, best %d msec\n", frag.map, frag.options, frag.best );

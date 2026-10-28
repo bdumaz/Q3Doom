@@ -1394,11 +1394,10 @@ tag 666 sectors move or the level ends
 =================
 */
 static void BossDeath( gentity_t *ent ) {
-	char		map[MAX_QPATH];
+	const char	*map = Doom_LevelName();
 	int			type = ent->doomMobj->type, i;
 	qboolean	e1m8, e2m8, e3m8, e4m6, e4m8;
 
-	trap_Cvar_VariableStringBuffer( "mapname", map, sizeof( map ) );
 	e1m8 = !Q_stricmp( map, "E1M8" ) && type == MT_BRUISER;
 	e2m8 = !Q_stricmp( map, "E2M8" ) && type == MT_CYBORG;
 	e3m8 = !Q_stricmp( map, "E3M8" ) && type == MT_SPIDER;

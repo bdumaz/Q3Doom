@@ -934,6 +934,25 @@ static void SetWeaponSet( void ) {
 
 /*
 =================
+Doom_LevelName
+
+The level's own name, upper case ("E1M4", on its DoomFrag copy DF_E1M4
+too), for what Doom ties to a level; "" on a Quake 3 map
+=================
+*/
+const char *Doom_LevelName( void ) {
+	static char	name[DOOM_LUMP_NAME_LEN + 1];
+
+	if ( !doomLevel.map ) {
+		return "";
+	}
+	Q_strncpyz( name, doomLevel.map->name, sizeof( name ) );
+	Q_strupr( name );
+	return name;
+}
+
+/*
+=================
 Doom_InitLevel
 
 Before the entities spawn: they need the sector state
@@ -1032,8 +1051,7 @@ const char *Doom_LevelMusic( void ) {
 	static const char	*e4[9] = { "E3M4", "E3M2", "E3M3", "E1M5", "E2M7", "E2M4", "E2M6", "E2M5", "E1M9" };
 	char				map[MAX_QPATH];
 
-	trap_Cvar_VariableStringBuffer( "mapname", map, sizeof( map ) );
-	Q_strupr( map );
+	Q_strncpyz( map, Doom_LevelName(), sizeof( map ) );
 	if ( strlen( map ) == 4 && map[0] == 'E' && map[2] == 'M' && map[3] >= '1' && map[3] <= '9' ) {
 		if ( map[1] == '4' ) {
 			return va( "doom/music/D_%s", e4[map[3] - '1'] );

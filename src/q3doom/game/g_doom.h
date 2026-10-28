@@ -123,6 +123,7 @@ extern doomLevel_t	doomLevel;
 void		Doom_InitLevel( void );		// before the entities spawn
 void		Doom_StartLevel( void );	// after
 const char	*Doom_LevelMusic( void );
+const char	*Doom_LevelName( void );	// the level's own name: E1M1 on its DoomFrag copy DF_E1M1
 void		Doom_ShutdownLevel( void );
 void		Doom_StatusCommand( void );
 void		Doom_RunFrame( void );
