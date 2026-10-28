@@ -701,3 +701,38 @@ int doom_switch_texture( const doom_wad_t *wad, const char *name, char out[DOOM_
 	out[2] = name[2] == '1' ? '2' : '1';
 	return doom_find_texture( wad, out ) >= 0;
 }
+
+/*
+=================
+doom_map_raise_ceilings
+
+For DoomFrag: a sector's base is its highest floor position (the top of a
+lift) with room for a player under the ceiling, else its floor at rest
+(a floor rising to its ceiling); no room at either (a closed door): left
+alone. A ceiling under base + clearance goes up to exactly that.
+=================
+*/
+int doom_map_raise_ceilings( const doom_wad_t *wad, doom_map_t *map, int clearance ) {
+	doom_plane_range_t	*ranges = calloc( map->num_sectors ? map->num_sectors : 1, sizeof( *ranges ) );
+	int					i, count = 0;
+
+	doom_sector_ranges( wad, map, ranges );
+	for ( i = 0 ; i < map->num_sectors ; i++ ) {
+		doom_sector_t	*s = &map->sectors[i];
+		int				top = ranges[i].floor_max > s->floor_height ? ranges[i].floor_max : s->floor_height, base;
+
+		if ( s->ceiling_height - top >= DOOM_PLAYER_HEIGHT ) {
+			base = top;
+		} else if ( s->ceiling_height - s->floor_height >= DOOM_PLAYER_HEIGHT ) {
+			base = s->floor_height;
+		} else {
+			continue;
+		}
+		if ( s->ceiling_height < base + clearance ) {
+			s->ceiling_height = base + clearance;
+			count++;
+		}
+	}
+	free( ranges );
+	return count;
+}

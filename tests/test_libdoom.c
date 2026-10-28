@@ -146,6 +146,81 @@ static void TestMaps( const doom_wad_t *wad ) {
 
 /*
 =================
+TestFragCeilings
+
+DoomFrag copies (DF_<level>): ceilings raised to 106 above the highest
+floor with room to stand under them, where they are lower; sectors no one
+can stand in (closed doors) left alone; nothing else changed.
+=================
+*/
+static int FragBase( const doom_sector_t *s, const doom_plane_range_t *r ) {
+	if ( s->ceiling_height - r->floor_max >= 56 ) {
+		return r->floor_max > s->floor_height ? r->floor_max : s->floor_height;
+	}
+	return s->ceiling_height - s->floor_height >= 56 ? s->floor_height : -100000;
+}
+
+static void TestFragCeilings( const doom_wad_t *wad ) {
+	char		names[64][DOOM_LUMP_NAME_LEN + 1], err[256];
+	doom_map_t	orig, frag;
+	int			i, j, n;
+
+	CHECK( !doom_map_load( wad, "E1M4", &orig, err, sizeof( err ) ), "E1M4: %s", err );
+	CHECK( !doom_map_load( wad, "DF_E1M4", &frag, err, sizeof( err ) ), "DF_E1M4: %s", err );
+	if ( frag.num_sectors == orig.num_sectors && frag.num_sectors > 108 ) {
+		CHECK( !strcmp( frag.name, "E1M4" ), "the copy is named %s", frag.name );
+		// corridor 82 (floor 128, ceiling 216) raised to 128 + 106
+		CHECK( frag.sectors[82].ceiling_height == 234, "sector 82 ceiling %d", frag.sectors[82].ceiling_height );
+		// the EXIT sign's gap 56 (192..248): exactly 56 high, raised
+		CHECK( frag.sectors[56].ceiling_height == 298, "sector 56 ceiling %d", frag.sectors[56].ceiling_height );
+		// the exit door 58 (192, closed at 192): untouched
+		CHECK( frag.sectors[58].ceiling_height == 192, "door 58 ceiling %d", frag.sectors[58].ceiling_height );
+		// lift 88 (top at 128, ceiling 200): raised from the top of its range
+		CHECK( frag.sectors[88].ceiling_height == 234, "lift 88 ceiling %d", frag.sectors[88].ceiling_height );
+		// tall room 6 (136..328): untouched
+		CHECK( frag.sectors[6].ceiling_height == 328, "sector 6 ceiling %d", frag.sectors[6].ceiling_height );
+	} else {
+		CHECK( 0, "DF_E1M4 has %d sectors, E1M4 %d", frag.num_sectors, orig.num_sectors );
+	}
+	doom_map_free( &orig );
+	doom_map_free( &frag );
+
+	CHECK( doom_map_load( wad, "DF_E9M9", &frag, err, sizeof( err ) ), "DF_E9M9 should not load" );
+	CHECK( doom_map_load( wad, "DF_", &frag, err, sizeof( err ) ), "DF_ should not load" );
+
+	// the rule on every sector of every level
+	n = doom_wad_list_maps( wad, names, 64 );
+	for ( i = 0 ; i < n && i < 64 ; i++ ) {
+		doom_plane_range_t	*ranges;
+		char				name[DOOM_LUMP_NAME_LEN + 4];
+
+		snprintf( name, sizeof( name ), "DF_%s", names[i] );
+		if ( doom_map_load( wad, names[i], &orig, err, sizeof( err ) ) ) {
+			continue;
+		}
+		if ( doom_map_load( wad, name, &frag, err, sizeof( err ) ) ) {
+			CHECK( 0, "%s: %s", name, err );
+			doom_map_free( &orig );
+			continue;
+		}
+		ranges = calloc( orig.num_sectors, sizeof( *ranges ) );
+		doom_sector_ranges( wad, &orig, ranges );
+		for ( j = 0 ; j < orig.num_sectors ; j++ ) {
+			const doom_sector_t	*o = &orig.sectors[j], *f = &frag.sectors[j];
+			int					base = FragBase( o, &ranges[j] );
+			int					want = base > -100000 && o->ceiling_height < base + 106 ? base + 106 : o->ceiling_height;
+
+			CHECK( f->floor_height == o->floor_height, "%s sector %d: floor %d -> %d", name, j, o->floor_height, f->floor_height );
+			CHECK( f->ceiling_height == want, "%s sector %d: ceiling %d -> %d, want %d", name, j, o->ceiling_height, f->ceiling_height, want );
+		}
+		free( ranges );
+		doom_map_free( &orig );
+		doom_map_free( &frag );
+	}
+}
+
+/*
+=================
 TestBuilder
 
 Every map builds, its BSP cells tile the bounds exactly (nothing is left
@@ -249,6 +324,7 @@ int main( int argc, char **argv ) {
 	TestNamespace( wad, DOOM_NS_SPRITES, "sprite", doom_load_sprite );
 	TestSounds( wad );
 	TestMaps( wad );
+	TestFragCeilings( wad );
 	TestBuilder( wad );
 	TestRobustness( wad );
 

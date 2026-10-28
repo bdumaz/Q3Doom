@@ -345,6 +345,17 @@ typedef struct {
 
 void	doom_sector_ranges( const doom_wad_t *wad, const doom_map_t *map, doom_plane_range_t *ranges );
 
+// DoomFrag copies: doom_map_load( wad, "DF_E1M1", ... ) loads E1M1 (keeping
+// that name) with every ceiling a player can stand under raised to at least
+// DOOM_FRAG_CLEARANCE above the highest floor that leaves standing room: a
+// VQ3 standing jump (46) of a Doom player (56), plus Doom's 4 under the
+// ceiling for the doors around. Returns the number of sectors raised.
+#define DOOM_FRAG_PREFIX		"DF_"
+#define DOOM_FRAG_CLEARANCE		106
+#define DOOM_PLAYER_HEIGHT		56
+
+int		doom_map_raise_ceilings( const doom_wad_t *wad, doom_map_t *map, int clearance );
+
 // Animated textures and flats: the cycle as seen from 'name' (0 if not animated).
 // Doom advances them every 8 tics.
 #define DOOM_ANIM_TICS		8

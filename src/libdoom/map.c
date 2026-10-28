@@ -84,7 +84,30 @@ static int SideIndex( uint16_t raw ) {
 	return raw == 0xFFFF ? DOOM_NO_SIDE : raw;
 }
 
+static int LoadLevel( const doom_wad_t *wad, const char *name, doom_map_t *out, char *err, size_t errlen );
+
+// "DF_<level>": the level as DoomFrag plays it, its low ceilings raised
 int doom_map_load( const doom_wad_t *wad, const char *name, doom_map_t *out, char *err, size_t errlen ) {
+	size_t	len = strlen( DOOM_FRAG_PREFIX ), i;
+
+	for ( i = 0 ; i < len && name[i] && toupper( (unsigned char)name[i] ) == DOOM_FRAG_PREFIX[i] ; i++ ) {
+	}
+	if ( i < len ) {
+		return LoadLevel( wad, name, out, err, errlen );
+	}
+	if ( !name[len] ) {
+		memset( out, 0, sizeof( *out ) );
+		doom_set_error( err, errlen, "map %s names no level", name );
+		return -1;
+	}
+	if ( LoadLevel( wad, name + len, out, err, errlen ) ) {
+		return -1;
+	}
+	doom_map_raise_ceilings( wad, out, DOOM_FRAG_CLEARANCE );
+	return 0;
+}
+
+static int LoadLevel( const doom_wad_t *wad, const char *name, doom_map_t *out, char *err, size_t errlen ) {
 	int				marker = -1, i, n;
 	const uint8_t	*d;
 
@@ -204,7 +227,6 @@ impassable, or leads to a sector too low to step up from (more than a Doom
 step) or through an opening too low for a player
 =================
 */
-#define DOOM_PLAYER_HEIGHT	56
 
 static int SectorIsEnclosed( const doom_map_t *map, int sector ) {
 	const doom_sector_t	*sec = &map->sectors[sector];
